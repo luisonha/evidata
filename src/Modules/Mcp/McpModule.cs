@@ -1,0 +1,28 @@
+using Evidata.Modules.Mcp.Application.Abstractions;
+using Evidata.Modules.Mcp.Infrastructure.Interactions;
+using Evidata.Modules.Mcp.Infrastructure.Persistence;
+using Evidata.Modules.Mcp.Infrastructure.Persistence.Factories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Evidata.Modules.Mcp;
+
+public static class McpModule
+{
+    public static IServiceCollection AddMcpModule(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("evidata-db")
+            ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
+
+        services.AddDbContext<McpDbContext>(options =>
+            options.UseNpgsql(connectionString,
+                b => b.MigrationsAssembly(typeof(McpDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<IMcpInteractionService, McpInteractionService>();
+
+        return services;
+    }
+}
