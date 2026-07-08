@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Evidata_Functions_SearchIndexing": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7209",
+      "launchBrowser": false
+    }
+  }
+}

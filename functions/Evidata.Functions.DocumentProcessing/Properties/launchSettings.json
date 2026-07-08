@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Evidata_Functions_DocumentProcessing": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7124",
+      "launchBrowser": false
+    }
+  }
+}
