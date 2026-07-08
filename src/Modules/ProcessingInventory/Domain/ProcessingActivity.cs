@@ -161,26 +161,47 @@ public class ProcessingActivity
 
     // ── FSM ────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Envía el tratamiento a revisión.
+    /// Valida completitud mínima (sec 8.1) antes de transicionar.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Si el estado no es Draft o la validación falla.</exception>
     public void SubmitForReview(Guid modifiedBy)
     {
         if (Status != ProcessingActivityStatus.Draft)
             throw new InvalidOperationException(
                 $"Solo se puede enviar a revisión desde Draft. Estado actual: {Status}.");
 
+        var validation = ProcessingActivityValidator.ValidateForReview(this);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no cumple los requisitos mínimos para revisión: {string.Join("; ", validation.Errors)}");
+
         Status = ProcessingActivityStatus.UnderReview;
-        LastModifiedBy = modifiedBy;
-        LastModifiedAt = DateTimeOffset.UtcNow;
+        Touch(modifiedBy);
     }
 
-    public void Approve(Guid approvedBy)
+    /// <summary>
+    /// Aprueba el tratamiento.
+    /// Valida completitud para aprobación (sec 8.2) antes de transicionar.
+    /// </summary>
+    /// <param name="approvedBy">Usuario que aprueba.</param>
+    /// <param name="retentionRequired">Si true, la retención es obligatoria para aprobar.</param>
+    public void Approve(Guid approvedBy, bool retentionRequired = false)
     {
         if (Status != ProcessingActivityStatus.UnderReview)
             throw new InvalidOperationException(
                 $"Solo se puede aprobar desde UnderReview. Estado actual: {Status}.");
 
+        var validation = ProcessingActivityValidator.ValidateForApproval(this, retentionRequired);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no cumple los requisitos para aprobación: {string.Join("; ", validation.Errors)}");
+
         Status = ProcessingActivityStatus.Approved;
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
+        Touch(approvedBy);
     }
 
     public void ReturnToDraft(Guid modifiedBy)
@@ -190,8 +211,7 @@ public class ProcessingActivity
                 $"Solo se puede devolver a Draft desde UnderReview. Estado actual: {Status}.");
 
         Status = ProcessingActivityStatus.Draft;
-        LastModifiedBy = modifiedBy;
-        LastModifiedAt = DateTimeOffset.UtcNow;
+        Touch(modifiedBy);
     }
 
     public void Archive(Guid modifiedBy)

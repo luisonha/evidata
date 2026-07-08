@@ -38,7 +38,11 @@ public class RatSectionsTests
     [Fact]
     public void SetPurpose_OnApproved_Throws()
     {
-        var act = BuildDraft();
+        // Construir activity completa para poder aprobar
+        var act = ProcessingActivity.Create(Guid.NewGuid(), "Tratamiento Aprobado", Guid.NewGuid());
+        act.SetPurpose(PurposeSection.Create("fin base", LegalBasis.LegalObligation, "justificación"), Guid.NewGuid());
+        act.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], Guid.NewGuid());
+        act.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], Guid.NewGuid());
         act.SubmitForReview(Guid.NewGuid());
         act.Approve(Guid.NewGuid());
         var purpose = PurposeSection.Create("fin", LegalBasis.LegalObligation, "just");

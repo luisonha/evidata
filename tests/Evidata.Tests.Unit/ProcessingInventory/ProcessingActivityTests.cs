@@ -8,6 +8,22 @@ public class ProcessingActivityTests
         ProcessingActivity.Create(Guid.NewGuid(), name, Guid.NewGuid(),
             description: "Gestión de nómina", controller: "RRHH", department: "Recursos Humanos");
 
+    /// <summary>Prepara un activity con secciones mínimas para pasar validación de revisión.</summary>
+    private static ProcessingActivity BuildReady(string name = "Tratamiento listo para revisión")
+    {
+        var act = ProcessingActivity.Create(Guid.NewGuid(), name, Guid.NewGuid());
+        act.SetPurpose(
+            PurposeSection.Create("Gestión de nómina", LegalBasis.ContractExecution, "Contrato laboral"),
+            Guid.NewGuid());
+        act.SetDataCategories(
+            [DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)],
+            Guid.NewGuid());
+        act.SetDataSubjects(
+            [DataSubjectEntry.Create(DataSubjectType.Employees)],
+            Guid.NewGuid());
+        return act;
+    }
+
     // ── TC1: Create OK → Draft v1 ─────────────────────────────────────────────
     [Fact]
     public void Create_Valid_ReturnsDraftV1()
@@ -60,11 +76,10 @@ public class ProcessingActivityTests
     [Fact]
     public void FSM_DraftToApproved_OK()
     {
-        var act = Build();
-        var reviewer = Guid.NewGuid();
+        var act = BuildReady();
         var approver = Guid.NewGuid();
 
-        act.SubmitForReview(reviewer);
+        act.SubmitForReview(Guid.NewGuid());
         Assert.Equal(ProcessingActivityStatus.UnderReview, act.Status);
 
         act.Approve(approver);
@@ -77,7 +92,7 @@ public class ProcessingActivityTests
     [Fact]
     public void Update_Approved_Throws()
     {
-        var act = Build();
+        var act = BuildReady();
         act.SubmitForReview(Guid.NewGuid());
         act.Approve(Guid.NewGuid());
 
@@ -89,7 +104,7 @@ public class ProcessingActivityTests
     [Fact]
     public void ReturnToDraft_FromUnderReview_OK()
     {
-        var act = Build();
+        var act = BuildReady();
         act.SubmitForReview(Guid.NewGuid());
         act.ReturnToDraft(Guid.NewGuid());
 
@@ -129,7 +144,7 @@ public class ProcessingActivityTests
     [Fact]
     public void SubmitForReview_FromUnderReview_Throws()
     {
-        var act = Build();
+        var act = BuildReady();
         act.SubmitForReview(Guid.NewGuid());
         Assert.Throws<InvalidOperationException>(() => act.SubmitForReview(Guid.NewGuid()));
     }
