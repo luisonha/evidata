@@ -1,18 +1,22 @@
 using Evidata.Api.Infrastructure.HealthChecks;
+using Evidata.Modules.TenantManagement;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddEvidataHealthChecks(builder.Configuration);
+builder.Services.AddTenantManagement(builder.Configuration);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapEvidataHealthEndpoints();
+app.MapControllers();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
