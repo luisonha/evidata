@@ -8,3 +8,22 @@
 .squad/.cache/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.swp
+*.sln.DotSettings.user
+[Pp]ublish/
+[Rr]elease/
+[Dd]ebug/
+TestResults/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
