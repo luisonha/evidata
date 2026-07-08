@@ -78,6 +78,21 @@ public class ProcessingActivity
     public IReadOnlyList<DataSubjectEntry> DataSubjects => _dataSubjects.AsReadOnly();
     private readonly List<DataSubjectEntry> _dataSubjects = [];
 
+    /// <summary>Sistemas internos/externos involucrados.</summary>
+    public IReadOnlyList<SystemEntry> Systems => _systems.AsReadOnly();
+    private readonly List<SystemEntry> _systems = [];
+
+    /// <summary>Proveedores / encargados de tratamiento.</summary>
+    public IReadOnlyList<SupplierEntry> Suppliers => _suppliers.AsReadOnly();
+    private readonly List<SupplierEntry> _suppliers = [];
+
+    /// <summary>Política de retención (recomendada; puede bloquear aprobación según config).</summary>
+    public RetentionSection? Retention { get; private set; }
+
+    /// <summary>Medidas de seguridad declaradas (obligatorias si hay SpecialCategory).</summary>
+    public IReadOnlyList<SecurityMeasureEntry> SecurityMeasures => _securityMeasures.AsReadOnly();
+    private readonly List<SecurityMeasureEntry> _securityMeasures = [];
+
     // ── Factory ────────────────────────────────────────────────────────────────
 
     public static ProcessingActivity Create(
@@ -212,6 +227,46 @@ public class ProcessingActivity
 
         _dataSubjects.Clear();
         _dataSubjects.AddRange(list);
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Sistemas ──────────────────────────────────────────────────────
+
+    public void SetSystems(IEnumerable<SystemEntry> entries, Guid modifiedBy)
+    {
+        GuardEditableState();
+        _systems.Clear();
+        _systems.AddRange(entries ?? []);
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Proveedores ───────────────────────────────────────────────────
+
+    public void SetSuppliers(IEnumerable<SupplierEntry> entries, Guid modifiedBy)
+    {
+        GuardEditableState();
+        _suppliers.Clear();
+        _suppliers.AddRange(entries ?? []);
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Retención ─────────────────────────────────────────────────────
+
+    public void SetRetention(RetentionSection retention, Guid modifiedBy)
+    {
+        GuardEditableState();
+        ArgumentNullException.ThrowIfNull(retention);
+        Retention = retention;
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Medidas de seguridad ──────────────────────────────────────────
+
+    public void SetSecurityMeasures(IEnumerable<SecurityMeasureEntry> entries, Guid modifiedBy)
+    {
+        GuardEditableState();
+        _securityMeasures.Clear();
+        _securityMeasures.AddRange(entries ?? []);
         Touch(modifiedBy);
     }
 

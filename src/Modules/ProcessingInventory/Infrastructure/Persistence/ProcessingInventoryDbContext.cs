@@ -70,6 +70,44 @@ public class ProcessingInventoryDbContext : DbContext
 
             e.Ignore(a => a.DataSubjects);
 
+            // ── Systems (JSONB) ───────────────────────────────────────────────
+            e.Property<List<SystemEntry>>("_systems")
+                .HasColumnName("systems")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<SystemEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+            e.Ignore(a => a.Systems);
+
+            // ── Suppliers (JSONB) ─────────────────────────────────────────────
+            e.Property<List<SupplierEntry>>("_suppliers")
+                .HasColumnName("suppliers")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<SupplierEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+            e.Ignore(a => a.Suppliers);
+
+            // ── RetentionSection (owned type) ─────────────────────────────────
+            e.OwnsOne(a => a.Retention, r =>
+            {
+                r.Property(s => s.PeriodDescription).HasColumnName("retention_period_description");
+                r.Property(s => s.RetentionMonths).HasColumnName("retention_months");
+                r.Property(s => s.LegalJustification).HasColumnName("retention_legal_justification");
+            });
+
+            // ── SecurityMeasures (JSONB) ──────────────────────────────────────
+            e.Property<List<SecurityMeasureEntry>>("_securityMeasures")
+                .HasColumnName("security_measures")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<SecurityMeasureEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+            e.Ignore(a => a.SecurityMeasures);
+
             // ── Índices ───────────────────────────────────────────────────────
             e.HasIndex(a => new { a.TenantId, a.Name })
                 .IsUnique()
