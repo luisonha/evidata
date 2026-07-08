@@ -1,6 +1,7 @@
 using Evidata.Worker.Outbox;
 using Evidata.Worker.Outbox.Messaging;
 using Evidata.Worker.Outbox.Persistence;
+using Evidata.Worker.Outbox.Poison;
 using Evidata.Worker.Outbox.Storage;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,6 +34,7 @@ else
 
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<OutboxPublisherWorker>();
+builder.Services.AddHostedService<DeadLetterMonitorWorker>();
 
 var host = builder.Build();
 host.Run();
