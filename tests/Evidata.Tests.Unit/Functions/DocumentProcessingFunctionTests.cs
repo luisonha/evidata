@@ -30,14 +30,18 @@ public class DocumentProcessingFunctionTests
     [Fact]
     public void DocumentUploadedPayload_Deserializes_Correctly()
     {
-        var json = """
+        var docId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var json = $$"""
             {
-                "documentId": "doc-1",
-                "tenantId": "tenant-1",
+                "documentId": "{{docId}}",
+                "tenantId": "{{tenantId}}",
                 "blobPath": "evidata/doc-1.pdf",
                 "fileName": "contrato.pdf",
                 "contentType": "application/pdf",
-                "uploadedBy": "user-1"
+                "uploadedBy": "{{userId}}"
             }
             """;
 
@@ -45,7 +49,7 @@ public class DocumentProcessingFunctionTests
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         Assert.NotNull(payload);
-        Assert.Equal("doc-1", payload.DocumentId);
+        Assert.Equal(docId, payload.DocumentId);
         Assert.Equal("application/pdf", payload.ContentType);
     }
 
