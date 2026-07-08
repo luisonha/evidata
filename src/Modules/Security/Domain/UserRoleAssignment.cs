@@ -1,7 +1,9 @@
+using Evidata.Modules.Identity.Application.Abstractions;
+
 namespace Evidata.Modules.Security.Domain;
 
 /// <summary>Asignación de un Role a un UserProfile dentro de un Tenant.</summary>
-public class UserRoleAssignment
+public class UserRoleAssignment : ITenantScoped
 {
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }

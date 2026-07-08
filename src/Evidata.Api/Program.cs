@@ -1,5 +1,6 @@
 using Evidata.Api.Infrastructure.HealthChecks;
 using Evidata.Modules.Identity;
+using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.Security;
 using Evidata.Modules.TenantManagement;
 
@@ -20,6 +21,7 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapEvidataHealthEndpoints();
+app.UseTenantIsolation();
 app.MapControllers();
 
 // Configure the HTTP request pipeline.

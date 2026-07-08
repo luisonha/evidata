@@ -1,6 +1,8 @@
+using Evidata.Modules.Identity.Application.Abstractions;
+
 namespace Evidata.Modules.Identity.Domain;
 
-public class UserProfile
+public class UserProfile : ITenantScoped
 {
     public Guid Id { get; private set; }
     public string ExternalId { get; private set; } = default!;
