@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Modules\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
     <ProjectReference Include="..\Modules\Evidence\Evidata.Modules.Evidence.csproj" />
     <ProjectReference Include="..\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
+    <ProjectReference Include="..\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
   </ItemGroup>
 
 </Project>
