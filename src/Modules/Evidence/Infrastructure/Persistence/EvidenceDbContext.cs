@@ -10,6 +10,7 @@ public class EvidenceDbContext : DbContext
     public DbSet<Domain.Evidence> Evidences => Set<Domain.Evidence>();
     public DbSet<EvidenceAccessLog> EvidenceAccessLogs => Set<EvidenceAccessLog>();
     public DbSet<EvidenceLink> EvidenceLinks => Set<EvidenceLink>();
+    public DbSet<EvidencePackJob> EvidencePackJobs => Set<EvidencePackJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +111,35 @@ public class EvidenceDbContext : DbContext
             e.HasIndex(l => new { l.EvidenceId, l.LinkedEntityType, l.LinkedEntityId, l.DeletedAt })
                 .HasDatabaseName("ix_evidence_links_dedup")
                 .HasFilter("deleted_at IS NULL");
+        });
+
+        // ── EvidencePackJob ───────────────────────────────────────────────────
+        modelBuilder.Entity<EvidencePackJob>(e =>
+        {
+            e.ToTable("evidence_pack_jobs");
+            e.HasKey(j => j.Id);
+
+            e.Property(j => j.Id).HasColumnName("id");
+            e.Property(j => j.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(j => j.RequestedBy).HasColumnName("requested_by").IsRequired();
+            e.Property(j => j.RequestedAt).HasColumnName("requested_at").IsRequired();
+            e.Property(j => j.Status).HasColumnName("status")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(j => j.ResultBlobPath).HasColumnName("result_blob_path").HasMaxLength(1000);
+            e.Property(j => j.ErrorMessage).HasColumnName("error_message").HasMaxLength(4000);
+            e.Property(j => j.StartedAt).HasColumnName("started_at");
+            e.Property(j => j.CompletedAt).HasColumnName("completed_at");
+            e.Property(j => j.ExpiresAt).HasColumnName("expires_at");
+
+            // EvidenceIds stored as JSON array
+            e.Property<List<Guid>>("_evidenceIds")
+                .HasColumnName("evidence_ids")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            e.HasIndex(j => j.TenantId).HasDatabaseName("ix_evidence_pack_jobs_tenant");
+            e.HasIndex(j => new { j.TenantId, j.Status }).HasDatabaseName("ix_evidence_pack_jobs_tenant_status");
+            e.HasIndex(j => j.ExpiresAt).HasDatabaseName("ix_evidence_pack_jobs_expires");
         });
     }
 }
