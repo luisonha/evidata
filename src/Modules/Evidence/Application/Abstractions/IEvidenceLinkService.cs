@@ -62,4 +62,15 @@ public interface IEvidenceLinkService
         Guid tenantId,
         Guid evidenceId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Retorna todos los vínculos activos de una entidad específica (consulta inversa).
+    /// Útil para obtener todas las evidencias vinculadas a un tratamiento RAT,
+    /// un control de seguridad, etc.
+    /// </summary>
+    Task<IReadOnlyList<EvidenceLinkDto>> GetLinksByEntityAsync(
+        Guid tenantId,
+        LinkedEntityType entityType,
+        Guid entityId,
+        CancellationToken ct = default);
 }

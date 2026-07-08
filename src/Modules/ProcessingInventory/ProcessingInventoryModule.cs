@@ -1,3 +1,5 @@
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
+using Evidata.Modules.ProcessingInventory.Infrastructure.Evidences;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +20,8 @@ public static class ProcessingInventoryModule
         services.AddDbContext<ProcessingInventoryDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<IRatEvidenceService, RatEvidenceService>();
 
         return services;
     }
