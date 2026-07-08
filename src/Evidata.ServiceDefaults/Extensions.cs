@@ -95,8 +95,9 @@ public static class Extensions
 
     public static IHostApplicationBuilder AddDefaultHealthChecks(this IHostApplicationBuilder builder)
     {
+        // Self liveness check — infra checks are registered per-service via AddEvidataHealthChecks
         builder.Services.AddHealthChecks()
-            .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+            .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"]);
         return builder;
     }
 
