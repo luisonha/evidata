@@ -1,21 +1,27 @@
 using Azure.Storage.Queues;
+using Evidata.Worker.Outbox.Messaging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Evidata.Worker.Outbox.Storage;
 
-public class AzureStorageQueuePublisher : Evidata.Worker.Outbox.Messaging.IMessagePublisher
+public class AzureStorageQueuePublisher : IMessagePublisher
 {
     private readonly QueueServiceClient _queueServiceClient;
-    private readonly Evidata.Worker.Outbox.Messaging.IDestinationResolver _destinationResolver;
+    private readonly IDestinationResolver _destinationResolver;
     private readonly ILogger<AzureStorageQueuePublisher> _logger;
 
     public AzureStorageQueuePublisher(
-        QueueServiceClient queueServiceClient,
-        Evidata.Worker.Outbox.Messaging.IDestinationResolver destinationResolver,
+        IConfiguration configuration,
+        IDestinationResolver destinationResolver,
         ILogger<AzureStorageQueuePublisher> logger)
     {
-        _queueServiceClient = queueServiceClient;
+        var connStr = configuration.GetConnectionString("blob")
+            ?? configuration.GetConnectionString("azurite")
+            ?? throw new InvalidOperationException("Storage connection string not found.");
+
+        _queueServiceClient = new QueueServiceClient(connStr);
         _destinationResolver = destinationResolver;
         _logger = logger;
     }
