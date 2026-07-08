@@ -6,6 +6,7 @@ namespace Evidata.Modules.Workflow.Infrastructure.Persistence;
 public sealed class WorkflowDbContext : DbContext
 {
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
 
     public WorkflowDbContext(DbContextOptions<WorkflowDbContext> options) : base(options) { }
 
@@ -34,6 +35,34 @@ public sealed class WorkflowDbContext : DbContext
 
             e.HasIndex(r => new { r.TenantId, r.Status }).HasDatabaseName("ix_reviews_tenant_status");
             e.HasIndex(r => new { r.TenantId, r.TargetEntityId }).HasDatabaseName("ix_reviews_tenant_entity");
+        });
+
+        modelBuilder.Entity<WorkflowTask>(e =>
+        {
+            e.ToTable("workflow_tasks");
+            e.HasKey(t => t.Id);
+
+            e.Property(t => t.Id).HasColumnName("id");
+            e.Property(t => t.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(t => t.TargetModule).HasColumnName("target_module").HasMaxLength(100).IsRequired();
+            e.Property(t => t.TargetEntityType).HasColumnName("target_entity_type").HasMaxLength(100).IsRequired();
+            e.Property(t => t.TargetEntityId).HasColumnName("target_entity_id").IsRequired();
+            e.Property(t => t.TaskType).HasColumnName("task_type")
+                .HasConversion<string>().HasMaxLength(30).IsRequired();
+            e.Property(t => t.Status).HasColumnName("status")
+                .HasConversion<string>().HasMaxLength(30).IsRequired();
+            e.Property(t => t.Title).HasColumnName("title").HasMaxLength(300).IsRequired();
+            e.Property(t => t.Description).HasColumnName("description").HasMaxLength(2000);
+            e.Property(t => t.AssignedTo).HasColumnName("assigned_to").IsRequired();
+            e.Property(t => t.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(t => t.DueAt).HasColumnName("due_at");
+            e.Property(t => t.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(t => t.StartedAt).HasColumnName("started_at");
+            e.Property(t => t.CompletedAt).HasColumnName("completed_at");
+
+            e.HasIndex(t => new { t.TenantId, t.Status }).HasDatabaseName("ix_workflow_tasks_tenant_status");
+            e.HasIndex(t => new { t.TenantId, t.AssignedTo }).HasDatabaseName("ix_workflow_tasks_tenant_assignee");
+            e.HasIndex(t => new { t.TenantId, t.TargetEntityId }).HasDatabaseName("ix_workflow_tasks_tenant_entity");
         });
     }
 }

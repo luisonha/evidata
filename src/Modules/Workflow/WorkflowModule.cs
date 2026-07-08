@@ -2,6 +2,7 @@ using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Infrastructure.Persistence;
 using Evidata.Modules.Workflow.Infrastructure.Persistence.Factories;
 using Evidata.Modules.Workflow.Infrastructure.Reviews;
+using Evidata.Modules.Workflow.Infrastructure.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public static class WorkflowModule
                 b => b.MigrationsAssembly(typeof(WorkflowDbContextFactory).Assembly.FullName)));
 
         services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
 
         return services;
     }
