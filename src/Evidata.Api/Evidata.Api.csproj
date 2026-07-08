@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
     <ProjectReference Include="..\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
     <ProjectReference Include="..\Modules\Workflow\Evidata.Modules.Workflow.csproj" />
+    <ProjectReference Include="..\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
   </ItemGroup>
 
 </Project>
