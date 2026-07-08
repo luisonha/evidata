@@ -1,6 +1,7 @@
 using Evidata.Api.Infrastructure.HealthChecks;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Identity;
+using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.Security;
 using Evidata.Modules.TenantManagement;
@@ -10,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddEvidataHealthChecks(builder.Configuration);
 builder.Services.AddTenantManagement(builder.Configuration);
-builder.Services.AddIdentityBridge(builder.Configuration);
+builder.Services.AddIdentityBridge(builder.Configuration, builder.Environment);
 builder.Services.AddRbac(builder.Configuration);
 builder.Services.AddAudit(builder.Configuration);
 
@@ -23,6 +24,7 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapEvidataHealthEndpoints();
+app.UseLocalDevGuard();
 app.UseTenantIsolation();
 app.MapControllers();
 
