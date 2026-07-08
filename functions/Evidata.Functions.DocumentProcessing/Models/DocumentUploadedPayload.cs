@@ -4,10 +4,11 @@ namespace Evidata.Functions.DocumentProcessing.Models;
 
 /// <summary>Payload del mensaje DocumentUploaded.</summary>
 public record DocumentUploadedPayload(
-    [property: JsonPropertyName("documentId")] string DocumentId,
-    [property: JsonPropertyName("tenantId")] string TenantId,
-    [property: JsonPropertyName("blobPath")] string BlobPath,
+    [property: JsonPropertyName("documentId")] Guid DocumentId,
+    [property: JsonPropertyName("tenantId")] Guid TenantId,
+    [property: JsonPropertyName("blobPath")] string? BlobPath,
     [property: JsonPropertyName("fileName")] string FileName,
     [property: JsonPropertyName("contentType")] string ContentType,
-    [property: JsonPropertyName("uploadedBy")] string UploadedBy
+    [property: JsonPropertyName("uploadedBy")] Guid UploadedBy,
+    [property: JsonPropertyName("sizeBytes")] long SizeBytes = 0
 );
