@@ -10,6 +10,7 @@ public class ProcessingInventoryDbContext : DbContext
         : base(options) { }
 
     public DbSet<ProcessingActivity> ProcessingActivities => Set<ProcessingActivity>();
+    public DbSet<ProcessingActivitySnapshot> ProcessingActivitySnapshots => Set<ProcessingActivitySnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,6 +139,28 @@ public class ProcessingInventoryDbContext : DbContext
 
             e.HasIndex(a => a.SupersedesId)
                 .HasDatabaseName("ix_processing_activities_supersedes");
+        });
+
+        // ── ProcessingActivitySnapshot ────────────────────────────────────────
+        modelBuilder.Entity<ProcessingActivitySnapshot>(e =>
+        {
+            e.ToTable("processing_activity_snapshots");
+            e.HasKey(s => s.Id);
+
+            e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(s => s.ActivityId).HasColumnName("activity_id").IsRequired();
+            e.Property(s => s.Version).HasColumnName("version").IsRequired();
+            e.Property(s => s.ApprovedBy).HasColumnName("approved_by").IsRequired();
+            e.Property(s => s.ApprovedAt).HasColumnName("approved_at").IsRequired();
+            e.Property(s => s.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
+
+            e.HasIndex(s => s.ActivityId)
+                .HasDatabaseName("ix_pat_snapshots_activity_id");
+
+            e.HasIndex(s => new { s.TenantId, s.ActivityId, s.Version })
+                .IsUnique()
+                .HasDatabaseName("ix_pat_snapshots_tenant_activity_version");
         });
     }
 }

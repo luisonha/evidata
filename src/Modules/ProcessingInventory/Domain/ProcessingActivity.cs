@@ -172,7 +172,7 @@ public class ProcessingActivity
         LastModifiedAt = DateTimeOffset.UtcNow;
     }
 
-    public void Approve(Guid approvedBy)
+    public ProcessingActivitySnapshot Approve(Guid approvedBy)
     {
         if (Status != ProcessingActivityStatus.UnderReview)
             throw new InvalidOperationException(
@@ -181,6 +181,48 @@ public class ProcessingActivity
         Status = ProcessingActivityStatus.Approved;
         ApprovedBy = approvedBy;
         ApprovedAt = DateTimeOffset.UtcNow;
+
+        return ProcessingActivitySnapshot.TakeFrom(this);
+    }
+
+    /// <summary>
+    /// Crea una nueva versión Draft a partir de este tratamiento aprobado.
+    /// La nueva versión copia todos los campos editables y establece SupersedesId.
+    /// El original permanece Approved e inmutable.
+    /// </summary>
+    public ProcessingActivity CreateNewVersion(Guid createdBy)
+    {
+        if (Status != ProcessingActivityStatus.Approved)
+            throw new InvalidOperationException(
+                "Solo se puede crear una nueva versión desde un tratamiento aprobado.");
+
+        var next = new ProcessingActivity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = TenantId,
+            Name = Name,
+            Description = Description,
+            Controller = Controller,
+            Department = Department,
+            Status = ProcessingActivityStatus.Draft,
+            Version = Version + 1,
+            SupersedesId = Id,
+            CreatedBy = createdBy,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Purpose = Purpose,
+            Retention = Retention,
+            HasInternationalTransfer = HasInternationalTransfer,
+            HasAutomatedDecision = HasAutomatedDecision
+        };
+
+        next._dataCategories.AddRange(_dataCategories);
+        next._dataSubjects.AddRange(_dataSubjects);
+        next._systems.AddRange(_systems);
+        next._suppliers.AddRange(_suppliers);
+        next._securityMeasures.AddRange(_securityMeasures);
+        next.RecalculateFlags();
+
+        return next;
     }
 
     public void ReturnToDraft(Guid modifiedBy)
