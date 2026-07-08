@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Evidata.Worker.Outbox\Evidata.Worker.Outbox.csproj" />
     <ProjectReference Include="..\..\functions\Evidata.Functions.DocumentProcessing\Evidata.Functions.DocumentProcessing.csproj" />
     <ProjectReference Include="..\..\src\Modules\Documents\Evidata.Modules.Documents.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
   </ItemGroup>
 
 </Project>
