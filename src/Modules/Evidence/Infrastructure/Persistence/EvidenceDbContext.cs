@@ -8,6 +8,7 @@ public class EvidenceDbContext : DbContext
     public EvidenceDbContext(DbContextOptions<EvidenceDbContext> options) : base(options) { }
 
     public DbSet<Domain.Evidence> Evidences => Set<Domain.Evidence>();
+    public DbSet<EvidenceAccessLog> EvidenceAccessLogs => Set<EvidenceAccessLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +49,34 @@ public class EvidenceDbContext : DbContext
             e.HasIndex(ev => new { ev.TenantId, ev.Type }).HasDatabaseName("ix_evidences_tenant_type");
             e.HasIndex(ev => ev.Sensitivity).HasDatabaseName("ix_evidences_sensitivity");
             e.HasIndex(ev => ev.SupersedesEvidenceId).HasDatabaseName("ix_evidences_supersedes");
+
+            e.HasMany<EvidenceAccessLog>()
+                .WithOne(l => l.Evidence)
+                .HasForeignKey(l => l.EvidenceId)
+                .OnDelete(DeleteBehavior.Restrict); // Preserve logs even if evidence is soft-deleted
+        });
+
+        // ── EvidenceAccessLog (append-only) ───────────────────────────────────
+        modelBuilder.Entity<EvidenceAccessLog>(e =>
+        {
+            e.ToTable("evidence_access_logs");
+            e.HasKey(l => l.Id);
+
+            e.Property(l => l.Id).HasColumnName("id");
+            e.Property(l => l.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(l => l.EvidenceId).HasColumnName("evidence_id").IsRequired();
+            e.Property(l => l.AccessedBy).HasColumnName("accessed_by").IsRequired();
+            e.Property(l => l.AccessedAt).HasColumnName("accessed_at").IsRequired();
+            e.Property(l => l.Reason).HasColumnName("reason").HasMaxLength(2000);
+            e.Property(l => l.ClientIp).HasColumnName("client_ip").HasMaxLength(64);
+            e.Property(l => l.UserAgent).HasColumnName("user_agent").HasMaxLength(500);
+            e.Property(l => l.CorrelationId).HasColumnName("correlation_id").HasMaxLength(128);
+            e.Property(l => l.SensitivityAtAccess).HasColumnName("sensitivity_at_access")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+
+            e.HasIndex(l => l.EvidenceId).HasDatabaseName("ix_evidence_access_logs_evidence_id");
+            e.HasIndex(l => new { l.TenantId, l.AccessedAt }).HasDatabaseName("ix_evidence_access_logs_tenant_date");
+            e.HasIndex(l => l.AccessedBy).HasDatabaseName("ix_evidence_access_logs_user");
         });
     }
 }

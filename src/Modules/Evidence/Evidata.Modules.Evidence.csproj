@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Identity\Evidata.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Documents\Evidata.Modules.Documents.csproj" />
   </ItemGroup>
 
 </Project>
