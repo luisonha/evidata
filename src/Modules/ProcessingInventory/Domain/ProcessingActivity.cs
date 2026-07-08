@@ -93,6 +93,18 @@ public class ProcessingActivity
     public IReadOnlyList<SecurityMeasureEntry> SecurityMeasures => _securityMeasures.AsReadOnly();
     private readonly List<SecurityMeasureEntry> _securityMeasures = [];
 
+    /// <summary>
+    /// Flags de riesgo regulatorio calculados automáticamente.
+    /// Se recalculan en cada cambio de sección relevante.
+    /// </summary>
+    public RiskFlags Flags { get; private set; } = RiskFlags.Empty();
+
+    /// <summary>¿Se declaran transferencias internacionales? (input manual, activa flag)</summary>
+    public bool HasInternationalTransfer { get; private set; }
+
+    /// <summary>¿Se declaran decisiones automatizadas o perfilamiento? (input manual, activa flag)</summary>
+    public bool HasAutomatedDecision { get; private set; }
+
     // ── Factory ────────────────────────────────────────────────────────────────
 
     public static ProcessingActivity Create(
@@ -199,6 +211,7 @@ public class ProcessingActivity
         GuardEditableState();
         ArgumentNullException.ThrowIfNull(purpose);
         Purpose = purpose;
+        RecalculateFlags();
         Touch(modifiedBy);
     }
 
@@ -213,6 +226,7 @@ public class ProcessingActivity
 
         _dataCategories.Clear();
         _dataCategories.AddRange(list);
+        RecalculateFlags();
         Touch(modifiedBy);
     }
 
@@ -257,6 +271,7 @@ public class ProcessingActivity
         GuardEditableState();
         ArgumentNullException.ThrowIfNull(retention);
         Retention = retention;
+        RecalculateFlags();
         Touch(modifiedBy);
     }
 
@@ -267,7 +282,48 @@ public class ProcessingActivity
         GuardEditableState();
         _securityMeasures.Clear();
         _securityMeasures.AddRange(entries ?? []);
+        RecalculateFlags();
         Touch(modifiedBy);
+    }
+
+    // ── Flags de riesgo ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Declara presencia de transferencias internacionales y/o decisiones automatizadas.
+    /// Recalcula flags automáticamente.
+    /// </summary>
+    public void SetRiskInputs(
+        bool hasInternationalTransfer,
+        bool hasAutomatedDecision,
+        Guid modifiedBy)
+    {
+        GuardEditableState();
+        HasInternationalTransfer = hasInternationalTransfer;
+        HasAutomatedDecision = hasAutomatedDecision;
+        RecalculateFlags();
+        Touch(modifiedBy);
+    }
+
+    /// <summary>
+    /// Marca o limpia el flag CriticalGapOpen.
+    /// Llamado por el Gap Management al crear/cerrar brechas críticas.
+    /// </summary>
+    public void SetCriticalGapFlag(bool hasCriticalGap, Guid modifiedBy)
+    {
+        // No requiere guard — puede llamarse desde estados no-Draft (gap puede llegar post-aprobación)
+        Flags = RiskFlags.Calculate(
+            _dataCategories, _securityMeasures, Retention, Purpose,
+            HasInternationalTransfer, HasAutomatedDecision,
+            hasCriticalGap);
+        Touch(modifiedBy);
+    }
+
+    private void RecalculateFlags()
+    {
+        Flags = RiskFlags.Calculate(
+            _dataCategories, _securityMeasures, Retention, Purpose,
+            HasInternationalTransfer, HasAutomatedDecision,
+            Flags.CriticalGapOpen);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

@@ -108,6 +108,26 @@ public class ProcessingInventoryDbContext : DbContext
                     v => JsonSerializer.Deserialize<List<SecurityMeasureEntry>>(v, (JsonSerializerOptions?)null) ?? new());
             e.Ignore(a => a.SecurityMeasures);
 
+            // ── RiskFlags (owned type — columnas booleanas) ───────────────────
+            e.OwnsOne(a => a.Flags, f =>
+            {
+                f.Property(r => r.SensitiveData).HasColumnName("flag_sensitive_data");
+                f.Property(r => r.ChildrenData).HasColumnName("flag_children_data");
+                f.Property(r => r.BiometricData).HasColumnName("flag_biometric_data");
+                f.Property(r => r.InternationalTransfer).HasColumnName("flag_international_transfer");
+                f.Property(r => r.AutomatedDecision).HasColumnName("flag_automated_decision");
+                f.Property(r => r.MissingLegalBasisEvidence).HasColumnName("flag_missing_legal_basis_evidence");
+                f.Property(r => r.MissingRetention).HasColumnName("flag_missing_retention");
+                f.Property(r => r.MissingSecurityMeasures).HasColumnName("flag_missing_security_measures");
+                f.Property(r => r.CriticalGapOpen).HasColumnName("flag_critical_gap_open");
+                f.Ignore(r => r.RequiresEnhancedReview);
+                f.Ignore(r => r.BlocksApproval);
+                f.Ignore(r => r.IsClean);
+            });
+
+            e.Property(a => a.HasInternationalTransfer).HasColumnName("has_international_transfer");
+            e.Property(a => a.HasAutomatedDecision).HasColumnName("has_automated_decision");
+
             // ── Índices ───────────────────────────────────────────────────────
             e.HasIndex(a => new { a.TenantId, a.Name })
                 .IsUnique()
