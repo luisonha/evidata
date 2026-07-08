@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\TenantManagement\Evidata.Modules.TenantManagement.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\Evidata.Modules.Identity.csproj" />
   </ItemGroup>
 
 </Project>
