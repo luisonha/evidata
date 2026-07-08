@@ -1,0 +1,52 @@
+{
+  "agents": {
+    "gandalf": {
+      "name": "gandalf",
+      "universe": "The Lord of the Rings",
+      "role": "Lead / Tech Architect",
+      "status": "active",
+      "charter": ".squad/agents/gandalf/charter.md",
+      "added": "2026-07-07"
+    },
+    "aragorn": {
+      "name": "aragorn",
+      "universe": "The Lord of the Rings",
+      "role": "Backend Core Engineer",
+      "status": "active",
+      "charter": ".squad/agents/aragorn/charter.md",
+      "added": "2026-07-07"
+    },
+    "legolas": {
+      "name": "legolas",
+      "universe": "The Lord of the Rings",
+      "role": "Security & Authorization Engineer",
+      "status": "active",
+      "charter": ".squad/agents/legolas/charter.md",
+      "added": "2026-07-07"
+    },
+    "gimli": {
+      "name": "gimli",
+      "universe": "The Lord of the Rings",
+      "role": "Data & Database Engineer",
+      "status": "active",
+      "charter": ".squad/agents/gimli/charter.md",
+      "added": "2026-07-07"
+    },
+    "frodo": {
+      "name": "frodo",
+      "universe": "The Lord of the Rings",
+      "role": "Async & Azure Functions Engineer",
+      "status": "active",
+      "charter": ".squad/agents/frodo/charter.md",
+      "added": "2026-07-07"
+    },
+    "sam": {
+      "name": "sam",
+      "universe": "The Lord of the Rings",
+      "role": "DevOps & Azure Infrastructure Engineer",
+      "status": "active",
+      "charter": ".squad/agents/sam/charter.md",
+      "added": "2026-07-07"
+    }
+  }
+}

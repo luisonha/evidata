@@ -1,0 +1,15 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "The Lord of the Rings",
+      "project": "evidata",
+      "assigned": "2026-07-07"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "evidata-2026-07-07": {
+      "universe": "The Lord of the Rings",
+      "agents": ["gandalf", "aragorn", "legolas", "gimli", "frodo", "sam"]
+    }
+  }
+}
