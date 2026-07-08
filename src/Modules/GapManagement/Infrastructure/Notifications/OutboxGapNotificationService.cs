@@ -3,6 +3,8 @@ using Evidata.Modules.GapManagement.Application.Notifications;
 using Evidata.Modules.GapManagement.Domain;
 using Evidata.Worker.Outbox.Persistence;
 
+// ReSharper disable once RedundantUsingDirective — GapEventTypes y GapEventPayload viven en este NS
+
 namespace Evidata.Modules.GapManagement.Infrastructure.Notifications;
 
 /// <summary>
