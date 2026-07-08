@@ -1,3 +1,5 @@
+using Evidata.Modules.Evidence.Application.Abstractions;
+using Evidata.Modules.Evidence.Infrastructure.Download;
 using Evidata.Modules.Evidence.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +19,8 @@ public static class EvidenceModule
         services.AddDbContext<EvidenceDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(EvidenceDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<IEvidenceDownloadService, EvidenceDownloadService>();
 
         return services;
     }
