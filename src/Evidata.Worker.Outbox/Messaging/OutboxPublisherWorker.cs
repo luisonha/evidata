@@ -1,27 +1,21 @@
+using Evidata.Worker.Outbox.Messaging;
+using Evidata.Worker.Outbox.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Evidata.Worker.Outbox.Messaging;
 
-/// <summary>
-/// Background service que lee OutboxMessages pendientes y los publica a las colas.
-/// En Fase 1 esto leerá de PostgreSQL via EF Core.
-/// Por ahora es el skeleton con la lógica de polling.
-/// </summary>
 public class OutboxPublisherWorker : BackgroundService
 {
-    private readonly IMessagePublisher _publisher;
-    private readonly IDestinationResolver _destinationResolver;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxPublisherWorker> _logger;
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(5);
+    private const int BatchSize = 50;
 
-    public OutboxPublisherWorker(
-        IMessagePublisher publisher,
-        IDestinationResolver destinationResolver,
-        ILogger<OutboxPublisherWorker> logger)
+    public OutboxPublisherWorker(IServiceScopeFactory scopeFactory, ILogger<OutboxPublisherWorker> logger)
     {
-        _publisher = publisher;
-        _destinationResolver = destinationResolver;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -44,11 +38,41 @@ public class OutboxPublisherWorker : BackgroundService
         }
     }
 
-    private async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
+    private async Task ProcessPendingMessagesAsync(CancellationToken ct)
     {
-        // TODO Fase 1: leer OutboxMessages pendientes de PostgreSQL via IOutboxRepository
-        // Por ahora: placeholder que confirma el worker está corriendo
-        _logger.LogDebug("OutboxPublisher: ciclo de polling (repositorio pendiente Fase 1)");
-        await Task.CompletedTask;
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+        var publisher = scope.ServiceProvider.GetRequiredService<IMessagePublisher>();
+
+        var messages = await repository.GetPendingAsync(BatchSize, ct);
+        if (messages.Count == 0) return;
+
+        _logger.LogDebug("OutboxPublisher: procesando {Count} mensajes pendientes", messages.Count);
+
+        foreach (var msg in messages)
+        {
+            try
+            {
+                await publisher.PublishAsync(
+                    msg.Destination,
+                    msg.MessageType,
+                    msg.Payload,
+                    msg.CorrelationId ?? msg.Id.ToString(),
+                    ct);
+
+                await repository.MarkSentAsync(msg.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Error publicando mensaje {MessageId} (intento {Retry})",
+                    msg.Id, msg.RetryCount + 1);
+
+                if (msg.RetryCount + 1 >= 5)
+                    await repository.MarkFailedAsync(msg.Id, ex.Message, ct);
+                else
+                    await repository.IncrementRetryAsync(msg.Id, ct);
+            }
+        }
     }
 }
