@@ -34,6 +34,7 @@
     <ProjectReference Include="..\..\src\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Evidata.Modules.Workflow.csproj" />
     <ProjectReference Include="..\..\src\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Search\Evidata.Modules.Search.csproj" />
   </ItemGroup>
 
 </Project>

@@ -11,6 +11,7 @@ using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Security;
 using Evidata.Modules.TenantManagement;
 using Evidata.Modules.Reporting;
+using Evidata.Modules.Search;
 using Evidata.Modules.Workflow;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +29,7 @@ builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddWorkflowModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
+builder.Services.AddSearchModule(builder.Configuration);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
