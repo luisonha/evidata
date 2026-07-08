@@ -1,3 +1,5 @@
+using Evidata.Modules.GapManagement.Application.Abstractions;
+using Evidata.Modules.GapManagement.Infrastructure.AutoDetection;
 using Evidata.Modules.GapManagement.Infrastructure.Persistence;
 using Evidata.Modules.GapManagement.Infrastructure.Persistence.Factories;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +20,9 @@ public static class GapManagementModule
         services.AddDbContext<GapManagementDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(GapManagementDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<IRatFlagsProvider, EfRatFlagsProvider>();
+        services.AddScoped<IRatGapDetectionService, RatGapDetectionService>();
 
         return services;
     }
