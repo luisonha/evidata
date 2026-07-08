@@ -6,6 +6,7 @@ using Evidata.Modules.Identity;
 using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.LegalKnowledge;
+using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Security;
 using Evidata.Modules.TenantManagement;
 
@@ -20,6 +21,7 @@ builder.Services.AddAudit(builder.Configuration);
 builder.Services.AddDocumentsModule(builder.Configuration);
 builder.Services.AddLegalKnowledge(builder.Configuration);
 builder.Services.AddEvidenceModule(builder.Configuration);
+builder.Services.AddProcessingInventoryModule(builder.Configuration);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
