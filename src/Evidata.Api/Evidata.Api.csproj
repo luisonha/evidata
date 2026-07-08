@@ -27,6 +27,7 @@
     <ProjectReference Include="..\Modules\Documents\Evidata.Modules.Documents.csproj" />
     <ProjectReference Include="..\Modules\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
     <ProjectReference Include="..\Modules\Evidence\Evidata.Modules.Evidence.csproj" />
+    <ProjectReference Include="..\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
   </ItemGroup>
 
 </Project>
