@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Modules\TenantManagement\Evidata.Modules.TenantManagement.csproj" />
     <ProjectReference Include="..\Modules\Identity\Evidata.Modules.Identity.csproj" />
     <ProjectReference Include="..\Modules\Security\Evidata.Modules.Security.csproj" />
+    <ProjectReference Include="..\Modules\Audit\Evidata.Modules.Audit.csproj" />
   </ItemGroup>
 
 </Project>
