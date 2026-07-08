@@ -1,5 +1,7 @@
 using Evidata.Modules.GapManagement.Application.Abstractions;
+using Evidata.Modules.GapManagement.Application.Notifications;
 using Evidata.Modules.GapManagement.Infrastructure.AutoDetection;
+using Evidata.Modules.GapManagement.Infrastructure.Notifications;
 using Evidata.Modules.GapManagement.Infrastructure.Persistence;
 using Evidata.Modules.GapManagement.Infrastructure.Persistence.Factories;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,7 @@ public static class GapManagementModule
 
         services.AddScoped<IRatFlagsProvider, EfRatFlagsProvider>();
         services.AddScoped<IRatGapDetectionService, RatGapDetectionService>();
+        services.AddScoped<IGapNotificationService, OutboxGapNotificationService>();
 
         return services;
     }
