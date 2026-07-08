@@ -1,6 +1,7 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.Reporting.Handlers;
 using Evidata.Modules.Evidence;
+using Evidata.Modules.GapManagement;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Reporting;
 using Microsoft.Azure.Functions.Worker;
@@ -17,6 +18,7 @@ builder.AddServiceDefaults();
 
 builder.Services.AddEvidenceModule(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
+builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
 
 builder.Services.AddOpenTelemetry()
@@ -24,5 +26,6 @@ builder.Services.AddOpenTelemetry()
     .UseAzureMonitorExporter();
 
 builder.Services.AddScoped<RatReportHandler>();
+builder.Services.AddScoped<GapReportHandler>();
 
 builder.Build().Run();

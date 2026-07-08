@@ -11,13 +11,16 @@ public class ReportingFunction
 {
     private readonly ILogger<ReportingFunction> _logger;
     private readonly RatReportHandler _ratHandler;
+    private readonly GapReportHandler _gapHandler;
 
     public ReportingFunction(
         ILogger<ReportingFunction> logger,
-        RatReportHandler ratHandler)
+        RatReportHandler ratHandler,
+        GapReportHandler gapHandler)
     {
         _logger = logger;
         _ratHandler = ratHandler;
+        _gapHandler = gapHandler;
     }
 
     [Function(nameof(ReportingFunction))]
@@ -76,6 +79,10 @@ public class ReportingFunction
         {
             case "RAT":
                 await _ratHandler.HandleAsync(payload.JobId, payload.TenantId, ct);
+                break;
+
+            case "Gaps":
+                await _gapHandler.HandleAsync(payload.JobId, payload.TenantId, ct);
                 break;
 
             default:
