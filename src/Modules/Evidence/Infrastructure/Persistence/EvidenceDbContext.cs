@@ -9,6 +9,7 @@ public class EvidenceDbContext : DbContext
 
     public DbSet<Domain.Evidence> Evidences => Set<Domain.Evidence>();
     public DbSet<EvidenceAccessLog> EvidenceAccessLogs => Set<EvidenceAccessLog>();
+    public DbSet<EvidenceLink> EvidenceLinks => Set<EvidenceLink>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,6 +78,38 @@ public class EvidenceDbContext : DbContext
             e.HasIndex(l => l.EvidenceId).HasDatabaseName("ix_evidence_access_logs_evidence_id");
             e.HasIndex(l => new { l.TenantId, l.AccessedAt }).HasDatabaseName("ix_evidence_access_logs_tenant_date");
             e.HasIndex(l => l.AccessedBy).HasDatabaseName("ix_evidence_access_logs_user");
+        });
+
+        // ── EvidenceLink ──────────────────────────────────────────────────────
+        modelBuilder.Entity<EvidenceLink>(e =>
+        {
+            e.ToTable("evidence_links");
+            e.HasKey(l => l.Id);
+
+            e.Property(l => l.Id).HasColumnName("id");
+            e.Property(l => l.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(l => l.EvidenceId).HasColumnName("evidence_id").IsRequired();
+            e.Property(l => l.LinkedEntityType).HasColumnName("linked_entity_type")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(l => l.LinkedEntityId).HasColumnName("linked_entity_id").IsRequired();
+            e.Property(l => l.Note).HasColumnName("note").HasMaxLength(1000);
+            e.Property(l => l.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(l => l.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(l => l.DeletedAt).HasColumnName("deleted_at");
+            e.Property(l => l.DeletedBy).HasColumnName("deleted_by");
+
+            e.Ignore(l => l.IsActive); // computed property
+
+            e.HasOne(l => l.Evidence)
+                .WithMany()
+                .HasForeignKey(l => l.EvidenceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(l => new { l.TenantId, l.EvidenceId })
+                .HasDatabaseName("ix_evidence_links_tenant_evidence");
+            e.HasIndex(l => new { l.EvidenceId, l.LinkedEntityType, l.LinkedEntityId, l.DeletedAt })
+                .HasDatabaseName("ix_evidence_links_dedup")
+                .HasFilter("deleted_at IS NULL");
         });
     }
 }
