@@ -65,6 +65,19 @@ public class ProcessingActivity
     /// <summary>ID del tratamiento anterior al que esta versión reemplaza (null si es la primera).</summary>
     public Guid? SupersedesId { get; private set; }
 
+    // ── Secciones (owned types / JSONB) ────────────────────────────────────────
+
+    /// <summary>Sección Finalidad y Base de Licitud (obligatoria para aprobación).</summary>
+    public PurposeSection? Purpose { get; private set; }
+
+    /// <summary>Categorías de datos tratados (al menos una requerida para aprobación).</summary>
+    public IReadOnlyList<DataCategoryEntry> DataCategories => _dataCategories.AsReadOnly();
+    private readonly List<DataCategoryEntry> _dataCategories = [];
+
+    /// <summary>Tipos de titulares afectados (al menos uno requerido para aprobación).</summary>
+    public IReadOnlyList<DataSubjectEntry> DataSubjects => _dataSubjects.AsReadOnly();
+    private readonly List<DataSubjectEntry> _dataSubjects = [];
+
     // ── Factory ────────────────────────────────────────────────────────────────
 
     public static ProcessingActivity Create(
@@ -116,8 +129,7 @@ public class ProcessingActivity
         Description = description?.Trim();
         Controller = controller?.Trim();
         Department = department?.Trim();
-        LastModifiedBy = modifiedBy;
-        LastModifiedAt = DateTimeOffset.UtcNow;
+        Touch(modifiedBy);
     }
 
     // ── FSM ────────────────────────────────────────────────────────────────────
@@ -165,7 +177,51 @@ public class ProcessingActivity
         LastModifiedAt = DateTimeOffset.UtcNow;
     }
 
+    // ── Sección: Finalidad ─────────────────────────────────────────────────────
+
+    public void SetPurpose(PurposeSection purpose, Guid modifiedBy)
+    {
+        GuardEditableState();
+        ArgumentNullException.ThrowIfNull(purpose);
+        Purpose = purpose;
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Categorías de datos ───────────────────────────────────────────
+
+    public void SetDataCategories(IEnumerable<DataCategoryEntry> entries, Guid modifiedBy)
+    {
+        GuardEditableState();
+        var list = entries?.ToList() ?? [];
+        if (list.Count == 0)
+            throw new ArgumentException("Debe indicarse al menos una categoría de datos.", nameof(entries));
+
+        _dataCategories.Clear();
+        _dataCategories.AddRange(list);
+        Touch(modifiedBy);
+    }
+
+    // ── Sección: Titulares ─────────────────────────────────────────────────────
+
+    public void SetDataSubjects(IEnumerable<DataSubjectEntry> entries, Guid modifiedBy)
+    {
+        GuardEditableState();
+        var list = entries?.ToList() ?? [];
+        if (list.Count == 0)
+            throw new ArgumentException("Debe indicarse al menos un tipo de titular.", nameof(entries));
+
+        _dataSubjects.Clear();
+        _dataSubjects.AddRange(list);
+        Touch(modifiedBy);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private void Touch(Guid modifiedBy)
+    {
+        LastModifiedBy = modifiedBy;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
 
     private void GuardEditableState()
     {

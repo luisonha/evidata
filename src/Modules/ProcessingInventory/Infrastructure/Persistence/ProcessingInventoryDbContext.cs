@@ -1,5 +1,6 @@
 using Evidata.Modules.ProcessingInventory.Domain;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 
@@ -36,9 +37,40 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property(a => a.ApprovedAt).HasColumnName("approved_at");
             e.Property(a => a.SupersedesId).HasColumnName("supersedes_id");
 
-            e.Ignore(a => a.IsEditable); // computed property
+            e.Ignore(a => a.IsEditable);
 
-            // Nombre único por tenant (case-insensitive en PG via índice funcional)
+            // ── PurposeSection (owned type) ───────────────────────────────────
+            e.OwnsOne(a => a.Purpose, p =>
+            {
+                p.Property(s => s.Purpose).HasColumnName("purpose_text");
+                p.Property(s => s.LegalBasis).HasColumnName("legal_basis")
+                    .HasConversion<string>().HasMaxLength(50);
+                p.Property(s => s.LegalBasisJustification).HasColumnName("legal_basis_justification");
+            });
+
+            // ── DataCategories (JSONB) ────────────────────────────────────────
+            e.Property<List<DataCategoryEntry>>("_dataCategories")
+                .HasColumnName("data_categories")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<DataCategoryEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+
+            e.Ignore(a => a.DataCategories); // exposed via read-only property
+
+            // ── DataSubjects (JSONB) ──────────────────────────────────────────
+            e.Property<List<DataSubjectEntry>>("_dataSubjects")
+                .HasColumnName("data_subjects")
+                .HasColumnType("jsonb")
+                .UsePropertyAccessMode(PropertyAccessMode.Field)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<DataSubjectEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+
+            e.Ignore(a => a.DataSubjects);
+
+            // ── Índices ───────────────────────────────────────────────────────
             e.HasIndex(a => new { a.TenantId, a.Name })
                 .IsUnique()
                 .HasDatabaseName("ix_processing_activities_tenant_name");
