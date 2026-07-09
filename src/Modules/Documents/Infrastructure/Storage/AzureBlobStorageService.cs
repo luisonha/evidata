@@ -36,6 +36,29 @@ public sealed class AzureBlobStorageService : IBlobStorageService
         _sharedKeyCredential = TryExtractSharedKeyCredential(_options.ConnectionString);
     }
 
+    public async Task<string> UploadAsync(
+        string blobPath,
+        byte[] content,
+        string contentType,
+        CancellationToken ct = default)
+    {
+        await EnsureContainerExistsAsync(ct);
+
+        var blobClient = _container.GetBlobClient(blobPath);
+        using var stream = new MemoryStream(content, writable: false);
+
+        await blobClient.UploadAsync(stream, overwrite: true, cancellationToken: ct);
+        await blobClient.SetHttpHeadersAsync(
+            new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType },
+            cancellationToken: ct);
+
+        _logger.LogInformation(
+            "Blob subido: {BlobPath} ({Bytes} bytes, {ContentType})",
+            blobPath, content.Length, contentType);
+
+        return blobPath;
+    }
+
     public async Task<SasUploadResult> GenerateUploadSasAsync(
         Guid tenantId,
         string fileName,

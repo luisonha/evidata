@@ -1,5 +1,8 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.Reporting.Handlers;
+using Evidata.Modules.Documents.Application.Abstractions;
+using Evidata.Modules.Documents.Infrastructure.Configuration;
+using Evidata.Modules.Documents.Infrastructure.Storage;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
 using Evidata.Modules.ProcessingInventory;
@@ -20,6 +23,11 @@ builder.Services.AddEvidenceModule(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
+
+// Blob Storage — usa Azurite en local (AzureWebJobsStorage=UseDevelopmentStorage=true)
+builder.Services.Configure<BlobStorageOptions>(
+    builder.Configuration.GetSection(BlobStorageOptions.SectionName));
+builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
 
 builder.Services.AddOpenTelemetry()
     .UseFunctionsWorkerDefaults()
