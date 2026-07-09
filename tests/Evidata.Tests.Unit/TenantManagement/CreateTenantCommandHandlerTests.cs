@@ -21,13 +21,16 @@ public class CreateTenantCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_DuplicateSlug_ThrowsException()
+    public async Task Handle_DuplicateSlug_ReturnsExistingTenant()
     {
+        var existing = Tenant.Create("acme", "Existing");
         var repo = Substitute.For<ITenantRepository>();
-        repo.GetBySlugAsync("acme", default).Returns(Tenant.Create("acme", "Existing"));
+        repo.GetBySlugAsync("acme", default).Returns(existing);
         var handler = new CreateTenantCommandHandler(repo, NullLogger<CreateTenantCommandHandler>.Instance);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.HandleAsync(new CreateTenantCommand("acme", "Acme Corp")));
+        var result = await handler.HandleAsync(new CreateTenantCommand("acme", "Acme Corp"));
+
+        Assert.Equal("acme", result.Slug);
+        await repo.DidNotReceive().AddAsync(Arg.Any<Tenant>(), default);
     }
 }
