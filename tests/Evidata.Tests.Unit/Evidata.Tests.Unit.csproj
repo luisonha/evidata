@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.6" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\TenantManagement\Evidata.Modules.TenantManagement.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\Evidata.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Security\Evidata.Modules.Security.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Audit\Evidata.Modules.Audit.csproj" />
+    <ProjectReference Include="..\..\src\Evidata.Worker.Outbox\Evidata.Worker.Outbox.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.DocumentProcessing\Evidata.Functions.DocumentProcessing.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Documents\Evidata.Modules.Documents.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Evidence\Evidata.Modules.Evidence.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
+    <ProjectReference Include="..\..\src\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Workflow\Evidata.Modules.Workflow.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Search\Evidata.Modules.Search.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Mcp\Evidata.Modules.Mcp.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.Notifications\Evidata.Functions.Notifications.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.Reporting\Evidata.Functions.Reporting.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.SearchIndexing\Evidata.Functions.SearchIndexing.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.McpBatch\Evidata.Functions.McpBatch.csproj" />
+  </ItemGroup>
+
+</Project>

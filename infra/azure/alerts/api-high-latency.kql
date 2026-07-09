@@ -1,0 +1,12 @@
+// Alert: API_HIGH_LATENCY
+// Descripción: Latencia media API > 2000ms en ventana de 15 minutos
+// Severidad: 2 (Warning)
+// Evaluación: cada 5 minutos, ventana 15 minutos
+
+requests
+| where timestamp > ago(15m)
+| where cloud_RoleName == "Evidata.Api"
+| where url !contains "/health" and url !contains "/alive"
+| summarize P95Duration = percentile(duration, 95) by bin(timestamp, 5m)
+| where P95Duration > 2000
+| project timestamp, P95Duration
