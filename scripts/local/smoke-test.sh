@@ -219,7 +219,8 @@ echo ""
 echo -e "${CYAN}▶ Documents${NC}"
 
 check "GET /api/documents" 200 GET "/api/documents"
-skip "POST /api/documents/upload-url — requiere Azurite (no disponible en dev local)"
+check "POST /api/documents/upload-url" 200 POST "/api/documents/upload-url" \
+  '{"fileName":"smoke-test.pdf","contentType":"application/pdf","description":"smoke test"}'
 
 # ─── Módulo 11: Reporting ────────────────────────────────────────────────────
 echo ""
