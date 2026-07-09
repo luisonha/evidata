@@ -20,6 +20,67 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check forbidden backend naming and routes
+        run: |
+          set -euo pipefail
+
+          check_absent() {
+            local description="$1"
+            local pattern="$2"
+            shift 2
+            local -a files=("$@")
+
+            if [ "${#files[@]}" -eq 0 ]; then
+              return 0
+            fi
+
+            local matches
+            local status
+
+            set +e
+            matches=$(grep -nI -E -i -- "${pattern}" "${files[@]}" 2>&1)
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo "::error::${description}"
+              echo "${matches}"
+              exit 1
+            fi
+
+            if [ "${status}" -ne 1 ]; then
+              echo "::error::Failed to execute guard: ${description}"
+              echo "${matches}"
+              exit "${status}"
+            fi
+          }
+
+          src_files=()
+          while IFS= read -r file; do
+            src_files+=("${file}")
+          done < <(find src -type f ! -path '*/bin/*' ! -path '*/obj/*' | sort)
+
+          http_files=()
+          while IFS= read -r file; do
+            http_files+=("${file}")
+          done < <(find . -type f -name '*.http' | sort)
+
+          check_absent \
+            "Forbidden backend naming detected: 'Treatment' must not appear under src/." \
+            "Treatment" \
+            "${src_files[@]}"
+
+          check_absent \
+            "Forbidden backend route detected: '/api/v1/treatments' and '/api/treatments' must not appear under src/." \
+            "/api/v1/treatments|/api/treatments" \
+            "${src_files[@]}"
+
+          weatherforecast_targets=("src/Evidata.Api/Program.cs" "${http_files[@]}")
+          check_absent \
+            "Forbidden regression detected: '/weatherforecast' must not appear in Program.cs or any .http file." \
+            "/weatherforecast" \
+            "${weatherforecast_targets[@]}"
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
