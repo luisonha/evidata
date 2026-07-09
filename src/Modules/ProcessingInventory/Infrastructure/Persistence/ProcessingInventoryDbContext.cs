@@ -1,5 +1,6 @@
 using Evidata.Modules.ProcessingInventory.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -20,6 +21,17 @@ public class ProcessingInventoryDbContext : DbContext
             return new List<T>();
         return JsonSerializer.Deserialize<List<T>>(v, (JsonSerializerOptions?)null) ?? new();
     }
+
+    // EF Core necesita un ValueComparer para detectar cambios en colecciones con HasConversion.
+    // Comparamos por JSON serializado: dos listas son iguales si producen el mismo JSON.
+    private static ValueComparer<List<T>> JsonListComparer<T>() =>
+        new(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null)
+                   == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+            v => JsonSerializer.Deserialize<List<T>>(
+                     JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                     (JsonSerializerOptions?)null) ?? new List<T>());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,7 +78,8 @@ public class ProcessingInventoryDbContext : DbContext
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => DeserializeList<DataCategoryEntry>(v));
+                    v => DeserializeList<DataCategoryEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<DataCategoryEntry>());
 
             e.Ignore(a => a.DataCategories); // exposed via read-only property
 
@@ -78,7 +91,8 @@ public class ProcessingInventoryDbContext : DbContext
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => DeserializeList<DataSubjectEntry>(v));
+                    v => DeserializeList<DataSubjectEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<DataSubjectEntry>());
 
             e.Ignore(a => a.DataSubjects);
 
@@ -90,7 +104,8 @@ public class ProcessingInventoryDbContext : DbContext
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => DeserializeList<SystemEntry>(v));
+                    v => DeserializeList<SystemEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SystemEntry>());
             e.Ignore(a => a.Systems);
 
             // ── Suppliers (JSONB) ─────────────────────────────────────────────
@@ -101,7 +116,8 @@ public class ProcessingInventoryDbContext : DbContext
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => DeserializeList<SupplierEntry>(v));
+                    v => DeserializeList<SupplierEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SupplierEntry>());
             e.Ignore(a => a.Suppliers);
 
             // ── RetentionSection (owned type) ─────────────────────────────────
@@ -120,7 +136,8 @@ public class ProcessingInventoryDbContext : DbContext
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => DeserializeList<SecurityMeasureEntry>(v));
+                    v => DeserializeList<SecurityMeasureEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SecurityMeasureEntry>());
             e.Ignore(a => a.SecurityMeasures);
 
             // ── RiskFlags (owned type — columnas booleanas) ───────────────────

@@ -113,7 +113,7 @@ public class EvidenceLinkServiceTests
 
     // ── TC5: RemoveLink link ya eliminado → excepción ─────────────────────────
     [Fact]
-    public async Task RemoveLink_AlreadyDeleted_Throws()
+    public async Task RemoveLink_AlreadyDeleted_ThrowsNotFound()
     {
         var tenantId = Guid.NewGuid();
         var ev = BuildEvidence(tenantId);
@@ -128,7 +128,10 @@ public class EvidenceLinkServiceTests
             tenantId, ev.Id, LinkedEntityType.AuditFinding, Guid.NewGuid(), userId);
         await svc.RemoveLinkAsync(tenantId, addResult.LinkId, userId);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        // Con el query filter DeletedAt == null, el link eliminado es invisible:
+        // el servicio lanza KeyNotFoundException ("no encontrado") en vez de
+        // InvalidOperationException ("ya eliminado").
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.RemoveLinkAsync(tenantId, addResult.LinkId, userId));
     }
 
