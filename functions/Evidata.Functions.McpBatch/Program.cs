@@ -1,8 +1,11 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.McpBatch.Handlers;
 using Evidata.Modules.Documents;
+using Evidata.Modules.GapManagement;
+using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.Mcp;
 using Evidata.Modules.ProcessingInventory;
+using Evidata.Worker.Outbox.Persistence;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
@@ -17,6 +20,11 @@ builder.AddServiceDefaults();
 
 builder.Services.AddDocumentsModule(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
+// IOutboxWriter requerido por OutboxGapNotificationService (GapManagement).
+// fn-mcp no envía notificaciones — NullOutboxWriter satisface la dependencia de DI.
+builder.Services.AddScoped<IOutboxWriter, NullOutboxWriter>();
+builder.Services.AddGapManagementModule(builder.Configuration);
+builder.Services.AddLegalKnowledge(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
 
 builder.Services.AddOpenTelemetry()
