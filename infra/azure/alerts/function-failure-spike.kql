@@ -1,0 +1,19 @@
+// Alert: FUNCTION_FAILURE_SPIKE
+// Descripción: Spike de errores en Azure Functions (>5 en 10 min)
+// Severidad: 2 (Warning)
+// Evaluación: cada 10 minutos, ventana 10 minutos
+
+requests
+| where timestamp > ago(10m)
+| where cloud_RoleName in (
+    "Evidata.Functions.Notifications",
+    "Evidata.Functions.Reporting",
+    "Evidata.Functions.SearchIndexing",
+    "Evidata.Functions.McpBatch",
+    "Evidata.Functions.DocumentProcessing",
+    "Evidata.Functions.Maintenance"
+  )
+| where success == false
+| summarize FailureCount = count() by cloud_RoleName
+| where FailureCount > 5
+| order by FailureCount desc
