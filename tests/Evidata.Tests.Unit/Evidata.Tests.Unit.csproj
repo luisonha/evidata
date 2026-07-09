@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\functions\Evidata.Functions.Notifications\Evidata.Functions.Notifications.csproj" />
     <ProjectReference Include="..\..\functions\Evidata.Functions.Reporting\Evidata.Functions.Reporting.csproj" />
     <ProjectReference Include="..\..\functions\Evidata.Functions.SearchIndexing\Evidata.Functions.SearchIndexing.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.McpBatch\Evidata.Functions.McpBatch.csproj" />
   </ItemGroup>
 
 </Project>
