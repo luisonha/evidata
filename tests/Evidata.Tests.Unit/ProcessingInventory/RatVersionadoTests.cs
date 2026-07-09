@@ -42,7 +42,8 @@ public class RatVersionadoTests
         act.SubmitForReview(Guid.NewGuid());
         var approver = Guid.NewGuid();
 
-        var snapshot = act.Approve(approver);
+        act.Approve(approver);
+        var snapshot = ProcessingActivitySnapshot.TakeFrom(act);
 
         Assert.NotNull(snapshot);
         Assert.Equal(act.Id, snapshot.ActivityId);
@@ -58,7 +59,8 @@ public class RatVersionadoTests
     {
         var act = BuildReady();
         act.SubmitForReview(Guid.NewGuid());
-        var snapshot = act.Approve(Guid.NewGuid());
+        act.Approve(Guid.NewGuid());
+        var snapshot = ProcessingActivitySnapshot.TakeFrom(act);
 
         Assert.Contains(act.Id.ToString(), snapshot.Payload);
     }
@@ -68,11 +70,13 @@ public class RatVersionadoTests
     {
         var act1 = BuildReady();
         act1.SubmitForReview(Guid.NewGuid());
-        var s1 = act1.Approve(Guid.NewGuid());
+        act1.Approve(Guid.NewGuid());
+        var s1 = ProcessingActivitySnapshot.TakeFrom(act1);
 
         var act2 = BuildReady();
         act2.SubmitForReview(Guid.NewGuid());
-        var s2 = act2.Approve(Guid.NewGuid());
+        act2.Approve(Guid.NewGuid());
+        var s2 = ProcessingActivitySnapshot.TakeFrom(act2);
 
         Assert.NotEqual(s1.Id, s2.Id);
     }

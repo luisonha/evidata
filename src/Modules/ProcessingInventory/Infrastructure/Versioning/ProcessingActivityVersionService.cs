@@ -30,7 +30,8 @@ public sealed class ProcessingActivityVersionService : IProcessingActivityVersio
             .FirstOrDefaultAsync(a => a.Id == activityId, ct)
             ?? throw new InvalidOperationException($"Tratamiento {activityId} no encontrado.");
 
-        var snapshot = activity.Approve(approvedBy);
+        activity.Approve(approvedBy);
+        var snapshot = ProcessingActivitySnapshot.TakeFrom(activity);
 
         _db.ProcessingActivitySnapshots.Add(snapshot);
         await _db.SaveChangesAsync(ct);
