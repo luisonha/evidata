@@ -1,4 +1,5 @@
 using Evidata.Api.Infrastructure.HealthChecks;
+using Evidata.Api.OpenApi;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
@@ -47,7 +48,15 @@ builder.Services.AddMcpModule(builder.Configuration);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeDocumentTransformer>();
+    options.AddDocumentTransformer<ApiErrorSchemaDocumentTransformer>();
+    options.AddOperationTransformer<StableOperationIdTransformer>();
+    options.AddOperationTransformer<BearerSecurityRequirementOperationTransformer>();
+    options.AddOperationTransformer<ChangeStatusOperationTransformer>();
+    options.AddOperationTransformer<ApiErrorResponsesOperationTransformer>();
+});
 builder.Services.AddControllers();
 
 var app = builder.Build();
