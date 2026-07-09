@@ -1,3 +1,4 @@
+using Evidata.Modules.LegalKnowledge.Application.Queries;
 using Evidata.Modules.LegalKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +18,9 @@ public static class LegalKnowledgeModule
         services.AddDbContext<LegalKnowledgeDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(LegalKnowledgeDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<ListLegalSourcesQueryHandler>();
+        services.AddScoped<ListLegalObligationsQueryHandler>();
 
         return services;
     }

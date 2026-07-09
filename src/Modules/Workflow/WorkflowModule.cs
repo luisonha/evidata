@@ -1,4 +1,5 @@
 using Evidata.Modules.Workflow.Application.Abstractions;
+using Evidata.Modules.Workflow.Application.Queries;
 using Evidata.Modules.Workflow.Infrastructure.Persistence;
 using Evidata.Modules.Workflow.Infrastructure.Persistence.Factories;
 using Evidata.Modules.Workflow.Infrastructure.Reviews;
@@ -24,6 +25,7 @@ public static class WorkflowModule
 
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
+        services.AddScoped<ListWorkflowTasksQueryHandler>();
 
         return services;
     }
