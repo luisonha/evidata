@@ -49,14 +49,16 @@ public class EvidenceSummaryQueryHandlerTests
         var draft = BuildEvidence(tenantId, EvidenceStatus.Draft);
         var archived = BuildEvidence(tenantId, EvidenceStatus.Archived, "archived.pdf");
         var superseded = BuildEvidence(tenantId, EvidenceStatus.Superseded, "superseded.pdf");
+        var deleted = BuildEvidence(tenantId, EvidenceStatus.Deleted, "deleted.pdf");
 
         await using var db = BuildContext();
-        db.Evidences.AddRange(active, draft, archived, superseded);
+        db.Evidences.AddRange(active, draft, archived, superseded, deleted);
         db.EvidenceLinks.AddRange(
             EvidenceLink.Create(tenantId, active.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId),
             EvidenceLink.Create(tenantId, draft.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId),
             EvidenceLink.Create(tenantId, archived.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId),
-            EvidenceLink.Create(tenantId, superseded.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId));
+            EvidenceLink.Create(tenantId, superseded.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId),
+            EvidenceLink.Create(tenantId, deleted.Id, LinkedEntityType.ProcessingActivity, processingActivityId, userId));
         await db.SaveChangesAsync();
 
         var result = await new GetEvidenceSummaryQueryHandler(db)
@@ -64,14 +66,16 @@ public class EvidenceSummaryQueryHandlerTests
 
         Assert.Equal(processingActivityId, result.ProcessingActivityId);
         Assert.Equal(versionId, result.VersionId);
-        Assert.Equal(4, result.TotalRequirements);
+        // Superseded y Deleted quedan excluidos: no son evidencia vigente y no deben bloquear
+        // ni contarse como "rejected" (evidencia reemplazada ya fue validada en su ciclo anterior).
+        Assert.Equal(3, result.TotalRequirements);
         Assert.Equal(1, result.PendingCount);
-        Assert.Equal(3, result.AttachedCount);
+        Assert.Equal(2, result.AttachedCount);
         Assert.Equal(1, result.ValidatedCount);
         Assert.Equal(1, result.InsufficientCount);
-        Assert.Equal(1, result.RejectedCount);
-        Assert.Equal(3, result.BlockingRequirementsCount);
-        Assert.Equal(25m, result.CompletionPercentage);
+        Assert.Equal(0, result.RejectedCount);
+        Assert.Equal(2, result.BlockingRequirementsCount);
+        Assert.Equal(33.33m, result.CompletionPercentage);
     }
 
     [Fact]

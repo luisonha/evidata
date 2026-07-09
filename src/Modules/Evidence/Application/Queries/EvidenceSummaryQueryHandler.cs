@@ -25,7 +25,9 @@ public sealed class GetEvidenceSummaryQueryHandler(EvidenceDbContext db) : IEvid
             .Where(link =>
                 link.TenantId == tenantId &&
                 link.LinkedEntityType == LinkedEntityType.ProcessingActivity &&
-                link.LinkedEntityId == processingActivityId)
+                link.LinkedEntityId == processingActivityId &&
+                link.Evidence.Status != EvidenceStatus.Superseded &&
+                link.Evidence.Status != EvidenceStatus.Deleted)
             .Select(link => new EvidenceSummaryRow(
                 link.EvidenceId,
                 link.Evidence.Status,
@@ -39,14 +41,17 @@ public sealed class GetEvidenceSummaryQueryHandler(EvidenceDbContext db) : IEvid
 
         // TODO: El dominio actual no tiene una entidad separada de "requisito de evidencia" ni estados
         // de validación específicos para insufficient/rejected/blocking. Mientras se implemente esa capa,
-        // usamos la aproximación más cercana con el lifecycle actual:
-        // Draft -> Pending, Active -> Validated, Archived -> Insufficient, Superseded -> Rejected.
+        // usamos la aproximación más cercana con el lifecycle vigente (Draft/Active/Archived).
+        // Superseded y Deleted se EXCLUYEN explícitamente del resumen: representan evidencia histórica ya
+        // reemplazada o eliminada, no un requisito vigente, y NO deben contar como "rejected" ni bloquear
+        // la aprobación del tratamiento (confirmado con el usuario — evidencia reemplazada ya fue validada
+        // en su ciclo anterior, no es un rechazo).
         var totalRequirements = evidences.Count;
         var pendingCount = evidences.Count(evidence => evidence.Status == EvidenceStatus.Draft);
         var attachedCount = evidences.Count(evidence => !string.IsNullOrWhiteSpace(evidence.BlobPath));
         var validatedCount = evidences.Count(evidence => evidence.Status == EvidenceStatus.Active);
         var insufficientCount = evidences.Count(evidence => evidence.Status == EvidenceStatus.Archived);
-        var rejectedCount = evidences.Count(evidence => evidence.Status == EvidenceStatus.Superseded);
+        var rejectedCount = 0; // No hay estado de rechazo explícito en el dominio actual; ver TODO arriba.
         var blockingRequirementsCount = pendingCount + insufficientCount + rejectedCount;
 
         var completionPercentage = totalRequirements == 0
