@@ -27,3 +27,9 @@ TestResults/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+
+# Artefactos generados por gri-map.sh
+docs/openapi/repository-map/*.csv
+docs/openapi/repository-map/*.txt
+docs/openapi/repository-map/*.zip
+docs/openapi/repository-map/repository-inventory
