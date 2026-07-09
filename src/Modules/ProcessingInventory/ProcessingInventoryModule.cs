@@ -24,6 +24,7 @@ public static class ProcessingInventoryModule
         services.AddScoped<ListProcessingActivitiesQueryHandler>();
         services.AddScoped<GetProcessingActivityQueryHandler>();
         services.AddScoped<CreateProcessingActivityCommandHandler>();
+        services.AddScoped<UpdateProcessingActivityCommandHandler>();
 
         return services;
     }

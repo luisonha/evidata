@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Evidata.Api.Contracts;
+namespace Evidata.Modules.Identity.Contracts;
 
 public sealed record ApiErrorResponse(
     [property: JsonPropertyName("code")] string Code,
