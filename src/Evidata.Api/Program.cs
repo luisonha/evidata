@@ -14,6 +14,8 @@ using Evidata.Modules.Mcp;
 using Evidata.Modules.Reporting;
 using Evidata.Modules.Search;
 using Evidata.Modules.Workflow;
+using Evidata.Worker.Outbox.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,15 @@ builder.Services.AddLegalKnowledge(builder.Configuration);
 builder.Services.AddEvidenceModule(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddGapManagementModule(builder.Configuration);
+
+// Outbox — escritura desde la API (GapManagement notificaciones)
+var outboxConn = builder.Configuration.GetConnectionString("evidata-db")
+    ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
+builder.Services.AddDbContext<OutboxDbContext>(options =>
+    options.UseNpgsql(outboxConn));
+builder.Services.AddScoped<OutboxRepository>();
+builder.Services.AddScoped<IOutboxWriter>(sp => sp.GetRequiredService<OutboxRepository>());
+
 builder.Services.AddWorkflowModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);

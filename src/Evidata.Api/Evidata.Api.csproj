@@ -33,6 +33,7 @@
     <ProjectReference Include="..\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
     <ProjectReference Include="..\Modules\Search\Evidata.Modules.Search.csproj" />
     <ProjectReference Include="..\Modules\Mcp\Evidata.Modules.Mcp.csproj" />
+    <ProjectReference Include="..\Evidata.Worker.Outbox\Evidata.Worker.Outbox.csproj" />
   </ItemGroup>
 
 </Project>
