@@ -167,6 +167,9 @@ run_migration "$REPO_ROOT/src/Modules/Mcp/Evidata.Modules.Mcp.csproj" "McpDbCont
 section "Módulo 13: Search"
 run_migration "$REPO_ROOT/src/Modules/Search/Evidata.Modules.Search.csproj" "SearchDbContext"
 
+section "Módulo 14: Outbox Worker"
+run_migration "$REPO_ROOT/src/Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj" "OutboxDbContext" "$REPO_ROOT/src/Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj"
+
 # ─── Resumen ──────────────────────────────────────────────────────────────────
 echo ""
 if [[ $FAILED -gt 0 ]]; then
@@ -186,7 +189,7 @@ fi
 echo "╔══════════════════════════════════════════════════╗"
 echo "║        Migraciones completadas ✅                ║"
 echo "╠══════════════════════════════════════════════════╣"
-echo "║  13 DbContexts procesados sin errores.           ║"
+echo "║  14 DbContexts procesados sin errores.           ║"
 echo "║  Siguiente: scripts/local/seed.sh                ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
@@ -306,11 +309,17 @@ run_migration \
   "$REPO_ROOT/src/Modules/Search/Evidata.Modules.Search.csproj" \
   "SearchDbContext"
 
+section "Módulo 14: Outbox Worker"
+run_migration \
+  "$REPO_ROOT/src/Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj" \
+  "OutboxDbContext" \
+  "$REPO_ROOT/src/Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj"
+
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
 echo "║        Migraciones completadas ✅                ║"
 echo "╠══════════════════════════════════════════════════╣"
-echo "║  13 DbContexts procesados.                       ║"
+echo "║  14 DbContexts procesados.                       ║"
 echo "║  Siguiente: scripts/local/seed.sh                ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
