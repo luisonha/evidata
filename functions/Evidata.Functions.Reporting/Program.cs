@@ -30,8 +30,11 @@ builder.Services.Configure<BlobStorageOptions>(
 builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
 
 builder.Services.AddOpenTelemetry()
-    .UseFunctionsWorkerDefaults()
-    .UseAzureMonitorExporter();
+    .UseFunctionsWorkerDefaults();
+
+// Azure Monitor solo en producción (requiere APPLICATIONINSIGHTS_CONNECTION_STRING)
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddOpenTelemetry().UseAzureMonitorExporter();
 
 builder.Services.AddScoped<RatReportHandler>();
 builder.Services.AddScoped<GapReportHandler>();
