@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workbookDisplayName": {
+      "type": "string",
+      "defaultValue": "Evidata — Operational Dashboard"
+    },
+    "workbookSourceId": {
+      "type": "string",
+      "defaultValue": "Azure Monitor"
+    }
+  },
+  "resources": [
+    {
+      "name": "[newGuid()]",
+      "type": "microsoft.insights/workbooks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2022-04-01",
+      "kind": "shared",
+      "properties": {
+        "displayName": "[parameters('workbookDisplayName')]",
+        "serializedData": "{\"version\":\"Notebook/1.0\",\"items\":[{\"type\":1,\"content\":{\"json\":\"## Evidata — Dashboard Operativo\\n\\nMonitorea en tiempo real los módulos críticos: MCP, Documentos, Reporting y Seguridad.\"},\"name\":\"header\"},{\"type\":9,\"content\":{\"version\":\"KqlParameterItem/1.0\",\"parameters\":[{\"id\":\"timeRange\",\"version\":\"KqlParameterItem/1.0\",\"name\":\"TimeRange\",\"type\":4,\"value\":{\"durationMs\":3600000},\"typeSettings\":{\"selectableValues\":[{\"durationMs\":900000},{\"durationMs\":3600000},{\"durationMs\":86400000}]}}]},\"name\":\"params\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"customMetrics\\n| where timestamp {TimeRange}\\n| where name in ('evidata_mcp_queries_total','evidata_mcp_errors_total','evidata_mcp_high_risk_total')\\n| summarize Total=sum(value) by name\\n| project name, Total\",\"size\":3,\"title\":\"MCP — Métricas clave\",\"queryType\":0,\"visualization\":\"tiles\",\"tileSettings\":{\"titleContent\":{\"columnMatch\":\"name\"},\"leftContent\":{\"columnMatch\":\"Total\"}}},\"name\":\"mcp-tiles\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"customMetrics\\n| where timestamp {TimeRange}\\n| where name in ('evidata_mcp_queries_total','evidata_mcp_errors_total')\\n| summarize Queries=sumif(value,name=='evidata_mcp_queries_total'), Errors=sumif(value,name=='evidata_mcp_errors_total') by bin(timestamp,5m)\\n| extend ErrorRate=iif(Queries>0,todouble(Errors)/todouble(Queries)*100,0.0)\\n| project timestamp, Queries, Errors, ErrorRate\",\"size\":0,\"title\":\"MCP — Tasa de errores en el tiempo\",\"queryType\":0,\"visualization\":\"timechart\"},\"name\":\"mcp-chart\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"customMetrics\\n| where timestamp {TimeRange}\\n| where name in ('evidata_documents_processed_total','evidata_documents_indexed_total','evidata_document_downloads_total')\\n| summarize Total=sum(value) by name\",\"size\":3,\"title\":\"Documentos — Procesados / Indexados / Descargas\",\"queryType\":0,\"visualization\":\"tiles\",\"tileSettings\":{\"titleContent\":{\"columnMatch\":\"name\"},\"leftContent\":{\"columnMatch\":\"Total\"}}},\"name\":\"docs-tiles\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"customMetrics\\n| where timestamp {TimeRange}\\n| where name == 'evidata_reports_generated_total'\\n| summarize Reports=sum(value) by tostring(customDimensions['report_type'])\\n| project ReportType=customDimensions_report_type, Reports\",\"size\":3,\"title\":\"Reporting — Reportes generados por tipo\",\"queryType\":0,\"visualization\":\"piechart\"},\"name\":\"reports-pie\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"customMetrics\\n| where timestamp {TimeRange}\\n| where name in ('evidata_authorization_failures_total','evidata_cross_tenant_attempts_total')\\n| summarize Total=sum(value) by name\",\"size\":3,\"title\":\"Seguridad — Fallas de autorización y cross-tenant\",\"queryType\":0,\"visualization\":\"tiles\",\"tileSettings\":{\"titleContent\":{\"columnMatch\":\"name\"},\"leftContent\":{\"columnMatch\":\"Total\"},\"showBorder\":true}},\"name\":\"security-tiles\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"requests\\n| where timestamp {TimeRange}\\n| where cloud_RoleName == 'Evidata.Api'\\n| where url !contains '/health' and url !contains '/alive'\\n| summarize P50=percentile(duration,50), P95=percentile(duration,95), P99=percentile(duration,99) by bin(timestamp,5m)\",\"size\":0,\"title\":\"API — Latencia (P50/P95/P99)\",\"queryType\":0,\"visualization\":\"timechart\"},\"name\":\"api-latency\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"requests\\n| where timestamp {TimeRange}\\n| where cloud_RoleName startswith 'Evidata.Functions'\\n| summarize Success=countif(success==true), Failures=countif(success==false) by cloud_RoleName\\n| extend SuccessRate=iif((Success+Failures)>0, todouble(Success)/todouble(Success+Failures)*100, 100.0)\\n| project Function=cloud_RoleName, Success, Failures, SuccessRate\\n| order by Failures desc\",\"size\":0,\"title\":\"Functions — Tasa de éxito por función\",\"queryType\":0,\"visualization\":\"table\"},\"name\":\"functions-table\"}]}",
+        "version": "1.0",
+        "sourceId": "[parameters('workbookSourceId')]",
+        "category": "workbook"
+      }
+    }
+  ]
+}

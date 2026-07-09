@@ -1,3 +1,4 @@
+using Evidata.ServiceDefaults;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,7 @@ public static class Extensions
         builder.AddDefaultHealthChecks();
 
         builder.Services.AddServiceDiscovery();
+        builder.Services.AddSingleton<EvidataMetrics>();
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
@@ -65,7 +67,8 @@ public static class Extensions
                 metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter(EvidataMetrics.MeterName);
             })
             .WithTracing(tracing =>
             {

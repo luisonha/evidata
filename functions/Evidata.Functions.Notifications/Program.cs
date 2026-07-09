@@ -1,4 +1,5 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Evidata.Functions.Notifications.Handlers;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
@@ -14,5 +15,7 @@ builder.AddServiceDefaults();
 builder.Services.AddOpenTelemetry()
     .UseFunctionsWorkerDefaults()
     .UseAzureMonitorExporter();
+
+builder.Services.AddScoped<GapNotificationHandler>();
 
 builder.Build().Run();

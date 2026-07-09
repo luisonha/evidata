@@ -28,6 +28,11 @@
     <ProjectReference Include="..\Modules\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
     <ProjectReference Include="..\Modules\Evidence\Evidata.Modules.Evidence.csproj" />
     <ProjectReference Include="..\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
+    <ProjectReference Include="..\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
+    <ProjectReference Include="..\Modules\Workflow\Evidata.Modules.Workflow.csproj" />
+    <ProjectReference Include="..\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
+    <ProjectReference Include="..\Modules\Search\Evidata.Modules.Search.csproj" />
+    <ProjectReference Include="..\Modules\Mcp\Evidata.Modules.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,18 @@
+// Alert: MCP_HIGH_ERROR_RATE
+// Descripción: Tasa de errores MCP > 10% en ventana de 15 minutos
+// Severidad: 1 (Error)
+// Evaluación: cada 5 minutos, ventana 15 minutos
+//
+// Threshold: ErrorRate > 0.10
+
+let window = 15m;
+let threshold = 0.10;
+customMetrics
+| where timestamp > ago(window)
+| where name in ("evidata_mcp_queries_total", "evidata_mcp_errors_total")
+| summarize
+    Queries = sumif(value, name == "evidata_mcp_queries_total"),
+    Errors  = sumif(value, name == "evidata_mcp_errors_total")
+| extend ErrorRate = iif(Queries > 0, todouble(Errors) / todouble(Queries), 0.0)
+| where ErrorRate > threshold
+| project ErrorRate, Queries, Errors

@@ -1,0 +1,13 @@
+// Alert: CROSS_TENANT_ATTEMPT
+// Descripción: Intento de acceso cross-tenant detectado (zero tolerance)
+// Severidad: 0 (Critical) — dispara inmediatamente
+// Evaluación: cada 5 minutos, ventana 5 minutos
+//
+// Cualquier evento es crítico — umbral = 1
+
+customMetrics
+| where timestamp > ago(5m)
+| where name == "evidata_cross_tenant_attempts_total"
+| summarize Count = sum(value)
+| where Count >= 1
+| project Count

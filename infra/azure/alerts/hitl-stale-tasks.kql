@@ -1,0 +1,14 @@
+// Alert: HITL_STALE_TASKS
+// Descripción: Detecta tareas HITL sin asignar por más de 2 horas
+// Severidad: 2 (Warning)
+// Evaluación: cada 15 minutos, ventana 30 minutos
+//
+// Configurar en Azure Monitor → Alerts → Create Alert Rule
+// Signal: Custom Log Search
+
+traces
+| where timestamp > ago(30m)
+| where message contains "HITL_STALE_TASK"
+| where severityLevel >= 2
+| summarize StaleCount = count() by bin(timestamp, 15m)
+| where StaleCount > 0

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Evidata.ServiceDefaults\Evidata.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\src\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
   </ItemGroup>
 
 </Project>
