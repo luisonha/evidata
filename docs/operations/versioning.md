@@ -16,7 +16,7 @@ El versionamiento de Evidata sigue **SemVer 2.0** (https://semver.org/lang/es/).
 ## 2. Formato de versión
 
 ```
-MAJOR.MINOR.PATCH[+<git-hash>]
+MAJOR.MINOR.PATCH.BUILD[+<git-hash>]
 ```
 
 | Segmento | Ejemplo | Descripción |
@@ -24,11 +24,27 @@ MAJOR.MINOR.PATCH[+<git-hash>]
 | `MAJOR` | `2` | Cambio que rompe compatibilidad (breaking change) |
 | `MINOR` | `1` | Nueva funcionalidad, sin romper lo existente |
 | `PATCH` | `3` | Corrección de bug, sin cambio funcional |
+| `BUILD` | `247` | Conteo total de commits git — se incrementa automáticamente |
 | `+<git-hash>` | `+a1b2c3d` | Metadato de build — identifica el commit exacto compilado |
 
-**Ejemplo completo:** `1.3.2+a1b2c3d`
+**Ejemplo completo:** `1.3.2.247+a1b2c3d`
 
-El metadato `+<git-hash>` **no forma parte de la precedencia de versión** (SemVer §10). Dos builds del mismo commit producen la misma versión base. Su propósito es trazabilidad: saber exactamente qué código está corriendo en producción.
+### Propiedades de ensamblado .NET
+
+| Propiedad | Valor | Uso |
+|-----------|-------|-----|
+| `AssemblyVersion` | `1.0.0.0` | Estable — solo cambia en MAJOR. Controla compatibilidad binaria. |
+| `FileVersion` | `1.0.0.247` | 4 bloques — visible en propiedades del archivo en Windows/macOS. |
+| `InformationalVersion` | `1.0.0.247+a1b2c3d` | Completo — aparece en logs, `/api/version`, Application Insights. |
+
+### Por qué el BUILD se incrementa automáticamente
+
+El BUILD es el resultado de `git rev-list --count HEAD` — el número total de commits en el repositorio. Cada commit agrega 1. Es:
+- **Determinista**: dos builds del mismo commit producen el mismo BUILD
+- **Monotónico**: siempre crece, nunca retrocede
+- **Sin dependencias**: no requiere servidor de build ni NuGet packages adicionales
+
+El `+<git-hash>` complementa al BUILD: si dos branches tienen el mismo conteo de commits pero diferente historia, el hash los diferencia.
 
 ---
 
