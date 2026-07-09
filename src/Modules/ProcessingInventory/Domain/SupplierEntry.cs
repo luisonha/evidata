@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Evidata.Modules.ProcessingInventory.Domain;
 
 /// <summary>
@@ -6,19 +8,13 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 /// </summary>
 public class SupplierEntry
 {
-    private SupplierEntry() { }
+    [JsonConstructor]
+    public SupplierEntry() { }
 
-    /// <summary>Nombre del proveedor o encargado.</summary>
-    public string SupplierName { get; private set; } = default!;
-
-    /// <summary>País de domicilio del proveedor (relevante para transferencias).</summary>
-    public string? Country { get; private set; }
-
-    /// <summary>Servicio o función que presta.</summary>
-    public string? ServiceDescription { get; private set; }
-
-    /// <summary>¿Existe contrato de encargo de tratamiento firmado?</summary>
-    public bool HasDataProcessingAgreement { get; private set; }
+    public string SupplierName { get; init; } = default!;
+    public string? Country { get; init; }
+    public string? ServiceDescription { get; init; }
+    public bool HasDataProcessingAgreement { get; init; }
 
     public static SupplierEntry Create(
         string supplierName,

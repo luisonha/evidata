@@ -167,6 +167,11 @@ public class ProcessingActivity
             throw new InvalidOperationException(
                 $"Solo se puede enviar a revisión desde Draft. Estado actual: {Status}.");
 
+        var validation = ProcessingActivityValidator.ValidateForReview(this);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no cumple los requisitos mínimos para revisión: {string.Join("; ", validation.Errors)}");
+
         Status = ProcessingActivityStatus.UnderReview;
         LastModifiedBy = modifiedBy;
         LastModifiedAt = DateTimeOffset.UtcNow;
@@ -177,6 +182,11 @@ public class ProcessingActivity
         if (Status != ProcessingActivityStatus.UnderReview)
             throw new InvalidOperationException(
                 $"Solo se puede aprobar desde UnderReview. Estado actual: {Status}.");
+
+        var validation = ProcessingActivityValidator.ValidateForApproval(this);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no puede aprobarse: {string.Join("; ", validation.Errors)}");
 
         Status = ProcessingActivityStatus.Approved;
         ApprovedBy = approvedBy;
@@ -192,6 +202,41 @@ public class ProcessingActivity
         Status = ProcessingActivityStatus.Draft;
         LastModifiedBy = modifiedBy;
         LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Crea una nueva versión editable (Draft) basada en este tratamiento aprobado.
+    /// La nueva versión hereda todos los datos y tiene Version = this.Version + 1.
+    /// </summary>
+    public ProcessingActivity CreateNewVersion(Guid createdBy)
+    {
+        if (Status != ProcessingActivityStatus.Approved)
+            throw new InvalidOperationException(
+                "Solo se puede crear una nueva versión desde un tratamiento Aprobado.");
+
+        var next = new ProcessingActivity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = TenantId,
+            Name = Name,
+            Description = Description,
+            Controller = Controller,
+            Department = Department,
+            Status = ProcessingActivityStatus.Draft,
+            Version = Version + 1,
+            SupersedesId = Id,
+            CreatedBy = createdBy,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Purpose = Purpose
+        };
+        next._dataCategories.AddRange(_dataCategories);
+        next._dataSubjects.AddRange(_dataSubjects);
+        next._systems.AddRange(_systems);
+        next._suppliers.AddRange(_suppliers);
+        next._securityMeasures.AddRange(_securityMeasures);
+        if (Retention is not null)
+            next.Retention = Retention;
+        return next;
     }
 
     public void Archive(Guid modifiedBy)

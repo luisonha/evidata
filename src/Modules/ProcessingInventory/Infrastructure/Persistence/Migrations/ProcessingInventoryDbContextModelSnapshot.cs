@@ -102,28 +102,38 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Migrati
 
                     b.Property<string>("_dataCategories")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("jsonb")
-                        .HasColumnName("data_categories");
+                        .HasColumnName("data_categories")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("_dataSubjects")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("jsonb")
-                        .HasColumnName("data_subjects");
+                        .HasColumnName("data_subjects")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("_securityMeasures")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("jsonb")
-                        .HasColumnName("security_measures");
+                        .HasColumnName("security_measures")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("_suppliers")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("jsonb")
-                        .HasColumnName("suppliers");
+                        .HasColumnName("suppliers")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("_systems")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("jsonb")
-                        .HasColumnName("systems");
+                        .HasColumnName("systems")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.HasKey("Id");
 

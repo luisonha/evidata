@@ -100,4 +100,26 @@ public class EvidenceLinkService : IEvidenceLinkService
                 l.CreatedAt))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<EvidenceLinkDto>> GetLinksByEntityAsync(
+        Guid tenantId,
+        LinkedEntityType linkedEntityType,
+        Guid linkedEntityId,
+        CancellationToken ct = default)
+    {
+        return await _db.EvidenceLinks
+            .Where(l => l.TenantId == tenantId
+                     && l.LinkedEntityType == linkedEntityType
+                     && l.LinkedEntityId == linkedEntityId
+                     && l.DeletedAt == null)
+            .OrderBy(l => l.CreatedAt)
+            .Select(l => new EvidenceLinkDto(
+                l.Id,
+                l.LinkedEntityType,
+                l.LinkedEntityId,
+                l.Note,
+                l.CreatedBy,
+                l.CreatedAt))
+            .ToListAsync(ct);
+    }
 }

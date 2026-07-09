@@ -1,4 +1,5 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Evidata.Functions.Notifications.Email;
 using Evidata.Functions.Notifications.Handlers;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -13,9 +14,14 @@ builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
 builder.Services.AddOpenTelemetry()
-    .UseFunctionsWorkerDefaults()
-    .UseAzureMonitorExporter();
+    .UseFunctionsWorkerDefaults();
 
+// Azure Monitor solo en producción (requiere APPLICATIONINSIGHTS_CONNECTION_STRING)
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddOpenTelemetry().UseAzureMonitorExporter();
+
+builder.Services.AddSingleton<IEmailSender, MailKitEmailSender>();
 builder.Services.AddScoped<GapNotificationHandler>();
+builder.Services.AddScoped<RatNotificationHandler>();
 
 builder.Build().Run();

@@ -1,10 +1,12 @@
 using Evidata.Modules.Security.Application.Commands;
 using Evidata.Modules.Security.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Security.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/roles")]
 public class RolesController : ControllerBase
 {

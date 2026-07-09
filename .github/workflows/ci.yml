@@ -20,6 +20,67 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check forbidden backend naming and routes
+        run: |
+          set -euo pipefail
+
+          check_absent() {
+            local description="$1"
+            local pattern="$2"
+            shift 2
+            local -a files=("$@")
+
+            if [ "${#files[@]}" -eq 0 ]; then
+              return 0
+            fi
+
+            local matches
+            local status
+
+            set +e
+            matches=$(grep -nI -E -i -- "${pattern}" "${files[@]}" 2>&1)
+            status=$?
+            set -e
+
+            if [ "${status}" -eq 0 ]; then
+              echo "::error::${description}"
+              echo "${matches}"
+              exit 1
+            fi
+
+            if [ "${status}" -ne 1 ]; then
+              echo "::error::Failed to execute guard: ${description}"
+              echo "${matches}"
+              exit "${status}"
+            fi
+          }
+
+          src_files=()
+          while IFS= read -r file; do
+            src_files+=("${file}")
+          done < <(find src -type f ! -path '*/bin/*' ! -path '*/obj/*' | sort)
+
+          http_files=()
+          while IFS= read -r file; do
+            http_files+=("${file}")
+          done < <(find . -type f -name '*.http' | sort)
+
+          check_absent \
+            "Forbidden backend naming detected: 'Treatment' must not appear under src/." \
+            "Treatment" \
+            "${src_files[@]}"
+
+          check_absent \
+            "Forbidden backend route detected: '/api/v1/treatments' and '/api/treatments' must not appear under src/." \
+            "/api/v1/treatments|/api/treatments" \
+            "${src_files[@]}"
+
+          weatherforecast_targets=("src/Evidata.Api/Program.cs" "${http_files[@]}")
+          check_absent \
+            "Forbidden regression detected: '/weatherforecast' must not appear in Program.cs or any .http file." \
+            "/weatherforecast" \
+            "${weatherforecast_targets[@]}"
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -29,7 +90,13 @@ jobs:
         run: dotnet restore Evidata.sln
 
       - name: Build
-        run: dotnet build Evidata.sln --no-restore --configuration Release
+        run: |
+          GIT_HASH=$(git rev-parse --short HEAD)
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          echo "Building version 1.0.0.${BUILD_NUMBER}+${GIT_HASH}"
+          dotnet build Evidata.sln --no-restore --configuration Release \
+            -p:SourceRevisionId="${GIT_HASH}" \
+            -p:BuildNumber="${BUILD_NUMBER}"
 
       - name: Test
         run: dotnet test Evidata.sln --no-build --configuration Release --verbosity minimal

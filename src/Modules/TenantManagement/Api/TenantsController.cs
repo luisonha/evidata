@@ -2,11 +2,13 @@ using Evidata.Modules.TenantManagement.Application.Commands;
 using Evidata.Modules.TenantManagement.Application.DTOs;
 using Evidata.Modules.TenantManagement.Application.Queries;
 using Evidata.Modules.TenantManagement.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.TenantManagement.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/tenants")]
 public class TenantsController(
     CreateTenantCommandHandler createHandler,

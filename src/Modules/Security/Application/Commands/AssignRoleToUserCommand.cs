@@ -22,8 +22,9 @@ public class AssignRoleToUserCommandHandler
             ?? throw new InvalidOperationException($"Role {command.RoleId} not found.");
 
         var existing = await _assignments.GetByUserAsync(command.UserId, command.TenantId, ct);
-        if (existing.Any(a => a.RoleId == command.RoleId))
-            throw new InvalidOperationException($"User {command.UserId} already has role {role.Name}.");
+        var alreadyAssigned = existing.FirstOrDefault(a => a.RoleId == command.RoleId);
+        if (alreadyAssigned is not null)
+            return new UserRoleAssignmentDto(command.UserId, command.RoleId, role.Name, command.TenantId, alreadyAssigned.AssignedAt);
 
         var assignment = UserRoleAssignment.Create(command.UserId, command.RoleId, command.TenantId);
         await _assignments.AssignAsync(assignment, ct);

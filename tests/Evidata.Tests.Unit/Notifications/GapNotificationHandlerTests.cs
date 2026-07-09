@@ -1,3 +1,4 @@
+using Evidata.Functions.Notifications.Email;
 using Evidata.Functions.Notifications.Handlers;
 using Evidata.Modules.GapManagement.Application.Notifications;
 using Evidata.Modules.GapManagement.Domain;
@@ -8,8 +9,13 @@ namespace Evidata.Tests.Unit.Notifications;
 
 public class GapNotificationHandlerTests
 {
+    private sealed class NullEmailSender : IEmailSender
+    {
+        public Task SendAsync(EmailMessage message, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
     private readonly GapNotificationHandler _handler =
-        new(NullLogger<GapNotificationHandler>.Instance);
+        new(new NullEmailSender(), NullLogger<GapNotificationHandler>.Instance);
 
     private static string BuildPayload(
         string? gapTitle = "Falta política de privacidad",

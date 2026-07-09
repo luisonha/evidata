@@ -1,4 +1,5 @@
 using Evidata.Modules.Documents.Application.Abstractions;
+using Evidata.Modules.Documents.Application.Queries;
 using Evidata.Modules.Documents.Infrastructure.Configuration;
 using Evidata.Modules.Documents.Infrastructure.Persistence;
 using Evidata.Modules.Documents.Infrastructure.Storage;
@@ -17,7 +18,17 @@ public static class DocumentsModule
         services.Configure<BlobStorageOptions>(
             configuration.GetSection(BlobStorageOptions.SectionName));
 
+        // Aspire inyecta el connection string de Azurite en "ConnectionStrings:blobs"
+        // (puerto dinámico según el contenedor). Tiene prioridad sobre el default estático.
+        services.PostConfigure<BlobStorageOptions>(opts =>
+        {
+            var aspireBlobs = configuration.GetConnectionString("blobs");
+            if (!string.IsNullOrWhiteSpace(aspireBlobs))
+                opts.ConnectionString = aspireBlobs;
+        });
+
         services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+        services.AddScoped<ListDocumentsQueryHandler>();
 
         var connectionString = configuration.GetConnectionString("evidata-db")
             ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");

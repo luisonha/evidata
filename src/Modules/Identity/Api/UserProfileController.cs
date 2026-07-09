@@ -1,10 +1,12 @@
 using Evidata.Modules.Identity.Application.Commands;
 using Evidata.Modules.Identity.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Identity.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/users")]
 public class UserProfileController : ControllerBase
 {

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Evidata.Modules.ProcessingInventory.Domain;
 
 /// <summary>
@@ -6,16 +8,12 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 /// </summary>
 public class SystemEntry
 {
-    private SystemEntry() { }
+    [JsonConstructor]
+    public SystemEntry() { }
 
-    /// <summary>Nombre del sistema o aplicación.</summary>
-    public string SystemName { get; private set; } = default!;
-
-    /// <summary>Descripción del rol que cumple en el tratamiento.</summary>
-    public string? Role { get; private set; }
-
-    /// <summary>¿Es un sistema de terceros (SaaS externo)?</summary>
-    public bool IsExternal { get; private set; }
+    public string SystemName { get; init; } = default!;
+    public string? Role { get; init; }
+    public bool IsExternal { get; init; }
 
     public static SystemEntry Create(string systemName, string? role = null, bool isExternal = false)
     {

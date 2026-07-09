@@ -26,7 +26,10 @@ builder.Services.AddDbContext<DocumentDbContext>(options =>
 builder.Services.AddScoped<DocumentUploadedHandler>();
 
 builder.Services.AddOpenTelemetry()
-    .UseFunctionsWorkerDefaults()
-    .UseAzureMonitorExporter();
+    .UseFunctionsWorkerDefaults();
+
+// Azure Monitor solo en producción (requiere APPLICATIONINSIGHTS_CONNECTION_STRING)
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddOpenTelemetry().UseAzureMonitorExporter();
 
 builder.Build().Run();

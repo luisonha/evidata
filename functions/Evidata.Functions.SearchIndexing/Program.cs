@@ -20,8 +20,11 @@ builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);
 
 builder.Services.AddOpenTelemetry()
-    .UseFunctionsWorkerDefaults()
-    .UseAzureMonitorExporter();
+    .UseFunctionsWorkerDefaults();
+
+// Azure Monitor solo en producción (requiere APPLICATIONINSIGHTS_CONNECTION_STRING)
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddOpenTelemetry().UseAzureMonitorExporter();
 
 builder.Services.AddScoped<DocumentIndexingHandler>();
 builder.Services.AddScoped<RatIndexingHandler>();

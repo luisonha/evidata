@@ -8,6 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+export DOTNET_ROOT="$HOME/.dotnet"
 export PATH="$HOME/.dotnet:$PATH"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -26,20 +27,33 @@ docker info &>/dev/null || {
   exit 1
 }
 
+info "Verificando instancias previas de Aspire..."
+EXISTING_PID=$(ps aux | grep "Evidata\.AppHost" | grep -v grep | awk '{print $2}' | head -1 || true)
+if [[ -n "$EXISTING_PID" ]]; then
+  warn "Instancia previa detectada (PID $EXISTING_PID). Deteniendo..."
+  kill "$EXISTING_PID" 2>/dev/null; sleep 3
+  info "Instancia anterior detenida."
+fi
+
+# ─── Build con git hash para versionamiento ──────────────────────────────────
+GIT_HASH=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_NUMBER=$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || echo "0")
+info "Compilando (versión 1.0.0.${BUILD_NUMBER}+${GIT_HASH})..."
+dotnet build "$REPO_ROOT/Evidata.sln" \
+  -p:SourceRevisionId="$GIT_HASH" \
+  -p:BuildNumber="$BUILD_NUMBER" \
+  --nologo -v:q 2>&1 | grep -E "error|warning|Error|Warning" || true
+info "Compilación completada."
+
 info "Iniciando stack via .NET Aspire..."
 echo ""
 echo -e "${CYAN}  URLs disponibles una vez iniciado:${NC}"
-echo "  • Aspire Dashboard : http://localhost:18888"
-echo "  • API REST         : http://localhost:5000"
-echo "  • Swagger (dev)    : http://localhost:5000/openapi/v1.json"
-echo "  • Health Check     : http://localhost:5000/health"
+echo "  • Aspire Dashboard : se muestra en la salida de Aspire"
+echo "  • API REST         : puerto dinámico (ver dashboard)"
 echo "  • Mailpit (emails) : http://localhost:8025"
-echo "  • PostgreSQL       : localhost:5432  (DB: evidata_dev)"
-echo "  • Azurite Blob     : http://127.0.0.1:10000/devstoreaccount1"
-echo "  • Azurite Queue    : http://127.0.0.1:10001/devstoreaccount1"
 echo ""
 echo -e "${YELLOW}  Presiona Ctrl+C para detener el stack${NC}"
 echo ""
 
 cd "$REPO_ROOT/src/Evidata.AppHost"
-dotnet run
+dotnet run --no-build

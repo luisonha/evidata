@@ -11,6 +11,7 @@ public enum LinkedEntityType
     SecurityControl,
     DataSubjectRequest,
     AuditFinding,
+    ProcessingActivity,
     Other
 }
 

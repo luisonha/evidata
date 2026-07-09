@@ -3,11 +3,13 @@ using Evidata.Modules.Mcp.Application.Abstractions;
 using Evidata.Modules.Mcp.Application.Audit;
 using Evidata.Modules.Mcp.Application.CitationVerification;
 using Evidata.Modules.Mcp.Application.Query;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Mcp.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/mcp")]
 public sealed class McpController : ControllerBase
 {
@@ -39,9 +41,6 @@ public sealed class McpController : ControllerBase
         [FromBody] McpQueryApiRequest request,
         CancellationToken ct)
     {
-        if (!_currentUser.IsAuthenticated)
-            return Unauthorized();
-
         if (string.IsNullOrWhiteSpace(request.Question))
             return BadRequest("La pregunta no puede estar vacía.");
 
@@ -64,8 +63,6 @@ public sealed class McpController : ControllerBase
         [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
     {
-        if (!_currentUser.IsAuthenticated) return Unauthorized();
-
         var query = new McpAuditQuery(
             TenantId: _currentUser.TenantId,
             From: from,
@@ -85,7 +82,6 @@ public sealed class McpController : ControllerBase
     [HttpGet("metrics/feedback")]
     public async Task<ActionResult<McpFeedbackMetrics>> GetFeedbackMetrics(CancellationToken ct)
     {
-        if (!_currentUser.IsAuthenticated) return Unauthorized();
         var result = await _auditService.GetFeedbackMetricsAsync(_currentUser.TenantId, ct);
         return Ok(result);
     }
@@ -96,7 +92,6 @@ public sealed class McpController : ControllerBase
     [HttpGet("metrics/hitl")]
     public async Task<ActionResult<McpHitlSummary>> GetHitlSummary(CancellationToken ct)
     {
-        if (!_currentUser.IsAuthenticated) return Unauthorized();
         var result = await _auditService.GetHitlSummaryAsync(_currentUser.TenantId, ct);
         return Ok(result);
     }
@@ -110,8 +105,6 @@ public sealed class McpController : ControllerBase
         [FromBody] McpFeedbackRequest request,
         CancellationToken ct)
     {
-        if (!_currentUser.IsAuthenticated) return Unauthorized();
-
         await _interactions.RecordFeedbackAsync(
             interactionId, _currentUser.TenantId, _currentUser.UserId,
             request.Rating, request.Comment, ct);
@@ -128,8 +121,6 @@ public sealed class McpController : ControllerBase
         [FromServices] IMcpCitationVerifier citationVerifier,
         CancellationToken ct)
     {
-        if (!_currentUser.IsAuthenticated) return Unauthorized();
-
         var interaction = await _interactions.GetByIdAsync(interactionId, ct);
         if (interaction is null) return NotFound();
         if (interaction.TenantId != _currentUser.TenantId) return Forbid();

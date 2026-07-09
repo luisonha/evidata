@@ -1,5 +1,7 @@
 using Evidata.Modules.ProcessingInventory.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
@@ -10,6 +12,27 @@ public class ProcessingInventoryDbContext : DbContext
         : base(options) { }
 
     public DbSet<ProcessingActivity> ProcessingActivities => Set<ProcessingActivity>();
+    public DbSet<ProcessingActivitySnapshot> ProcessingActivitySnapshots => Set<ProcessingActivitySnapshot>();
+
+    // ⚠️ WARNING: Si el valor almacenado no es un array JSON válido (p.ej. '{}'),
+    // se retorna lista vacía. Esto indica datos corruptos o insertados sin pasar por EF Core.
+    private static List<T> DeserializeList<T>(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v) || v.TrimStart().StartsWith('{'))
+            return new List<T>();
+        return JsonSerializer.Deserialize<List<T>>(v, (JsonSerializerOptions?)null) ?? new();
+    }
+
+    // EF Core necesita un ValueComparer para detectar cambios en colecciones con HasConversion.
+    // Comparamos por JSON serializado: dos listas son iguales si producen el mismo JSON.
+    private static ValueComparer<List<T>> JsonListComparer<T>() =>
+        new(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null)
+                   == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+            v => JsonSerializer.Deserialize<List<T>>(
+                     JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                     (JsonSerializerOptions?)null) ?? new List<T>());
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,10 +75,12 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property<List<DataCategoryEntry>>("_dataCategories")
                 .HasColumnName("data_categories")
                 .HasColumnType("jsonb")
+                .HasDefaultValueSql("'[]'::jsonb")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<DataCategoryEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+                    v => DeserializeList<DataCategoryEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<DataCategoryEntry>());
 
             e.Ignore(a => a.DataCategories); // exposed via read-only property
 
@@ -63,10 +88,12 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property<List<DataSubjectEntry>>("_dataSubjects")
                 .HasColumnName("data_subjects")
                 .HasColumnType("jsonb")
+                .HasDefaultValueSql("'[]'::jsonb")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<DataSubjectEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+                    v => DeserializeList<DataSubjectEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<DataSubjectEntry>());
 
             e.Ignore(a => a.DataSubjects);
 
@@ -74,20 +101,24 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property<List<SystemEntry>>("_systems")
                 .HasColumnName("systems")
                 .HasColumnType("jsonb")
+                .HasDefaultValueSql("'[]'::jsonb")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<SystemEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+                    v => DeserializeList<SystemEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SystemEntry>());
             e.Ignore(a => a.Systems);
 
             // ── Suppliers (JSONB) ─────────────────────────────────────────────
             e.Property<List<SupplierEntry>>("_suppliers")
                 .HasColumnName("suppliers")
                 .HasColumnType("jsonb")
+                .HasDefaultValueSql("'[]'::jsonb")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<SupplierEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+                    v => DeserializeList<SupplierEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SupplierEntry>());
             e.Ignore(a => a.Suppliers);
 
             // ── RetentionSection (owned type) ─────────────────────────────────
@@ -102,10 +133,12 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property<List<SecurityMeasureEntry>>("_securityMeasures")
                 .HasColumnName("security_measures")
                 .HasColumnType("jsonb")
+                .HasDefaultValueSql("'[]'::jsonb")
                 .UsePropertyAccessMode(PropertyAccessMode.Field)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<SecurityMeasureEntry>>(v, (JsonSerializerOptions?)null) ?? new());
+                    v => DeserializeList<SecurityMeasureEntry>(v))
+                .Metadata.SetValueComparer(JsonListComparer<SecurityMeasureEntry>());
             e.Ignore(a => a.SecurityMeasures);
 
             // ── RiskFlags (owned type — columnas booleanas) ───────────────────
@@ -138,6 +171,22 @@ public class ProcessingInventoryDbContext : DbContext
 
             e.HasIndex(a => a.SupersedesId)
                 .HasDatabaseName("ix_processing_activities_supersedes");
+        });
+
+        modelBuilder.Entity<ProcessingActivitySnapshot>(e =>
+        {
+            e.ToTable("processing_activity_snapshots");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.TenantId).HasColumnName("tenant_id");
+            e.Property(s => s.ActivityId).HasColumnName("activity_id");
+            e.Property(s => s.Version).HasColumnName("version");
+            e.Property(s => s.ApprovedBy).HasColumnName("approved_by");
+            e.Property(s => s.ApprovedAt).HasColumnName("approved_at");
+            e.Property(s => s.Payload).HasColumnName("payload").HasColumnType("jsonb");
+            e.HasIndex(s => new { s.ActivityId, s.Version })
+                .IsUnique()
+                .HasDatabaseName("ix_rat_snapshots_activity_version");
         });
     }
 }
