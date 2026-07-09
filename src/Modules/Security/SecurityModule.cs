@@ -2,7 +2,9 @@ using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Security.Application.Commands;
 using Evidata.Modules.Security.Application.Queries;
 using Evidata.Modules.Security.Domain;
+using Evidata.Modules.Security.Infrastructure.Authorization;
 using Evidata.Modules.Security.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,8 +27,11 @@ public static class SecurityModule
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IUserRoleAssignmentRepository, UserRoleAssignmentRepository>();
-        services.AddScoped<IAuthorizationEvaluator, AuthorizationEvaluator>();
+        services.AddScoped<Application.Abstractions.IAuthorizationEvaluator, AuthorizationEvaluator>();
         services.AddScoped<IResourcePermissionsQueryService, ResourcePermissionsQueryService>();
+        
+        // Authorization handlers for fine-grained RBAC policies
+        services.AddScoped<IAuthorizationHandler, TenantOwnerOrComplianceAdminHandler>();
 
         services.AddScoped<AssignRoleToUserCommandHandler>();
         services.AddScoped<RemoveRoleFromUserCommandHandler>();
