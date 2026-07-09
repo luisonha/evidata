@@ -9,7 +9,7 @@ El dominio backend debe organizarse alrededor de `ProcessingActivity`. La UI pue
 | Concepto objetivo | Implementación actual esperada/detectada | Decisión | Acción |
 |---|---|---|---|
 | `ProcessingActivity` | `ProcessingInventory/Domain/ProcessingActivity.cs` | Mantener y alinear | ExistingModify |
-| `ProcessingActivityVersion` | No confirmado | Crear | New |
+| `ProcessingActivityVersion` | `ProcessingActivity.Version` + `ProcessingActivity.SupersedesId` + `ProcessingActivitySnapshot` + `IProcessingActivityVersionService`/`ProcessingActivityVersionService` | Adoptar como estrategia oficial sin duplicar infraestructura | ExistingModify |
 | `ProcessingActivityNode` | RAT sections/flags/systems | Mapear como proyección o entidad formal | ExistingModify/New |
 | `ProcessingActivityTemplate` | Parcial/no confirmado | Crear o alinear | New/ExistingModify |
 | `Evidence` | Evidence module | Mantener y alinear | ExistingModify |
@@ -199,3 +199,80 @@ Deben existir validaciones de CI para detectar:
 - `/api/v1/treatments`;
 - `/api/treatments`;
 - `/weatherforecast` en contrato público.
+
+## ADR: Estrategia de versionado de ProcessingActivity
+
+### Estado
+
+Aceptado para esta iteración.
+
+### Contexto
+
+El contrato original de este documento asumía que `ProcessingActivityVersion` aún no estaba confirmado como implementación real. La revisión del código actual muestra que el versionado ya está resuelto con cuatro piezas concretas:
+
+- `ProcessingActivity` modela cada versión como una fila completa del agregado, con `Version`, `SupersedesId`, `ApprovedBy` y `ApprovedAt`.
+- `ProcessingActivity.CreateNewVersion(Guid createdBy)` crea una nueva versión `Draft`, incrementa `Version` y enlaza la versión previa vía `SupersedesId`.
+- `ProcessingActivitySnapshot` captura una copia inmutable al aprobar, incluyendo `Version`, `ApprovedBy`, `ApprovedAt` y `Payload` JSON.
+- `IProcessingActivityVersionService` / `ProcessingActivityVersionService` coordinan `ApproveAndSnapshotAsync`, `CreateNewVersionAsync` y `GetSnapshotsAsync`.
+
+### Decisión
+
+Se adopta la infraestructura de versionado ya existente como estrategia oficial del sprint, sin crear una entidad paralela adicional llamada `ProcessingActivityVersion` ni duplicar infraestructura.
+
+El término canónico `ProcessingActivityVersion` de los documentos del sprint se debe interpretar, para esta base de código, como un modelo compuesto por:
+
+1. la instancia actual de `ProcessingActivity` (que representa una versión editable o aprobada),
+2. la cadena de reemplazo entre versiones vía `SupersedesId`,
+3. los metadatos de aprobación (`ApprovedBy`, `ApprovedAt`),
+4. y el historial inmutable persistido en `ProcessingActivitySnapshot`.
+
+No hace falta duplicar ni reemplazar nada porque el código ya cubre los objetivos esenciales del contrato: bloqueo de edición sobre aprobados, creación de nueva versión a partir de un aprobado, preservación de historial y servicio de orquestación transaccional para aprobación + snapshot.
+
+### Mapeo al modelo canónico y a `/control`
+
+#### Interpretación canónica
+
+| Concepto canónico esperado | Implementación real adoptada |
+|---|---|
+| `ProcessingActivityVersion.id` | `ProcessingActivity.Id` de la fila que representa esa versión |
+| `ProcessingActivityVersion.version` | `ProcessingActivity.Version` |
+| relación con versión anterior | `ProcessingActivity.SupersedesId` |
+| aprobación de versión | `ProcessingActivity.ApprovedBy` + `ProcessingActivity.ApprovedAt` |
+| historial inmutable | `ProcessingActivitySnapshot` |
+| estado congelado aprobado | `ProcessingActivitySnapshot.Payload` (JSON) |
+
+#### Mapeo de campos al contrato de la sección 9 de `03-control-viewmodel-and-ui-contract.md`
+
+| Campo real | Estado en doc 03 | Decisión ADR |
+|---|---|---|
+| `Version` (`int`) | Ya existe en `ProcessingActivityDetailViewModel.version` y `ProcessingActivityControlViewModel.version.version` | Se mantiene tal cual. |
+| `SupersedesId` | No estaba declarado en sección 9 | Se agrega como campo opcional de metadata de versión. |
+| `ApprovedAt` | No estaba declarado en sección 9 | Se agrega como campo opcional de metadata de versión. |
+| `ApprovedBy` | No estaba declarado en sección 9 | Se agrega como campo opcional de metadata de versión. |
+| `ProcessingActivitySnapshot.Payload` | No estaba declarado en `/control` | No se expone en `/control`; queda como artefacto de auditoría/historial. |
+
+Regla de exposición adoptada:
+
+- `/control.processingActivity` representa la versión actual como detalle del agregado.
+- `/control.version` representa el metadata de versionado de esa misma fila.
+- `Payload` del snapshot no debe inyectarse en `/control`, porque es un freeze completo para auditoría y comparación, no un read model operativo principal.
+
+### Alcance de la operación "nueva versión" en P1
+
+`CreateNewVersionAsync` existe en la capa de aplicación/infraestructura, pero no aparece hoy como operación HTTP cerrada en la traceability matrix ni en el backlog P1 con `operationId` propio.
+
+Por evidencia documental de esta iteración:
+
+- sí está trazada la aprobación (`approveProcessingActivity` → `ApproveAndSnapshotAsync`);
+- no está trazada una operación pública específica para "crear nueva versión";
+- no está trazado un endpoint para historial de snapshots.
+
+Por tanto, en este sprint P1 la capacidad de "nueva versión" queda formalizada como capacidad interna existente del dominio/servicio, pero no como operación API pública comprometida por contrato. Si se quiere exponer, debe entrar después como endpoint explícito y agregarse a la traceability matrix.
+
+### Brechas y ambigüedades conocidas
+
+1. **Sin endpoint HTTP para historial**: `GetSnapshotsAsync` existe, pero la traceability matrix no declara un endpoint para listar snapshots/version history.
+2. **Sin endpoint HTTP explícito para crear nueva versión**: `CreateNewVersionAsync` existe, pero no hay `operationId` ni ruta `/api/v1/...` trazada para esa acción.
+3. **Desacople con `activeVersionId/currentDraftVersionId`**: la sección 9 del doc 03 usa esos campos, pero el código actual no mantiene esos punteros como propiedades persistidas del agregado; hoy sólo son proyectables/derivables, no fuente primaria.
+4. **Desacople con estado `Active`**: la traceability matrix ya marca `activateProcessingActivity` como `DecisionRequired`, y el agregado real sólo modela `Draft → UnderReview → Approved → Archived`.
+5. **Parámetro no aplicado en servicio**: `ApproveAndSnapshotAsync` recibe `retentionRequired`, pero la implementación actual no lo usa; las precondiciones de aprobación quedan delegadas al validador del agregado. Esto debe tratarse como ambigüedad abierta, no como regla ya resuelta.
