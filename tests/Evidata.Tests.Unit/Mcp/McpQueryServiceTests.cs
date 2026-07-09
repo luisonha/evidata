@@ -87,6 +87,11 @@ public class McpQueryServiceTests
         public Task RequestHumanReviewAsync(Guid interactionId, CancellationToken ct = default)
             => Task.CompletedTask;
 
+        public Task RecordFeedbackAsync(
+            Guid interactionId, Guid tenantId, Guid userId,
+            McpFeedbackRating rating, string? comment, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task<McpInteraction?> GetByIdAsync(Guid interactionId, CancellationToken ct = default)
             => Task.FromResult<McpInteraction?>(null);
 
