@@ -37,7 +37,7 @@ public class AssignRoleToUserCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_DuplicateAssignment_ThrowsException()
+    public async Task Handle_DuplicateAssignment_ReturnsExistingAssignment()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -49,8 +49,12 @@ public class AssignRoleToUserCommandHandlerTests
         _roles.GetByIdAsync(role.Id).Returns(role);
         _assignments.GetByUserAsync(userId, tenantId).Returns([existing]);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _handler.HandleAsync(command));
+        // Act
+        var result = await _handler.HandleAsync(command);
+
+        // Assert
+        Assert.Equal(role.Name, result.RoleName);
+        await _assignments.DidNotReceive().AssignAsync(Arg.Any<UserRoleAssignment>());
     }
 
     [Fact]
