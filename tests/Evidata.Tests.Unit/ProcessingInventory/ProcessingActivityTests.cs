@@ -8,6 +8,22 @@ public class ProcessingActivityTests
         ProcessingActivity.Create(Guid.NewGuid(), name, Guid.NewGuid(),
             description: "Gestión de nómina", controller: "RRHH", department: "Recursos Humanos");
 
+    private static ProcessingActivity BuildReadyForReview()
+    {
+        var act = Build();
+        act.SetPurpose(PurposeSection.Create("Gestión de nómina", LegalBasis.ContractExecution, "Contrato laboral"), Guid.NewGuid());
+        act.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], Guid.NewGuid());
+        act.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], Guid.NewGuid());
+        return act;
+    }
+
+    private static ProcessingActivity BuildReadyForApproval()
+    {
+        var act = BuildReadyForReview();
+        act.SetRetention(RetentionSection.Create("5 años"), Guid.NewGuid());
+        return act;
+    }
+
     // ── TC1: Create OK → Draft v1 ─────────────────────────────────────────────
     [Fact]
     public void Create_Valid_ReturnsDraftV1()
@@ -60,7 +76,7 @@ public class ProcessingActivityTests
     [Fact]
     public void FSM_DraftToApproved_OK()
     {
-        var act = Build();
+        var act = BuildReadyForApproval();
         var reviewer = Guid.NewGuid();
         var approver = Guid.NewGuid();
 
@@ -77,7 +93,7 @@ public class ProcessingActivityTests
     [Fact]
     public void Update_Approved_Throws()
     {
-        var act = Build();
+        var act = BuildReadyForApproval();
         act.SubmitForReview(Guid.NewGuid());
         act.Approve(Guid.NewGuid());
 
@@ -89,7 +105,7 @@ public class ProcessingActivityTests
     [Fact]
     public void ReturnToDraft_FromUnderReview_OK()
     {
-        var act = Build();
+        var act = BuildReadyForReview();
         act.SubmitForReview(Guid.NewGuid());
         act.ReturnToDraft(Guid.NewGuid());
 
@@ -129,7 +145,7 @@ public class ProcessingActivityTests
     [Fact]
     public void SubmitForReview_FromUnderReview_Throws()
     {
-        var act = Build();
+        var act = BuildReadyForReview();
         act.SubmitForReview(Guid.NewGuid());
         Assert.Throws<InvalidOperationException>(() => act.SubmitForReview(Guid.NewGuid()));
     }
