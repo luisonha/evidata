@@ -1,5 +1,7 @@
 using Azure.Storage.Queues;
 using Evidata.Modules.Evidence.Application.Abstractions;
+using Evidata.Modules.Evidence.Application.Commands;
+using Evidata.Modules.Evidence.Application.Queries;
 using Evidata.Modules.Evidence.Infrastructure.Download;
 using Evidata.Modules.Evidence.Infrastructure.Links;
 using Evidata.Modules.Evidence.Infrastructure.Pack;
@@ -25,6 +27,9 @@ public static class EvidenceModule
 
         services.AddScoped<IEvidenceDownloadService, EvidenceDownloadService>();
         services.AddScoped<IEvidenceLinkService, EvidenceLinkService>();
+        services.AddScoped<ListEvidenceQueryHandler>();
+        services.AddScoped<GetEvidenceQueryHandler>();
+        services.AddScoped<CreateEvidenceCommandHandler>();
 
         // EvidencePackService requiere QueueClient — solo disponible si está configurado
         var storageConn = configuration.GetValue<string>("AzureWebJobsStorage");

@@ -1,4 +1,5 @@
 using Evidata.Modules.Search.Application.Abstractions;
+using Evidata.Modules.Search.Application.Queries;
 using Evidata.Modules.Search.Infrastructure.Persistence;
 using Evidata.Modules.Search.Infrastructure.Persistence.Factories;
 using Evidata.Modules.Search.Infrastructure.Queries;
@@ -22,6 +23,7 @@ public static class SearchModule
                 b => b.MigrationsAssembly(typeof(SearchDbContextFactory).Assembly.FullName)));
 
         services.AddScoped<ISearchQueryLogService, SearchQueryLogService>();
+        services.AddScoped<SearchQueryHandler>();
 
         return services;
     }

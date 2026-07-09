@@ -1,4 +1,5 @@
 using Evidata.Modules.Documents.Application.Abstractions;
+using Evidata.Modules.Documents.Application.Queries;
 using Evidata.Modules.Documents.Infrastructure.Configuration;
 using Evidata.Modules.Documents.Infrastructure.Persistence;
 using Evidata.Modules.Documents.Infrastructure.Storage;
@@ -18,6 +19,7 @@ public static class DocumentsModule
             configuration.GetSection(BlobStorageOptions.SectionName));
 
         services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+        services.AddScoped<ListDocumentsQueryHandler>();
 
         var connectionString = configuration.GetConnectionString("evidata-db")
             ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");

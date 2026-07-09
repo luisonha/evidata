@@ -1,3 +1,5 @@
+using Evidata.Modules.ProcessingInventory.Application.Commands;
+using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +20,10 @@ public static class ProcessingInventoryModule
         services.AddDbContext<ProcessingInventoryDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
+
+        services.AddScoped<ListProcessingActivitiesQueryHandler>();
+        services.AddScoped<GetProcessingActivityQueryHandler>();
+        services.AddScoped<CreateProcessingActivityCommandHandler>();
 
         return services;
     }
