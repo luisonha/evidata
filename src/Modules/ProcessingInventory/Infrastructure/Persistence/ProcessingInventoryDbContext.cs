@@ -12,6 +12,7 @@ public class ProcessingInventoryDbContext : DbContext
         : base(options) { }
 
     public DbSet<ProcessingActivity> ProcessingActivities => Set<ProcessingActivity>();
+    public DbSet<ProcessingActivitySnapshot> ProcessingActivitySnapshots => Set<ProcessingActivitySnapshot>();
 
     // ⚠️ WARNING: Si el valor almacenado no es un array JSON válido (p.ej. '{}'),
     // se retorna lista vacía. Esto indica datos corruptos o insertados sin pasar por EF Core.
@@ -170,6 +171,22 @@ public class ProcessingInventoryDbContext : DbContext
 
             e.HasIndex(a => a.SupersedesId)
                 .HasDatabaseName("ix_processing_activities_supersedes");
+        });
+
+        modelBuilder.Entity<ProcessingActivitySnapshot>(e =>
+        {
+            e.ToTable("processing_activity_snapshots");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.TenantId).HasColumnName("tenant_id");
+            e.Property(s => s.ActivityId).HasColumnName("activity_id");
+            e.Property(s => s.Version).HasColumnName("version");
+            e.Property(s => s.ApprovedBy).HasColumnName("approved_by");
+            e.Property(s => s.ApprovedAt).HasColumnName("approved_at");
+            e.Property(s => s.Payload).HasColumnName("payload").HasColumnType("jsonb");
+            e.HasIndex(s => new { s.ActivityId, s.Version })
+                .IsUnique()
+                .HasDatabaseName("ix_rat_snapshots_activity_version");
         });
     }
 }
