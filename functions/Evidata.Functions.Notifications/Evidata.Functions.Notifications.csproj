@@ -10,7 +10,10 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.52.0" />
+    <!-- Pin EF Relational para resolver conflicto MSB3277: Functions SDK trae 9.0.1, módulos requieren 9.0.6 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.6" PrivateAssets="none" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Storage.Queues" Version="5.5.4" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.OpenTelemetry" Version="1.2.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
@@ -22,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Evidata.ServiceDefaults\Evidata.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
   </ItemGroup>
 
 </Project>

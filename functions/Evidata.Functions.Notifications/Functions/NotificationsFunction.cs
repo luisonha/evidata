@@ -11,13 +11,16 @@ public class NotificationsFunction
 {
     private readonly ILogger<NotificationsFunction> _logger;
     private readonly GapNotificationHandler _gapHandler;
+    private readonly RatNotificationHandler _ratHandler;
 
     public NotificationsFunction(
         ILogger<NotificationsFunction> logger,
-        GapNotificationHandler gapHandler)
+        GapNotificationHandler gapHandler,
+        RatNotificationHandler ratHandler)
     {
-        _logger = logger;
+        _logger     = logger;
         _gapHandler = gapHandler;
+        _ratHandler = ratHandler;
     }
 
     /// <summary>
@@ -69,6 +72,15 @@ public class NotificationsFunction
             var handled = await _gapHandler.HandleAsync(envelope.MessageType, envelope.Payload, ct);
             if (!handled)
                 _logger.LogWarning("Notifications: tipo {Type} no manejado", envelope.MessageType);
+            return;
+        }
+
+        // Mensajes de Actividades de Tratamiento (rat.*)
+        if (envelope.MessageType.StartsWith("rat.", StringComparison.OrdinalIgnoreCase))
+        {
+            var handled = await _ratHandler.HandleAsync(envelope.MessageType, envelope.Payload, ct);
+            if (!handled)
+                _logger.LogWarning("Notifications: tipo RAT {Type} no manejado", envelope.MessageType);
             return;
         }
 
