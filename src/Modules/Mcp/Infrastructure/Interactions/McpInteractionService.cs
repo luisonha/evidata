@@ -49,6 +49,15 @@ public sealed class McpInteractionService : IMcpInteractionService
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task RecordFeedbackAsync(
+        Guid interactionId, Guid tenantId, Guid userId,
+        McpFeedbackRating rating, string? comment, CancellationToken ct = default)
+    {
+        var feedback = McpFeedback.Record(interactionId, tenantId, userId, rating, comment);
+        _db.McpFeedbacks.Add(feedback);
+        await _db.SaveChangesAsync(ct);
+    }
+
     public Task<McpInteraction?> GetByIdAsync(Guid interactionId, CancellationToken ct = default) =>
         _db.McpInteractions
             .Include(i => i.Citations)

@@ -37,6 +37,15 @@ public interface IMcpInteractionService
     /// <summary>Escala la interacción a revisión humana (HITL).</summary>
     Task RequestHumanReviewAsync(Guid interactionId, CancellationToken ct = default);
 
+    /// <summary>Registra feedback de un usuario sobre una interacción.</summary>
+    Task RecordFeedbackAsync(
+        Guid interactionId,
+        Guid tenantId,
+        Guid userId,
+        McpFeedbackRating rating,
+        string? comment,
+        CancellationToken ct = default);
+
     /// <summary>Obtiene una interacción por Id (incluye citaciones).</summary>
     Task<McpInteraction?> GetByIdAsync(Guid interactionId, CancellationToken ct = default);
 

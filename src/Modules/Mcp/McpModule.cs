@@ -1,6 +1,7 @@
 using Evidata.Modules.Mcp.Application.Abstractions;
 using Evidata.Modules.Mcp.Application.Audit;
 using Evidata.Modules.Mcp.Application.CitationVerification;
+using Evidata.Modules.Mcp.Application.Query;
 using Evidata.Modules.Mcp.Application.RatContext;
 using Evidata.Modules.Mcp.Application.RiskRouting;
 using Evidata.Modules.Mcp.Infrastructure.Audit;
@@ -8,6 +9,7 @@ using Evidata.Modules.Mcp.Infrastructure.CitationVerification;
 using Evidata.Modules.Mcp.Infrastructure.Interactions;
 using Evidata.Modules.Mcp.Infrastructure.Persistence;
 using Evidata.Modules.Mcp.Infrastructure.Persistence.Factories;
+using Evidata.Modules.Mcp.Infrastructure.Query;
 using Evidata.Modules.Mcp.Infrastructure.RatContext;
 using Evidata.Modules.Mcp.Infrastructure.RiskRouting;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +36,7 @@ public static class McpModule
         services.AddScoped<IRatContextProvider, RatContextProvider>();
         services.AddScoped<IMcpAuditService, McpAuditService>();
         services.AddScoped<IMcpCitationVerifier, McpCitationVerifier>();
+        services.AddScoped<IMcpQueryService, McpQueryService>();
 
         return services;
     }

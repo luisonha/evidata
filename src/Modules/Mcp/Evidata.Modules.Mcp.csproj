@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Documents\Evidata.Modules.Documents.csproj" />
     <ProjectReference Include="..\GapManagement\Evidata.Modules.GapManagement.csproj" />
+    <ProjectReference Include="..\Identity\Evidata.Modules.Identity.csproj" />
     <ProjectReference Include="..\LegalKnowledge\Evidata.Modules.LegalKnowledge.csproj" />
     <ProjectReference Include="..\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
   </ItemGroup>
