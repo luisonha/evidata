@@ -1,11 +1,13 @@
 using Evidata.Modules.Evidence.Application.Commands;
 using Evidata.Modules.Evidence.Application.Queries;
 using Evidata.Modules.Identity.Application.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Evidence.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/evidence")]
 [Route("api/v1/evidence")]
 public class EvidenceController(

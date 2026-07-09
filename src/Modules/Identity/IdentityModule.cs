@@ -31,15 +31,16 @@ public static class IdentityModule
         services.AddScoped<DeactivateUserCommandHandler>();
         services.AddScoped<GetUserProfileQueryHandler>();
 
-        // LocalDev en Development, Null en otros ambientes
+        services.AddHttpContextAccessor();
+
+        // LocalDev en Development, JWT en otros ambientes
         if (environment?.IsDevelopment() == true)
         {
-            services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserContext, LocalDevCurrentUserContext>();
         }
         else
         {
-            services.AddScoped<ICurrentUserContext, NullCurrentUserContext>();
+            services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
         }
 
         return services;

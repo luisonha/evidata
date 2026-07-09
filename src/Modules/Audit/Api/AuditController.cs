@@ -1,19 +1,24 @@
 using Evidata.Modules.Audit.Application.DTOs;
 using Evidata.Modules.Audit.Domain;
+using Evidata.Modules.Identity.Application.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Audit.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/audit")]
 [Route("api/v1/audit-events")]
 public class AuditController : ControllerBase
 {
     private readonly IAuditLogRepository _repository;
+    private readonly ICurrentUserContext _currentUser;
 
-    public AuditController(IAuditLogRepository repository)
+    public AuditController(IAuditLogRepository repository, ICurrentUserContext currentUser)
     {
         _repository = repository;
+        _currentUser = currentUser;
     }
 
     [HttpGet("tenant/{tenantId:guid}")]
@@ -23,6 +28,9 @@ public class AuditController : ControllerBase
         [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
     {
+        if (tenantId != _currentUser.TenantId)
+            return Forbid();
+
         var logs = await _repository.GetByTenantAsync(tenantId, page, pageSize, ct);
         return Ok(logs.Select(MapToDto));
     }
@@ -31,6 +39,9 @@ public class AuditController : ControllerBase
     public async Task<IActionResult> GetByResource(
         Guid tenantId, string resource, Guid resourceId, CancellationToken ct)
     {
+        if (tenantId != _currentUser.TenantId)
+            return Forbid();
+
         var logs = await _repository.GetByResourceAsync(tenantId, resource, resourceId, ct);
         return Ok(logs.Select(MapToDto));
     }
