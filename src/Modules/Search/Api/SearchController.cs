@@ -1,10 +1,12 @@
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Search.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Search.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/search")]
 public class SearchController(
     SearchQueryHandler searchHandler,
