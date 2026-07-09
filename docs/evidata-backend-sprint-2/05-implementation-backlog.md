@@ -1,0 +1,47 @@
+# 05 — Backlog de implementación backend v1.6.4
+
+## P0 — Bloqueantes de contrato
+
+| ID | Acción | Resultado esperado | Gate |
+|---|---|---|---|
+| P0-001 | Exponer rutas oficiales `/api/v1/...`. | OpenAPI público sólo usa rutas versionadas. | OpenAPI contract |
+| P0-002 | Eliminar `/weatherforecast`. | No aparece en OpenAPI ni endpoints públicos. | Forbidden routes |
+| P0-003 | Agregar `operationId` a toda operación. | Cliente generado estable. | OpenAPI lint |
+| P0-004 | Agregar `securitySchemes` y `security`. | Contrato declara protección por endpoint. | OpenAPI lint |
+| P0-005 | Agregar `x-change-status`. | Cada operación clasifica su cambio. | OpenAPI lint |
+| P0-006 | Estandarizar `ApiErrorResponse`. | Errores consistentes. | Contract tests |
+| P0-007 | Prohibir `/api/v1/treatments`. | Naming backend protegido. | Forbidden routes |
+| P0-008 | Crear mapping operation → controller/action → test. | No hay endpoints declarados sin implementación planificada. | Traceability gate |
+
+## P1 — Alineamiento funcional
+
+| ID | Acción | Resultado esperado | Gate |
+|---|---|---|---|
+| P1-001 | Implementar `/control`. | `ProcessingActivityControlViewModel` disponible. | API + Integration |
+| P1-002 | Crear/mapear `ProcessingActivityVersion`. | Versionado formal del RAT. | Domain tests |
+| P1-003 | Crear/mapear `ProcessingActivityNode`. | Nodos RAT estandarizados. | Domain + API |
+| P1-004 | Agregar `availableActions` y `blockedActions`. | UI no infiere permisos críticos. | Security tests |
+| P1-005 | Formalizar `EvidenceRequirement`. | Evidencia requerida es trazable. | Integration |
+| P1-006 | Formalizar `EvidenceValidation`. | Validación/insuficiencia/rechazo auditable. | Evidence tests |
+| P1-007 | Formalizar `GapRule`. | Reglas trazadas a fixtures y tests. | Gap rule tests |
+| P1-008 | Mapear Reporting a Exports. | Exportaciones oficiales y warnings. | Export tests |
+| P1-009 | Mapear AuditLog a AuditEvent o extenderlo. | Acciones críticas auditables. | Audit tests |
+| P1-010 | Crear `TimelineEvent`. | Bitácora UI proyectada. | Timeline tests |
+
+## P2 — Limpieza y compatibilidad
+
+| ID | Acción | Resultado esperado |
+|---|---|---|
+| P2-001 | Definir retiro de rutas `/api/...` legacy. | Migración controlada. |
+| P2-002 | Limpiar referencias históricas `TreatmentEvidenceSummary`. | Naming consistente. |
+| P2-003 | Separar OpenAPI interno legacy si se requiere. | Contrato público limpio. |
+| P2-004 | Agregar step-up opcional para acciones críticas. | Seguridad avanzada P2. |
+| P2-005 | Agregar `EvidenceVersion` si storage lo soporta. | Historial de evidencia más robusto. |
+
+## Orden recomendado de ejecución
+
+1. P0 completo: contrato API/OpenAPI.
+2. P1-001 a P1-004: `/control`, versionado, nodos y permisos.
+3. P1-005 a P1-007: evidencia y brechas.
+4. P1-008 a P1-010: exports, audit y timeline.
+5. P2 según necesidad de compatibilidad.
