@@ -7,6 +7,18 @@ public class RatSectionsTests
     private static ProcessingActivity BuildDraft() =>
         ProcessingActivity.Create(Guid.NewGuid(), "Tratamiento Test", Guid.NewGuid());
 
+    private static ProcessingActivity BuildApproved()
+    {
+        var act = BuildDraft();
+        act.SetPurpose(PurposeSection.Create("Gestión de nómina", LegalBasis.ContractExecution, "Contrato laboral"), Guid.NewGuid());
+        act.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], Guid.NewGuid());
+        act.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], Guid.NewGuid());
+        act.SetRetention(RetentionSection.Create("5 años"), Guid.NewGuid());
+        act.SubmitForReview(Guid.NewGuid());
+        act.Approve(Guid.NewGuid());
+        return act;
+    }
+
     // ── PurposeSection ────────────────────────────────────────────────────────
 
     [Fact]
@@ -38,9 +50,7 @@ public class RatSectionsTests
     [Fact]
     public void SetPurpose_OnApproved_Throws()
     {
-        var act = BuildDraft();
-        act.SubmitForReview(Guid.NewGuid());
-        act.Approve(Guid.NewGuid());
+        var act = BuildApproved();
         var purpose = PurposeSection.Create("fin", LegalBasis.LegalObligation, "just");
 
         Assert.Throws<InvalidOperationException>(() => act.SetPurpose(purpose, Guid.NewGuid()));

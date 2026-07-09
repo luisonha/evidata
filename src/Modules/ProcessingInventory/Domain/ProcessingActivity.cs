@@ -167,6 +167,11 @@ public class ProcessingActivity
             throw new InvalidOperationException(
                 $"Solo se puede enviar a revisión desde Draft. Estado actual: {Status}.");
 
+        var validation = ProcessingActivityValidator.ValidateForReview(this);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no cumple los requisitos mínimos para revisión: {string.Join("; ", validation.Errors)}");
+
         Status = ProcessingActivityStatus.UnderReview;
         LastModifiedBy = modifiedBy;
         LastModifiedAt = DateTimeOffset.UtcNow;
@@ -177,6 +182,11 @@ public class ProcessingActivity
         if (Status != ProcessingActivityStatus.UnderReview)
             throw new InvalidOperationException(
                 $"Solo se puede aprobar desde UnderReview. Estado actual: {Status}.");
+
+        var validation = ProcessingActivityValidator.ValidateForApproval(this);
+        if (!validation.IsValid)
+            throw new InvalidOperationException(
+                $"El tratamiento no puede aprobarse: {string.Join("; ", validation.Errors)}");
 
         Status = ProcessingActivityStatus.Approved;
         ApprovedBy = approvedBy;

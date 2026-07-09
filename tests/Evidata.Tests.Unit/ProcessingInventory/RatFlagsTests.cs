@@ -7,6 +7,18 @@ public class RatFlagsTests
     private static ProcessingActivity BuildDraft() =>
         ProcessingActivity.Create(Guid.NewGuid(), "Test", Guid.NewGuid());
 
+    private static ProcessingActivity BuildApproved()
+    {
+        var act = BuildDraft();
+        act.SetPurpose(PurposeSection.Create("Gestión de nómina", LegalBasis.ContractExecution, "Contrato laboral"), Guid.NewGuid());
+        act.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], Guid.NewGuid());
+        act.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], Guid.NewGuid());
+        act.SetRetention(RetentionSection.Create("5 años"), Guid.NewGuid());
+        act.SubmitForReview(Guid.NewGuid());
+        act.Approve(Guid.NewGuid());
+        return act;
+    }
+
     private static DataCategoryEntry Ordinary() =>
         DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary);
 
@@ -180,9 +192,7 @@ public class RatFlagsTests
     [Fact]
     public void SetRiskInputs_OnApproved_Throws()
     {
-        var act = BuildDraft();
-        act.SubmitForReview(Guid.NewGuid());
-        act.Approve(Guid.NewGuid());
+        var act = BuildApproved();
 
         Assert.Throws<InvalidOperationException>(() =>
             act.SetRiskInputs(true, false, Guid.NewGuid()));
