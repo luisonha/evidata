@@ -1,10 +1,12 @@
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Workflow.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/workflows")]
 public class WorkflowController(
     ListWorkflowTasksQueryHandler handler,

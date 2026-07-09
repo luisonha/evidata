@@ -1,11 +1,13 @@
 using Evidata.Modules.GapManagement.Application.Commands;
 using Evidata.Modules.GapManagement.Application.Queries;
 using Evidata.Modules.Identity.Application.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.GapManagement.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/gaps")]
 public class GapsController(
     ListGapsQueryHandler listHandler,

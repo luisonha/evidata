@@ -16,8 +16,12 @@ using Evidata.Modules.Reporting;
 using Evidata.Modules.Search;
 using Evidata.Modules.Workflow;
 using Evidata.Worker.Outbox.Persistence;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +50,50 @@ builder.Services.AddReportingModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
 
+var authenticationBuilder = builder.Services.AddAuthentication(options =>
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        options.DefaultAuthenticateScheme = LocalDevAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = LocalDevAuthenticationDefaults.AuthenticationScheme;
+    }
+    else
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    }
+});
+
+authenticationBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    var issuer = builder.Configuration["Jwt:Issuer"]
+        ?? throw new InvalidOperationException("JWT issuer not configured. Set Jwt:Issuer.");
+    var audience = builder.Configuration["Jwt:Audience"]
+        ?? throw new InvalidOperationException("JWT audience not configured. Set Jwt:Audience.");
+    var signingKey = builder.Configuration["Jwt:SigningKey"]
+        ?? throw new InvalidOperationException("JWT signing key not configured. Set Jwt:SigningKey.");
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = issuer,
+        ValidateAudience = true,
+        ValidAudience = audience,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
+    };
+});
+
+if (builder.Environment.IsDevelopment())
+{
+    authenticationBuilder.AddScheme<AuthenticationSchemeOptions, LocalDevAuthenticationHandler>(
+        LocalDevAuthenticationDefaults.AuthenticationScheme,
+        _ => { });
+}
+
+builder.Services.AddAuthorization();
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options =>
@@ -63,9 +111,6 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapEvidataHealthEndpoints();
-app.UseLocalDevGuard();
-app.UseTenantIsolation();
-app.MapControllers();
 
 // ── /api/version — versión del binario en ejecución ──────────────────────────
 app.MapGet("/api/version", () =>
@@ -93,6 +138,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseLocalDevGuard();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ── Log de versión al arranque ────────────────────────────────────────────────
 var startupLogger = app.Services.GetRequiredService<ILogger<EvidataApiStartup>>();
@@ -103,6 +151,9 @@ startupLogger.LogInformation(
     "Evidata API iniciada · versión {Version} · entorno {Environment}",
     startupVer,
     app.Environment.EnvironmentName);
+
+app.UseTenantIsolation();
+app.MapControllers();
 
 app.Run();
 

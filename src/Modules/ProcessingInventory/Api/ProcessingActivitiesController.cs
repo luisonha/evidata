@@ -1,4 +1,5 @@
 using Evidata.Modules.Identity.Application.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Domain;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Evidata.Modules.ProcessingInventory.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/processing-activities")]
 public class ProcessingActivitiesController(
     ListProcessingActivitiesQueryHandler listHandler,

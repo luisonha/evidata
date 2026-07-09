@@ -1,11 +1,13 @@
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Evidata.Modules.Identity.Application.Abstractions;
 
 namespace Evidata.Modules.Reporting.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/reports")]
 public class ReportsController(
     IReportJobService reportService,
