@@ -22,7 +22,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Evidata.ServiceDefaults\Evidata.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Documents\Evidata.Modules.Documents.csproj" />
     <ProjectReference Include="..\..\src\Modules\Mcp\Evidata.Modules.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
   </ItemGroup>
 
 </Project>

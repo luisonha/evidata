@@ -1,6 +1,8 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.McpBatch.Handlers;
+using Evidata.Modules.Documents;
 using Evidata.Modules.Mcp;
+using Evidata.Modules.ProcessingInventory;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
@@ -13,6 +15,8 @@ var builder = FunctionsApplication.CreateBuilder(args);
 builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
+builder.Services.AddDocumentsModule(builder.Configuration);
+builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
 
 builder.Services.AddOpenTelemetry()
