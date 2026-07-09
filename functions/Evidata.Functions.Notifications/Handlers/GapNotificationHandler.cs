@@ -1,3 +1,4 @@
+using Evidata.Functions.Notifications.Email;
 using Evidata.Modules.GapManagement.Application.Notifications;
 using Evidata.Modules.GapManagement.Domain;
 using Microsoft.Extensions.Logging;
@@ -7,19 +8,18 @@ namespace Evidata.Functions.Notifications.Handlers;
 
 /// <summary>
 /// Procesa eventos de brecha de cumplimiento y despacha la notificación adecuada.
-///
-/// Entrega actual: log estructurado con todos los campos relevantes.
-/// Extensión futura: inyectar IEmailSender / IPushNotifier (SendGrid, ACS, etc.)
 /// </summary>
 public class GapNotificationHandler
 {
+    private readonly IEmailSender _email;
     private readonly ILogger<GapNotificationHandler> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNameCaseInsensitive = true };
 
-    public GapNotificationHandler(ILogger<GapNotificationHandler> logger)
+    public GapNotificationHandler(IEmailSender email, ILogger<GapNotificationHandler> logger)
     {
+        _email = email;
         _logger = logger;
     }
 
@@ -50,33 +50,39 @@ public class GapNotificationHandler
 
     // ── Handlers por tipo ─────────────────────────────────────────────────────
 
-    private Task<bool> OnGapCreated(GapEventPayload p, CancellationToken ct)
+    private async Task<bool> OnGapCreated(GapEventPayload p, CancellationToken ct)
     {
         _logger.LogInformation(
             "📋 GAP CREADO | GapId={GapId} Tenant={TenantId} Título='{Title}' Severidad={Severity} Actor={ActorId}",
             p.GapId, p.TenantId, p.GapTitle, p.Severity, p.ActorId);
 
-        // Notifica al propietario asignado si existe
-        if (p.OwnerId.HasValue)
-            _logger.LogInformation(
-                "→ Notificando propietario {OwnerId} sobre nueva brecha '{Title}'",
-                p.OwnerId.Value, p.GapTitle);
+        var html = EmailTemplates.GapCreated(p.GapTitle, p.Severity.ToString(), p.TenantId.ToString(), null);
+        await TrySendAsync(new EmailMessage(
+            ToAddress: p.ActorId.ToString(),
+            ToName: "Responsable",
+            Subject: $"Nueva brecha de cumplimiento: {p.GapTitle}",
+            HtmlBody: html), ct);
 
-        return Task.FromResult(true);
+        return true;
     }
 
-    private Task<bool> OnGapAssigned(GapEventPayload p, CancellationToken ct)
+    private async Task<bool> OnGapAssigned(GapEventPayload p, CancellationToken ct)
     {
         _logger.LogInformation(
             "👤 GAP ASIGNADO | GapId={GapId} Tenant={TenantId} NuevoOwner={OwnerId} Actor={ActorId}",
             p.GapId, p.TenantId, p.OwnerId, p.ActorId);
 
         if (p.OwnerId.HasValue)
-            _logger.LogInformation(
-                "→ Notificando nuevo propietario {OwnerId}: asignado a brecha '{Title}'",
-                p.OwnerId.Value, p.GapTitle);
+        {
+            var html = EmailTemplates.GapAssigned(p.GapTitle, p.Severity.ToString(), p.TenantId.ToString(), p.OwnerId.Value.ToString());
+            await TrySendAsync(new EmailMessage(
+                ToAddress: p.OwnerId.Value.ToString(),
+                ToName: "Propietario",
+                Subject: $"Se te asignó una brecha: {p.GapTitle}",
+                HtmlBody: html), ct);
+        }
 
-        return Task.FromResult(true);
+        return true;
     }
 
     private Task<bool> OnGapProgressed(GapEventPayload p, CancellationToken ct)
@@ -87,26 +93,39 @@ public class GapNotificationHandler
         return Task.FromResult(true);
     }
 
-    private Task<bool> OnGapBlocked(GapEventPayload p, CancellationToken ct)
+    private async Task<bool> OnGapBlocked(GapEventPayload p, CancellationToken ct)
     {
         _logger.LogWarning(
             "🚧 GAP BLOQUEADO | GapId={GapId} Tenant={TenantId} Título='{Title}' Razón={Extra}",
             p.GapId, p.TenantId, p.GapTitle, p.Extra ?? "sin detalle");
 
-        // Brecha bloqueada: severidad Critical/High notifica a responsables del tenant
         if (p.Severity is GapSeverity.Critical or GapSeverity.High)
-            _logger.LogWarning(
-                "→ Alerta de alta severidad enviada para brecha bloqueada '{Title}'", p.GapTitle);
+        {
+            var html = EmailTemplates.GapBlocked(p.GapTitle, p.Extra ?? "sin detalle", p.TenantId.ToString());
+            await TrySendAsync(new EmailMessage(
+                ToAddress: p.ActorId.ToString(),
+                ToName: "Responsable",
+                Subject: $"Brecha bloqueada (alta severidad): {p.GapTitle}",
+                HtmlBody: html), ct);
+        }
 
-        return Task.FromResult(true);
+        return true;
     }
 
-    private Task<bool> OnGapResolved(GapEventPayload p, CancellationToken ct)
+    private async Task<bool> OnGapResolved(GapEventPayload p, CancellationToken ct)
     {
         _logger.LogInformation(
             "✅ GAP RESUELTO | GapId={GapId} Tenant={TenantId} Título='{Title}'",
             p.GapId, p.TenantId, p.GapTitle);
-        return Task.FromResult(true);
+
+        var html = EmailTemplates.GapResolved(p.GapTitle, p.TenantId.ToString());
+        await TrySendAsync(new EmailMessage(
+            ToAddress: p.ActorId.ToString(),
+            ToName: "Responsable",
+            Subject: $"Brecha resuelta: {p.GapTitle}",
+            HtmlBody: html), ct);
+
+        return true;
     }
 
     private Task<bool> OnGapRiskAccepted(GapEventPayload p, CancellationToken ct)
@@ -129,5 +148,17 @@ public class GapNotificationHandler
     {
         _logger.LogWarning("⚠ Tipo de mensaje no reconocido: {MessageType} — ignorando", messageType);
         return false;
+    }
+
+    private async Task TrySendAsync(EmailMessage message, CancellationToken ct)
+    {
+        try
+        {
+            await _email.SendAsync(message, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al enviar email a {ToAddress}: {Subject}", message.ToAddress, message.Subject);
+        }
     }
 }
