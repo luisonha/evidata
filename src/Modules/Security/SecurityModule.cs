@@ -26,6 +26,7 @@ public static class SecurityModule
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IUserRoleAssignmentRepository, UserRoleAssignmentRepository>();
         services.AddScoped<IAuthorizationEvaluator, AuthorizationEvaluator>();
+        services.AddScoped<IResourcePermissionsQueryService, ResourcePermissionsQueryService>();
 
         services.AddScoped<AssignRoleToUserCommandHandler>();
         services.AddScoped<RemoveRoleFromUserCommandHandler>();
