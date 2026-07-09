@@ -64,6 +64,9 @@ public class EvidenceDbContext : DbContext
             e.ToTable("evidence_access_logs");
             e.HasKey(l => l.Id);
 
+            // Matching filter: evita warning por relación requerida con Evidence filtrado
+            e.HasQueryFilter(l => l.Evidence!.Status != EvidenceStatus.Deleted);
+
             e.Property(l => l.Id).HasColumnName("id");
             e.Property(l => l.TenantId).HasColumnName("tenant_id").IsRequired();
             e.Property(l => l.EvidenceId).HasColumnName("evidence_id").IsRequired();
@@ -86,6 +89,9 @@ public class EvidenceDbContext : DbContext
         {
             e.ToTable("evidence_links");
             e.HasKey(l => l.Id);
+
+            // Matching filter: combina soft-delete propio + relación requerida con Evidence
+            e.HasQueryFilter(l => l.DeletedAt == null && l.Evidence!.Status != EvidenceStatus.Deleted);
 
             e.Property(l => l.Id).HasColumnName("id");
             e.Property(l => l.TenantId).HasColumnName("tenant_id").IsRequired();

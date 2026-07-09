@@ -59,6 +59,9 @@ public class DocumentDbContext : DbContext
         modelBuilder.Entity<DocumentVersion>(e =>
         {
             e.ToTable("document_versions");
+
+            // Matching filter: evita warning por relación requerida con Document filtrado
+            e.HasQueryFilter(v => v.Document!.DeletedAt == null);
             e.HasKey(v => v.Id);
 
             e.Property(v => v.Id).HasColumnName("id");
