@@ -7,6 +7,7 @@ namespace Evidata.Modules.Reporting.Api;
 
 [ApiController]
 [Route("api/reports")]
+[Route("api/v1/exports")]
 public class ReportsController(
     IReportJobService reportService,
     ICurrentUserContext currentUser) : ControllerBase

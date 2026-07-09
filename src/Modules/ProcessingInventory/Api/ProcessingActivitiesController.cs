@@ -8,6 +8,7 @@ namespace Evidata.Modules.ProcessingInventory.Api;
 
 [ApiController]
 [Route("api/processing-activities")]
+[Route("api/v1/processing-activities")]
 public class ProcessingActivitiesController(
     ListProcessingActivitiesQueryHandler listHandler,
     GetProcessingActivityQueryHandler getHandler,

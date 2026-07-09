@@ -7,6 +7,7 @@ namespace Evidata.Modules.Evidence.Api;
 
 [ApiController]
 [Route("api/evidence")]
+[Route("api/v1/evidence")]
 public class EvidenceController(
     ListEvidenceQueryHandler listHandler,
     GetEvidenceQueryHandler getHandler,

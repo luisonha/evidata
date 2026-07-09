@@ -6,6 +6,7 @@ namespace Evidata.Modules.Workflow.Api;
 
 [ApiController]
 [Route("api/workflows")]
+[Route("api/v1/workflows")]
 public class WorkflowController(
     ListWorkflowTasksQueryHandler handler,
     ICurrentUserContext currentUser) : ControllerBase
