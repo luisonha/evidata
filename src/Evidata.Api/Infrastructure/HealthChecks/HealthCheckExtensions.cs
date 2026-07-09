@@ -19,8 +19,7 @@ public static class HealthCheckExtensions
         var blobConnection = configuration.GetConnectionString("blobs");
         var queueConnection = configuration.GetConnectionString("queues");
 
-        var builder = services.AddHealthChecks()
-            .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"]);
+        var builder = services.AddHealthChecks();
 
         if (!string.IsNullOrWhiteSpace(pgConnection))
         {
