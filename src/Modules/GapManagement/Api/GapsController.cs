@@ -7,6 +7,7 @@ namespace Evidata.Modules.GapManagement.Api;
 
 [ApiController]
 [Route("api/gaps")]
+[Route("api/v1/gaps")]
 public class GapsController(
     ListGapsQueryHandler listHandler,
     GetGapsSummaryQueryHandler summaryHandler,

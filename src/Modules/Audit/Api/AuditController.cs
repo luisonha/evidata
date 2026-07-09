@@ -6,6 +6,7 @@ namespace Evidata.Modules.Audit.Api;
 
 [ApiController]
 [Route("api/audit")]
+[Route("api/v1/audit-events")]
 public class AuditController : ControllerBase
 {
     private readonly IAuditLogRepository _repository;
