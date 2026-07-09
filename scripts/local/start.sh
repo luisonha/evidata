@@ -28,7 +28,7 @@ docker info &>/dev/null || {
 }
 
 info "Verificando instancias previas de Aspire..."
-EXISTING_PID=$(ps aux | grep "Evidata\.AppHost$" | grep -v grep | awk '{print $2}' | head -1)
+EXISTING_PID=$(ps aux | grep "Evidata\.AppHost" | grep -v grep | awk '{print $2}' | head -1 || true)
 if [[ -n "$EXISTING_PID" ]]; then
   warn "Instancia previa detectada (PID $EXISTING_PID). Deteniendo..."
   kill "$EXISTING_PID" 2>/dev/null; sleep 3
