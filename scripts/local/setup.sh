@@ -66,8 +66,10 @@ info "Configurando User Secrets para Evidata.Worker.Outbox..."
 cd "$REPO_ROOT/src/Evidata.Worker.Outbox"
 
 dotnet user-secrets set "ConnectionStrings:evidata-db" \
-  "Host=localhost;Port=5432;Database=evidata_dev;Username=evidata;Password=evidata_local_pw" \
-  2>/dev/null || warn "Worker.Outbox puede no tener UserSecretsId configurado, omitiendo."
+  "Host=localhost;Port=5432;Database=evidata_dev;Username=evidata;Password=evidata_local_pw"
+
+dotnet user-secrets set "ConnectionStrings:evidata-storage" \
+  "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGLjX+N6+KymFfefef3fQ==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1"
 
 # ─── Verificar build ─────────────────────────────────────────────────────────
 info "Verificando que el proyecto compila..."
