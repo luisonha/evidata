@@ -36,7 +36,7 @@ detect_pg_connection() {
     | grep "^POSTGRES_PASSWORD=" | cut -d= -f2-)
 
   if [[ -n "$port" && -n "$password" ]]; then
-    echo "Host=localhost;Port=${port};Database=evidata_dev;Username=postgres;Password=${password};Include Error Detail=true"
+    echo "Host=localhost;Port=${port};Database=evidata-db;Username=postgres;Password=${password};Include Error Detail=true"
   else
     echo ""
   fi
@@ -53,7 +53,7 @@ else
     echo ""
     echo -e "${RED}[ERROR]${NC} No se encontró el contenedor PostgreSQL de Aspire."
     echo "  ➜  Ejecuta primero: scripts/local/start.sh"
-    echo "  ➜  O define: export DB_CONNECTION='Host=...;Port=...;Database=evidata_dev;...'"
+    echo "  ➜  O define: export DB_CONNECTION='Host=...;Port=...;Database=evidata-db;...'"
     exit 1
   fi
 
@@ -198,7 +198,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export PATH="$HOME/.dotnet:$PATH"
 
 # Connection string local por defecto
-DB_CONNECTION="${DB_CONNECTION:-Host=localhost;Port=5432;Database=evidata_dev;Username=evidata;Password=evidata_local_pw}"
+DB_CONNECTION="${DB_CONNECTION:-Host=localhost;Port=5432;Database=evidata-db;Username=evidata;Password=evidata_local_pw}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()    { echo -e "${GREEN}[INFO]${NC}  $*"; }

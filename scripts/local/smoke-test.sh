@@ -5,7 +5,6 @@
 # =============================================================================
 set -euo pipefail
 
-API="${EVIDATA_API:-http://localhost:5000}"
 TENANT_ID="${EVIDATA_TENANT:-00000000-0000-0000-0000-000000000001}"
 ADMIN_ID="${EVIDATA_ADMIN:-00000000-0000-0000-0000-000000000010}"
 USER_ID="${EVIDATA_USER:-00000000-0000-0000-0000-000000000011}"
@@ -17,6 +16,45 @@ PASS=0; FAIL=0; SKIP=0
 pass() { echo -e "  ${GREEN}✅ PASS${NC}  $*"; ((PASS++)); }
 fail() { echo -e "  ${RED}❌ FAIL${NC}  $*"; ((FAIL++)); }
 skip() { echo -e "  ${YELLOW}⏭  SKIP${NC}  $*"; ((SKIP++)); }
+
+# ─── Detectar URL de la API (puerto dinámico de Aspire) ──────────────────────
+detect_api_url() {
+  [[ -n "${EVIDATA_API:-}" ]] && echo "$EVIDATA_API" && return
+
+  # Buscar proceso Evidata.Api por nombre exacto en lsof (no el AppHost/Aspire)
+  local ports
+  ports=$(lsof -nP -i TCP -sTCP:LISTEN 2>/dev/null \
+    | grep "^Evidata\." \
+    | awk '{print $9}' | grep -o '[0-9]*$' | sort -n | uniq)
+
+  if [[ -z "$ports" ]]; then
+    local api_pid
+    api_pid=$(ps aux | grep "Evidata\.Api$" | grep -v grep | awk '{print $2}' | head -1)
+    if [[ -n "$api_pid" ]]; then
+      ports=$(lsof -p "$api_pid" -nP -i TCP -sTCP:LISTEN 2>/dev/null \
+        | awk '{print $9}' | grep -o '[0-9]*$' | sort -n | uniq)
+    fi
+  fi
+
+  for port in $ports; do
+    local code
+    code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 3 \
+      "https://localhost:${port}/health" 2>/dev/null || echo "000")
+    if [[ "$code" == "200" || "$code" == "503" ]]; then
+      echo "https://localhost:${port}"
+      return
+    fi
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 \
+      "http://localhost:${port}/health" 2>/dev/null || echo "000")
+    if [[ "$code" == "200" || "$code" == "503" ]]; then
+      echo "http://localhost:${port}"
+      return
+    fi
+  done
+  echo ""
+}
+
+API=$(detect_api_url)
 
 # ─── Helper: verificar endpoint ───────────────────────────────────────────────
 check() {
@@ -31,10 +69,10 @@ check() {
 
   local http_code
   if [[ -n "$body" ]]; then
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
+    http_code=$(curl -sL --insecure -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
       "${headers[@]}" -H "Content-Type: application/json" -d "$body" 2>/dev/null || echo "000")
   else
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
+    http_code=$(curl -sL --insecure -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
       "${headers[@]}" 2>/dev/null || echo "000")
   fi
 
@@ -58,7 +96,7 @@ check_contains() {
   )
 
   local body
-  body=$(curl -s "$API$path" "${headers[@]}" 2>/dev/null || echo "")
+  body=$(curl -sL --insecure "$API$path" "${headers[@]}" 2>/dev/null || echo "")
 
   if echo "$body" | grep -q "$search"; then
     pass "$label (contiene '$search')"
@@ -77,11 +115,13 @@ echo ""
 # ─── Disponibilidad ──────────────────────────────────────────────────────────
 echo -e "${CYAN}▶ Disponibilidad del servicio${NC}"
 
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API/health" 2>/dev/null || echo "000")
-if [[ "$HTTP_STATUS" == "000" ]]; then
-  echo -e "${RED}[FATAL]${NC} API no disponible en $API. Ejecuta start.sh primero."
+if [[ -z "$API" ]]; then
+  echo -e "${RED}[FATAL]${NC} No se detectó la API de Evidata en ningún puerto."
+  echo "   ➜  Ejecuta start.sh primero."
   exit 1
 fi
+
+HTTP_STATUS=$(curl -sL --insecure -o /dev/null -w "%{http_code}" "$API/health" 2>/dev/null || echo "000")
 
 if [[ "$HTTP_STATUS" == "200" ]]; then
   pass "Health check — servicio saludable"
@@ -206,7 +246,7 @@ check "GET /api/search?q=datos" 200 GET "/api/search?q=datos"
 echo ""
 echo -e "${CYAN}▶ Health Checks detallados${NC}"
 
-HEALTH_BODY=$(curl -s "$API/health" 2>/dev/null || echo '{}')
+HEALTH_BODY=$(curl -sL --insecure "$API/health" 2>/dev/null || echo '{}')
 if echo "$HEALTH_BODY" | grep -qi '"status".*"Healthy"'; then
   pass "Todos los servicios en estado Healthy"
 elif echo "$HEALTH_BODY" | grep -qi "Degraded"; then
@@ -265,10 +305,10 @@ check() {
 
   local response http_code
   if [[ -n "$body" ]]; then
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
+    http_code=$(curl -sL --insecure -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
       "${headers[@]}" -H "Content-Type: application/json" -d "$body" 2>/dev/null || echo "000")
   else
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
+    http_code=$(curl -sL --insecure -o /dev/null -w "%{http_code}" -X "$method" "$API$path" \
       "${headers[@]}" 2>/dev/null || echo "000")
   fi
 
@@ -292,7 +332,7 @@ check_contains() {
   )
 
   local body
-  body=$(curl -s "$API$path" "${headers[@]}" 2>/dev/null || echo "")
+  body=$(curl -sL --insecure "$API$path" "${headers[@]}" 2>/dev/null || echo "")
 
   if echo "$body" | grep -q "$search"; then
     pass "$label (contiene '$search')"
@@ -311,7 +351,7 @@ echo ""
 # ─── Verificar disponibilidad ────────────────────────────────────────────────
 echo -e "${CYAN}▶ Disponibilidad del servicio${NC}"
 
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API/health" 2>/dev/null || echo "000")
+HTTP_STATUS=$(curl -sL --insecure -o /dev/null -w "%{http_code}" "$API/health" 2>/dev/null || echo "000")
 if [[ "$HTTP_STATUS" == "000" ]]; then
   echo -e "${RED}[FATAL]${NC} API no disponible en $API. Ejecuta start.sh primero."
   exit 1
@@ -364,7 +404,7 @@ echo -e "${CYAN}▶ Health Checks detallados${NC}"
 
 check "GET /health" 200 GET "/health"
 
-HEALTH_BODY=$(curl -s "$API/health" 2>/dev/null || echo '{}')
+HEALTH_BODY=$(curl -sL --insecure "$API/health" 2>/dev/null || echo '{}')
 if echo "$HEALTH_BODY" | grep -qi '"status".*"Healthy"'; then
   pass "Todos los health checks en estado Healthy"
 elif echo "$HEALTH_BODY" | grep -qi "Degraded"; then
