@@ -105,7 +105,7 @@ app.MapGet("/weatherforecast", () =>
 .WithName("GetWeatherForecast");
 
 // ── Log de versión al arranque ────────────────────────────────────────────────
-var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+var startupLogger = app.Services.GetRequiredService<ILogger<EvidataApiStartup>>();
 var startupAsm    = Assembly.GetEntryAssembly()!;
 var startupVer    = startupAsm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                    ?? startupAsm.GetName().Version?.ToString() ?? "unknown";
@@ -120,3 +120,7 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
+
+// Marcador para categoría de log de arranque — evita ambigüedad CS0436
+// con Evidata.Worker.Outbox que también tiene clase Program implícita.
+internal sealed class EvidataApiStartup { }
