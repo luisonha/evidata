@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Evidata.Modules.ProcessingInventory.Domain;
 
 /// <summary>
@@ -6,19 +8,13 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 /// </summary>
 public class DataCategoryEntry
 {
-    private DataCategoryEntry() { } // deserialización
+    [JsonConstructor]
+    private DataCategoryEntry() { }
 
-    /// <summary>ID de referencia a catálogo global DataCategory (LegalKnowledge).</summary>
-    public Guid DataCategoryId { get; private set; }
-
-    /// <summary>Nombre local o alias del dato en este tratamiento (opcional).</summary>
-    public string? LocalName { get; private set; }
-
-    /// <summary>Sensibilidad declarada para este dato en este tratamiento.</summary>
-    public DataSensitivityLevel Sensitivity { get; private set; }
-
-    /// <summary>Comentario adicional.</summary>
-    public string? Comment { get; private set; }
+    public Guid DataCategoryId { get; init; }
+    public string? LocalName { get; init; }
+    public DataSensitivityLevel Sensitivity { get; init; }
+    public string? Comment { get; init; }
 
     public static DataCategoryEntry Create(
         Guid dataCategoryId,
@@ -39,13 +35,9 @@ public class DataCategoryEntry
     }
 }
 
-/// <summary>Nivel de sensibilidad de un dato en el contexto del tratamiento.</summary>
 public enum DataSensitivityLevel
 {
-    /// <summary>Datos ordinarios (nombre, dirección, email).</summary>
     Ordinary,
-    /// <summary>Datos financieros, laborales o comerciales con riesgo medio.</summary>
     Sensitive,
-    /// <summary>Datos especialmente protegidos: salud, origen, religión, biometría, NNA.</summary>
     SpecialCategory
 }

@@ -1,20 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Evidata.Modules.ProcessingInventory.Domain;
 
-/// <summary>
-/// Tipo de titular de datos afectado por el tratamiento (doc 14, sec 5.5).
-/// </summary>
 public enum DataSubjectType
 {
-    Employees,
-    Customers,
-    Applicants,
-    Suppliers,
-    WebUsers,
-    Children,        // NNA — activa flag de riesgo
-    Patients,
-    Students,
-    PublicOfficials,
-    Other
+    Employees, Customers, Applicants, Suppliers, WebUsers,
+    Children, Patients, Students, PublicOfficials, Other
 }
 
 /// <summary>
@@ -23,15 +14,12 @@ public enum DataSubjectType
 /// </summary>
 public class DataSubjectEntry
 {
-    private DataSubjectEntry() { } // deserialización
+    [JsonConstructor]
+    private DataSubjectEntry() { }
 
-    public DataSubjectType SubjectType { get; private set; }
-
-    /// <summary>Descripción libre cuando SubjectType == Other.</summary>
-    public string? Description { get; private set; }
-
-    /// <summary>Estimado de cantidad de titulares afectados (opcional).</summary>
-    public int? EstimatedCount { get; private set; }
+    public DataSubjectType SubjectType { get; init; }
+    public string? Description { get; init; }
+    public int? EstimatedCount { get; init; }
 
     public static DataSubjectEntry Create(
         DataSubjectType subjectType,

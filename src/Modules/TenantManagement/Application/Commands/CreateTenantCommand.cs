@@ -12,7 +12,10 @@ public class CreateTenantCommandHandler(ITenantRepository repository, ILogger<Cr
     {
         var existing = await repository.GetBySlugAsync(command.Slug, ct);
         if (existing is not null)
-            throw new InvalidOperationException($"Tenant with slug '{command.Slug}' already exists.");
+        {
+            logger.LogInformation("Tenant ya existe. Slug={Slug} Id={TenantId}", command.Slug, existing.Id);
+            return existing.ToDto();
+        }
 
         var tenant = Tenant.Create(command.Slug, command.Name);
         await repository.AddAsync(tenant, ct);
