@@ -11,7 +11,7 @@ public enum SecurityMeasureType { Technical, Organizational, Physical }
 public class SecurityMeasureEntry
 {
     [JsonConstructor]
-    private SecurityMeasureEntry() { }
+    public SecurityMeasureEntry() { }
 
     public SecurityMeasureType MeasureType { get; init; }
     public string Description { get; init; } = default!;

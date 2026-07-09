@@ -9,7 +9,7 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 public class SystemEntry
 {
     [JsonConstructor]
-    private SystemEntry() { }
+    public SystemEntry() { }
 
     public string SystemName { get; init; } = default!;
     public string? Role { get; init; }

@@ -9,7 +9,7 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 public class DataCategoryEntry
 {
     [JsonConstructor]
-    private DataCategoryEntry() { }
+    public DataCategoryEntry() { }
 
     public Guid DataCategoryId { get; init; }
     public string? LocalName { get; init; }
