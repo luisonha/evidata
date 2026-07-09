@@ -199,6 +199,21 @@ else
   warn "PostgreSQL no disponible. Roles omitidos."
 fi
 
+# ─── Usuarios de prueba en identity.user_profiles ──────────────────────────
+if [[ -n "$PSQL_CMD" ]]; then
+  info "Insertando usuarios de prueba..."
+  $PSQL_CMD <<EOSQL 2>&1 | grep -v "^$" || warn "Algunos usuarios pueden ya existir"
+INSERT INTO identity.user_profiles ("Id", "ExternalId", "Provider", "Email", "DisplayName", "TenantId", "IsActive", "CreatedAt", "UpdatedAt")
+VALUES
+  ('$ADMIN_ID', 'local|admin',  'localdev', 'admin@localdev.evidata', 'Admin DPO',       '$TENANT_ID', true, NOW(), NOW()),
+  ('$USER_ID',  'local|user',   'localdev', 'user@localdev.evidata',  'Usuario Regular', '$TENANT_ID', true, NOW(), NOW())
+ON CONFLICT DO NOTHING;
+EOSQL
+  info "Usuarios de prueba insertados ✅"
+else
+  warn "PostgreSQL no disponible. Usuarios omitidos."
+fi
+
 # Asignar roles via API
 info "Asignando rol DPO al admin..."
 call_api POST "/api/roles/assign" "{

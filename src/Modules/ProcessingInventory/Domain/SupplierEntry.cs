@@ -9,7 +9,7 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 public class SupplierEntry
 {
     [JsonConstructor]
-    private SupplierEntry() { }
+    public SupplierEntry() { }
 
     public string SupplierName { get; init; } = default!;
     public string? Country { get; init; }

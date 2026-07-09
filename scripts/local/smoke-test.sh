@@ -142,15 +142,16 @@ TENANT_RESPONSE=$(curl -sL --insecure -X POST "$API/api/tenants" \
   -H "X-Evidata-Dev-Email: admin@localdev.evidata" \
   -H "Content-Type: application/json" \
   -d '{"slug": "empresa-demo", "name": "Empresa Demo S.A."}' 2>/dev/null || echo '{}')
-REAL_TENANT_ID=$(echo "$TENANT_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+REAL_TENANT_ID=$(echo "$TENANT_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 if [[ -n "$REAL_TENANT_ID" ]]; then
   pass "POST /api/tenants (idempotente, id=$REAL_TENANT_ID)"
-  TENANT_ID="$REAL_TENANT_ID"
+  # Nota: no sobreescribimos TENANT_ID — el seed insertó todos los datos bajo el ID fijo
+  # $TENANT_ID = ${EVIDATA_TENANT:-00000000-0000-0000-0000-000000000001}
 else
   fail "POST /api/tenants — no retornó id (respuesta: ${TENANT_RESPONSE:0:120})"
 fi
 
-check "GET /api/tenants/{id}" 200 GET "/api/tenants/$TENANT_ID"
+check "GET /api/tenants/{id}" 200 GET "/api/tenants/$REAL_TENANT_ID"
 
 # ─── Módulo 2: Identity ──────────────────────────────────────────────────────
 echo ""

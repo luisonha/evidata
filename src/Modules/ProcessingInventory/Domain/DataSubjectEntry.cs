@@ -15,7 +15,7 @@ public enum DataSubjectType
 public class DataSubjectEntry
 {
     [JsonConstructor]
-    private DataSubjectEntry() { }
+    public DataSubjectEntry() { }
 
     public DataSubjectType SubjectType { get; init; }
     public string? Description { get; init; }
