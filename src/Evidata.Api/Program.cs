@@ -10,6 +10,7 @@ using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Security;
+using Evidata.Modules.Security.Infrastructure.Authorization;
 using Evidata.Modules.TenantManagement;
 using Evidata.Modules.Mcp;
 using Evidata.Modules.Reporting;
@@ -18,6 +19,7 @@ using Evidata.Modules.Workflow;
 using Evidata.Worker.Outbox.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
@@ -92,7 +94,18 @@ if (builder.Environment.IsDevelopment())
         _ => { });
 }
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Default policy: all endpoints require authentication
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+    
+    // Fine-grained policy for role management operations (assign/remove roles)
+    // Requires user to have TenantOwner or ComplianceAdmin role in the current tenant
+    options.AddPolicy("TenantOwnerOrComplianceAdmin", policy =>
+        policy.AddRequirements(new TenantOwnerOrComplianceAdminRequirement()));
+});
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
