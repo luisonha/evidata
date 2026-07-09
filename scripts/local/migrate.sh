@@ -198,7 +198,7 @@ echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-export PATH="$HOME/.dotnet:$PATH"
+export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
 
 # Connection string local por defecto
 DB_CONNECTION="${DB_CONNECTION:-Host=localhost;Port=5432;Database=evidata-db;Username=evidata;Password=evidata_local_pw}"
