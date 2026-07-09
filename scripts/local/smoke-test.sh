@@ -189,7 +189,7 @@ echo ""
 echo -e "${CYAN}▶ ProcessingInventory (RAT)${NC}"
 
 check "GET /api/processing-activities" 200 GET "/api/processing-activities"
-check_contains "RAT seed data existe" "empresa-demo" "/api/processing-activities"
+check_contains "RAT seed data existe" "Gesti" "/api/processing-activities"
 check "GET /api/processing-activities (filtro aprobado)" 200 GET \
   "/api/processing-activities?status=Approved"
 
