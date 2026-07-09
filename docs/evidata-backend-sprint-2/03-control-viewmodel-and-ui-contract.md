@@ -126,7 +126,7 @@ Todo estado/enum visible en UI debe viajar con su `labelKey` asociado (`statusLa
 
 ```text
 processingActivity: ProcessingActivityDetailViewModel
-version: object ({ id?: string (uuid), version: number (>=1), status: string (enum ProcessingActivityVersionStatus), statusLabelKey: string, activeVersionId?: string (uuid), currentDraftVersionId?: string (uuid) })
+version: object ({ id?: string (uuid), version: number (>=1), status: string (enum ProcessingActivityVersionStatus), statusLabelKey: string, supersedesId?: string (uuid), approvedAt?: string (date-time), approvedBy?: string (uuid), activeVersionId?: string (uuid), currentDraftVersionId?: string (uuid) })
 controlTower: object ({ completionPercentage: number (0-100), riskLevel?: string (enum RiskLevel), riskLevelLabelKey?: string, availableActions: AvailableActionViewModel[], blockedActions: BlockedActionViewModel[] })
 priorityActions: AvailableActionViewModel[]
 operationalMap: object ({ nodes: ProcessingActivityNodeViewModel[] })
@@ -166,6 +166,9 @@ category?: string
 status: string (enum ProcessingActivityStatus)
 statusLabelKey: string
 version: number (>=1)
+supersedesId?: string (uuid)
+approvedBy?: string (uuid)
+approvedAt?: string (date-time)
 activeVersionId?: string (uuid)
 currentDraftVersionId?: string (uuid)
 createdAt: string (date-time)
