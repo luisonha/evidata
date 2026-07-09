@@ -238,33 +238,39 @@ if [[ -n "$PSQL_CMD" ]]; then
   info "Insertando RATs de prueba..."
   $PSQL_CMD <<EOSQL 2>&1 | grep -v "^$" || warn "Algunos RATs pueden ya existir"
 INSERT INTO rat.processing_activities
-  (id, tenant_id, name, description, controller, department, status, version, created_by, created_at)
+  (id, tenant_id, name, description, controller, department, status, version, created_by, created_at,
+   data_categories, data_subjects, systems, suppliers, security_measures)
 VALUES
   ('d0000001-0000-0000-0000-000000000001', '$TENANT_ID',
    'Gestión de Nómina',
    'Tratamiento de datos personales de empleados para cálculo y pago de remuneraciones.',
    'Gerencia de Recursos Humanos', 'Recursos Humanos', 'Approved', 1, '$ADMIN_ID',
-   NOW() - INTERVAL '30 days'),
+   NOW() - INTERVAL '30 days',
+   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb),
   ('d0000001-0000-0000-0000-000000000002', '$TENANT_ID',
    'Atención al Cliente',
    'Tratamiento de datos de clientes para gestión de solicitudes, reclamos y soporte.',
    'Gerencia Comercial', 'Servicio al Cliente', 'Draft', 1, '$ADMIN_ID',
-   NOW() - INTERVAL '15 days'),
+   NOW() - INTERVAL '15 days',
+   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb),
   ('d0000001-0000-0000-0000-000000000003', '$TENANT_ID',
    'Marketing Directo',
    'Envío de comunicaciones comerciales a clientes con consentimiento expreso.',
    'Gerencia de Marketing', 'Marketing Digital', 'Draft', 1, '$USER_ID',
-   NOW() - INTERVAL '10 days'),
+   NOW() - INTERVAL '10 days',
+   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb),
   ('d0000001-0000-0000-0000-000000000004', '$TENANT_ID',
    'Videovigilancia Instalaciones',
    'Sistema de cámaras de seguridad en acceso a instalaciones físicas.',
    'Gerencia de Seguridad', 'Seguridad Corporativa', 'UnderReview', 1, '$USER_ID',
-   NOW() - INTERVAL '5 days'),
+   NOW() - INTERVAL '5 days',
+   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb),
   ('d0000001-0000-0000-0000-000000000005', '$TENANT_ID',
    'Portal de Proveedores',
    'Gestión de datos de proveedores y representantes legales para proceso de compras.',
    'Gerencia de Abastecimiento', 'Adquisiciones', 'Draft', 1, '$USER_ID',
-   NOW() - INTERVAL '2 days')
+   NOW() - INTERVAL '2 days',
+   '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 EOSQL
   info "RATs creados ✅"

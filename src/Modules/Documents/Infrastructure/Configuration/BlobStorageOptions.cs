@@ -12,7 +12,7 @@ public sealed class BlobStorageOptions
     /// Connection string a Azure Storage Account.
     /// En local, usar "UseDevelopmentStorage=true" (Azurite).
     /// </summary>
-    public string ConnectionString { get; init; } = "UseDevelopmentStorage=true";
+    public string ConnectionString { get; set; } = "UseDevelopmentStorage=true";
 
     /// <summary>
     /// Nombre del container donde se almacenan los documentos.
