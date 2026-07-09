@@ -59,7 +59,7 @@ public class ReviewSummaryQueryHandlerTests
         Assert.NotNull(result);
         Assert.Equal("Approved", result.LastDecisionCode);
         Assert.NotNull(result.DecidedAt);
-        Assert.Equal(review.CreatedAt, result.DecidedAt);
+        Assert.Equal(review.CompletedAt, result.DecidedAt);
     }
 
     // ── TC3: Revisión ChangesRequested → devuelve "ChangesRequested" + decidedAt ─
@@ -84,7 +84,7 @@ public class ReviewSummaryQueryHandlerTests
         Assert.NotNull(result);
         Assert.Equal("ChangesRequested", result.LastDecisionCode);
         Assert.NotNull(result.DecidedAt);
-        Assert.Equal(review.CreatedAt, result.DecidedAt);
+        Assert.Equal(review.CompletedAt, result.DecidedAt);
     }
 
     // ── TC4: Revisión Cancelled → devuelve null (no es decisión final) ───────────

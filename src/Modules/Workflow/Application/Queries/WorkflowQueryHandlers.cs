@@ -78,12 +78,12 @@ public sealed class GetReviewSummaryQueryHandler(WorkflowDbContext db)
             if (latestReview.Status == ReviewStatus.Approved)
             {
                 lastDecisionCode = "Approved";
-                decidedAt = latestReview.CreatedAt;
+                decidedAt = latestReview.CompletedAt;
             }
             else if (latestReview.Status == ReviewStatus.ChangesRequested)
             {
                 lastDecisionCode = "ChangesRequested";
-                decidedAt = latestReview.CreatedAt;
+                decidedAt = latestReview.CompletedAt;
             }
             // Cancelled o sin revisión completada → lastDecisionCode es null
         }
