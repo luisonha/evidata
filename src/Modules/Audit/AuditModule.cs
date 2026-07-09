@@ -1,4 +1,5 @@
 using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Application.Queries;
 using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Audit.Infrastructure;
 using Evidata.Modules.Audit.Infrastructure.Persistence;
@@ -23,6 +24,7 @@ public static class AuditModule
 
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<ITimelineQueryService, TimelineQueryService>();
 
         return services;
     }
