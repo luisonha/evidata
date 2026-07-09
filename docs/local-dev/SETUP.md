@@ -172,7 +172,7 @@ El seed crea un dataset completo para probar todos los flujos de la plataforma:
 **Consultas MCP:**
 - 2 interacciones MCP (1 resuelta, 1 pendiente HITL)
 
-Ver [`tools/seed/seed-data.sh`](../../tools/seed/README.md) para más detalles.
+Ver [`scripts/local/seed.sh`](../../scripts/local/seed.sh) para más detalles.
 
 ---
 
