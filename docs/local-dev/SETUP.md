@@ -275,6 +275,16 @@ export EVIDATA_USER=00000000-0000-0000-0000-000000000011
 
 ## 10. Solución de problemas
 
+### Error de certificado HTTPS en el browser (NET::ERR_CERT_INVALID)
+
+El certificado de desarrollo de .NET no está en el keychain del sistema. Ejecutar:
+
+```bash
+dotnet dev-certs https --trust
+```
+
+Pedirá tu contraseña para instalarlo en el keychain. Después de eso, recargar la página. Este paso también lo hace automáticamente `setup.sh`.
+
 ### Error: "Connection refused" al levantar la API
 
 El PostgreSQL todavía no terminó de iniciar. Esperar 10-15 segundos y reintentar.

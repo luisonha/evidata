@@ -38,6 +38,10 @@ docker info &>/dev/null || error "Docker no está corriendo. Inicia Docker Deskt
 
 info "Pre-requisitos OK"
 
+# ─── Certificado HTTPS de desarrollo ─────────────────────────────────────────
+info "Confiando en el certificado HTTPS de desarrollo (.NET dev-certs)..."
+dotnet dev-certs https --trust || warn "No se pudo confiar en el certificado automáticamente. Ejecuta manualmente: dotnet dev-certs https --trust"
+
 # ─── Instalar workload de Aspire ─────────────────────────────────────────────
 info "Instalando workload de .NET Aspire..."
 dotnet workload install aspire 2>&1 | tail -3 || warn "El workload puede ya estar instalado."
