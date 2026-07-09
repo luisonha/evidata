@@ -29,7 +29,13 @@ jobs:
         run: dotnet restore Evidata.sln
 
       - name: Build
-        run: dotnet build Evidata.sln --no-restore --configuration Release
+        run: |
+          GIT_HASH=$(git rev-parse --short HEAD)
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          echo "Building version 1.0.0.${BUILD_NUMBER}+${GIT_HASH}"
+          dotnet build Evidata.sln --no-restore --configuration Release \
+            -p:SourceRevisionId="${GIT_HASH}" \
+            -p:BuildNumber="${BUILD_NUMBER}"
 
       - name: Test
         run: dotnet test Evidata.sln --no-build --configuration Release --verbosity minimal

@@ -35,6 +35,16 @@ if [[ -n "$EXISTING_PID" ]]; then
   info "Instancia anterior detenida."
 fi
 
+# ─── Build con git hash para versionamiento ──────────────────────────────────
+GIT_HASH=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_NUMBER=$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || echo "0")
+info "Compilando (versión 1.0.0.${BUILD_NUMBER}+${GIT_HASH})..."
+dotnet build "$REPO_ROOT/Evidata.sln" \
+  -p:SourceRevisionId="$GIT_HASH" \
+  -p:BuildNumber="$BUILD_NUMBER" \
+  --nologo -v:q 2>&1 | grep -E "error|warning|Error|Warning" || true
+info "Compilación completada."
+
 info "Iniciando stack via .NET Aspire..."
 echo ""
 echo -e "${CYAN}  URLs disponibles una vez iniciado:${NC}"
@@ -46,4 +56,4 @@ echo -e "${YELLOW}  Presiona Ctrl+C para detener el stack${NC}"
 echo ""
 
 cd "$REPO_ROOT/src/Evidata.AppHost"
-dotnet run
+dotnet run --no-build

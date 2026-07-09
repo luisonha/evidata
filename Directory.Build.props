@@ -1,0 +1,27 @@
+<Project>
+  <PropertyGroup>
+    <!-- Versión semántica base. Incrementar manualmente según SemVer. -->
+    <VersionPrefix>1.0.0</VersionPrefix>
+
+    <!-- BuildNumber: conteo total de commits. Se inyecta con -p:BuildNumber=N -->
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+
+    <!-- SourceRevisionId: hash corto del commit. El SDK lo concatena al InformationalVersion. -->
+
+    <!--
+      AssemblyVersion      = 1.0.0.0          (estable, compatibilidad binaria)
+      FileVersion          = 1.0.0.110         (4 bloques, crece con cada commit)
+      InformationalVersion = 1.0.0.110+a75cc5c (completo: version + build + hash)
+    -->
+    <!-- Desactiva el auto-append del SDK para que no duplique el hash -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).$(BuildNumber)</FileVersion>
+    <InformationalVersion>$(VersionPrefix).$(BuildNumber)+$(SourceRevisionId)</InformationalVersion>
+
+    <Company>Evidata</Company>
+    <Product>Evidata Compliance Platform</Product>
+    <Copyright>© 2026 Evidata</Copyright>
+  </PropertyGroup>
+</Project>
