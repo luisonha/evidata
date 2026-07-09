@@ -16,6 +16,7 @@ using Evidata.Modules.Search;
 using Evidata.Modules.Workflow;
 using Evidata.Worker.Outbox.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,25 @@ app.UseLocalDevGuard();
 app.UseTenantIsolation();
 app.MapControllers();
 
+// ── /api/version — versión del binario en ejecución ──────────────────────────
+app.MapGet("/api/version", () =>
+{
+    var asm = Assembly.GetEntryAssembly()!;
+    var infoVersion = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                      ?? asm.GetName().Version?.ToString() ?? "unknown";
+    var fileVersion = asm.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "unknown";
+    return Results.Ok(new
+    {
+        version       = infoVersion,
+        fileVersion   = fileVersion,
+        assemblyName  = asm.GetName().Name,
+        buildTime     = new FileInfo(asm.Location).LastWriteTimeUtc.ToString("o"),
+        environment   = app.Environment.EnvironmentName
+    });
+})
+.WithName("GetVersion")
+.ExcludeFromDescription(); // no aparece en OpenAPI público
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -83,6 +103,16 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+// ── Log de versión al arranque ────────────────────────────────────────────────
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+var startupAsm    = Assembly.GetEntryAssembly()!;
+var startupVer    = startupAsm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                   ?? startupAsm.GetName().Version?.ToString() ?? "unknown";
+startupLogger.LogInformation(
+    "Evidata API iniciada · versión {Version} · entorno {Environment}",
+    startupVer,
+    app.Environment.EnvironmentName);
 
 app.Run();
 
