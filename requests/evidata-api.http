@@ -1,0 +1,162 @@
+# Evidata API — Requests para VS Code REST Client
+# Instalar extensión: REST Client (Huachao Mao)
+#
+# Variables: ajustar según ambiente local
+# Stack local: start.sh → API en http://localhost:5000
+
+@baseUrl = http://localhost:5000
+@tenantId = 00000000-0000-0000-0000-000000000001
+@adminId  = 00000000-0000-0000-0000-000000000010
+@userId   = 00000000-0000-0000-0000-000000000011
+
+# Headers de autenticación local (DEV ONLY)
+# ⚠️ Solo funcionan en ASPNETCORE_ENVIRONMENT=Development
+
+###
+# ═══════════════════════════════════════════════
+# HEALTH
+# ═══════════════════════════════════════════════
+
+### Health Check — estado general
+GET {{baseUrl}}/health
+
+### Health Check — detalle de cada dependencia
+GET {{baseUrl}}/health/detail
+
+### OpenAPI Schema
+GET {{baseUrl}}/openapi/v1.json
+
+###
+# ═══════════════════════════════════════════════
+# TENANT MANAGEMENT
+# ═══════════════════════════════════════════════
+
+### Obtener tenant seed
+# @name getTenant
+GET {{baseUrl}}/api/tenants/{{tenantId}}
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+### Crear nuevo tenant
+POST {{baseUrl}}/api/tenants
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "slug": "nueva-empresa",
+  "name": "Nueva Empresa SpA"
+}
+
+### Actualizar configuración del tenant
+PATCH {{baseUrl}}/api/tenants/{{tenantId}}/settings
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "timeZone": "America/Santiago",
+  "locale": "es-CL",
+  "maxUsers": 50,
+  "mfaRequired": false
+}
+
+### Cambiar estado del tenant
+PATCH {{baseUrl}}/api/tenants/{{tenantId}}/status
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "status": "Active"
+}
+
+###
+# ═══════════════════════════════════════════════
+# IDENTITY / PERFILES
+# ═══════════════════════════════════════════════
+
+### Obtener perfil del usuario admin
+GET {{baseUrl}}/api/users/profile
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+### Obtener perfil del usuario regular
+GET {{baseUrl}}/api/users/profile
+X-Evidata-Dev-User: {{userId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: user@localdev.evidata
+
+### Vincular identidad externa (ejemplo)
+POST {{baseUrl}}/api/users/link
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "externalProvider": "AzureAD",
+  "externalId": "azure-object-id-12345",
+  "email": "admin@empresa.com",
+  "displayName": "Administrador Principal"
+}
+
+###
+# ═══════════════════════════════════════════════
+# SECURITY / RBAC
+# ═══════════════════════════════════════════════
+
+### Ver roles del admin
+GET {{baseUrl}}/api/roles/users/{{adminId}}?tenantId={{tenantId}}
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+### Ver roles del usuario regular
+GET {{baseUrl}}/api/roles/users/{{userId}}?tenantId={{tenantId}}
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+### Asignar rol DPO al admin (idempotente)
+# @name assignRole
+POST {{baseUrl}}/api/roles/assign
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "userId": "{{adminId}}",
+  "roleId": "b0000001-0000-0000-0000-000000000001",
+  "tenantId": "{{tenantId}}"
+}
+
+### Asignar rol PrivacyAnalyst al usuario regular
+POST {{baseUrl}}/api/roles/assign
+Content-Type: application/json
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
+
+{
+  "userId": "{{userId}}",
+  "roleId": "b0000001-0000-0000-0000-000000000002",
+  "tenantId": "{{tenantId}}"
+}
+
+###
+# ═══════════════════════════════════════════════
+# AUDIT
+# ═══════════════════════════════════════════════
+
+### Ver log de auditoría del tenant
+GET {{baseUrl}}/api/audit?tenantId={{tenantId}}
+X-Evidata-Dev-User: {{adminId}}
+X-Evidata-Dev-Tenant: {{tenantId}}
+X-Evidata-Dev-Email: admin@localdev.evidata
