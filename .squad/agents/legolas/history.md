@@ -91,3 +91,4 @@
 **PR**: #99 created against develop
 **ADR**: legolas-tenant-owner-compliance-admin-policy.md (documents architectural decision)
 
+**ADR**: legolas-global-fallback-authorization-policy.md documents FallbackPolicy decision
