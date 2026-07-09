@@ -1,8 +1,8 @@
 {
   "profiles": {
-    "Evidata_Functions_SearchIndexing": {
+    "Evidata_Functions_McpBatch": {
       "commandName": "Project",
-      "commandLineArgs": "--port 7209",
+      "commandLineArgs": "--port 7210",
       "launchBrowser": false
     }
   }
