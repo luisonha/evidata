@@ -4,9 +4,17 @@
     <ProjectReference Include="..\Evidata.ServiceDefaults\Evidata.ServiceDefaults.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\Evidata.Api\Evidata.Api.csproj" />
     <ProjectReference Include="..\Evidata.Worker.Outbox\Evidata.Worker.Outbox.csproj" />
+    <!-- Azure Functions -->
+    <ProjectReference Include="..\..\functions\Evidata.Functions.Notifications\Evidata.Functions.Notifications.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.DocumentProcessing\Evidata.Functions.DocumentProcessing.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.Maintenance\Evidata.Functions.Maintenance.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.McpBatch\Evidata.Functions.McpBatch.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.Reporting\Evidata.Functions.Reporting.csproj" />
+    <ProjectReference Include="..\..\functions\Evidata.Functions.SearchIndexing\Evidata.Functions.SearchIndexing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Functions" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.MailPit" Version="13.4.0" />
