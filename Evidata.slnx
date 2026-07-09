@@ -1,0 +1,65 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/functions/">
+    <Project Path="functions/Evidata.Functions.DocumentProcessing/Evidata.Functions.DocumentProcessing.csproj" />
+    <Project Path="functions/Evidata.Functions.Maintenance/Evidata.Functions.Maintenance.csproj" />
+    <Project Path="functions/Evidata.Functions.McpBatch/Evidata.Functions.McpBatch.csproj" />
+    <Project Path="functions/Evidata.Functions.Notifications/Evidata.Functions.Notifications.csproj" />
+    <Project Path="functions/Evidata.Functions.Reporting/Evidata.Functions.Reporting.csproj" />
+    <Project Path="functions/Evidata.Functions.SearchIndexing/Evidata.Functions.SearchIndexing.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Evidata.Api/Evidata.Api.csproj" />
+    <Project Path="src/Evidata.AppHost/Evidata.AppHost.csproj" />
+    <Project Path="src/Evidata.ServiceDefaults/Evidata.ServiceDefaults.csproj" />
+    <Project Path="src/Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Audit/">
+    <Project Path="src/Modules/Audit/Evidata.Modules.Audit.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Documents/">
+    <Project Path="src/Modules/Documents/Evidata.Modules.Documents.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Evidence/">
+    <Project Path="src/Modules/Evidence/Evidata.Modules.Evidence.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/GapManagement/">
+    <Project Path="src/Modules/GapManagement/Evidata.Modules.GapManagement.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Evidata.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/LegalKnowledge/">
+    <Project Path="src/Modules/LegalKnowledge/Evidata.Modules.LegalKnowledge.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Mcp/">
+    <Project Path="src/Modules/Mcp/Evidata.Modules.Mcp.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/ProcessingInventory/">
+    <Project Path="src/Modules/ProcessingInventory/Evidata.Modules.ProcessingInventory.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Reporting/">
+    <Project Path="src/Modules/Reporting/Evidata.Modules.Reporting.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Search/">
+    <Project Path="src/Modules/Search/Evidata.Modules.Search.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Security/">
+    <Project Path="src/Modules/Security/Evidata.Modules.Security.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/TenantManagement/">
+    <Project Path="src/Modules/TenantManagement/Evidata.Modules.TenantManagement.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Workflow/">
+    <Project Path="src/Modules/Workflow/Evidata.Modules.Workflow.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Evidata.Tests.Integration/Evidata.Tests.Integration.csproj" />
+    <Project Path="tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj" />
+  </Folder>
+</Solution>
