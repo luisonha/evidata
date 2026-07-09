@@ -27,6 +27,8 @@ public static class GapManagementModule
 
         services.AddScoped<IRatFlagsProvider, EfRatFlagsProvider>();
         services.AddScoped<IRatGapDetectionService, RatGapDetectionService>();
+        services.AddScoped<GetGapSummaryByProcessingActivityQueryHandler>();
+        services.AddScoped<IGapSummaryQueryService>(sp => sp.GetRequiredService<GetGapSummaryByProcessingActivityQueryHandler>());
         services.AddScoped<IGapNotificationService, OutboxGapNotificationService>();
         services.AddScoped<ListGapsQueryHandler>();
         services.AddScoped<GetGapsSummaryQueryHandler>();
