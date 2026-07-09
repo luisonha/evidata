@@ -7,6 +7,18 @@ public class RatSistemasTests
     private static ProcessingActivity BuildDraft() =>
         ProcessingActivity.Create(Guid.NewGuid(), "Tratamiento Test", Guid.NewGuid());
 
+    private static ProcessingActivity BuildApproved()
+    {
+        var act = BuildDraft();
+        act.SetPurpose(PurposeSection.Create("Gestión de nómina", LegalBasis.ContractExecution, "Contrato laboral"), Guid.NewGuid());
+        act.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], Guid.NewGuid());
+        act.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], Guid.NewGuid());
+        act.SetRetention(RetentionSection.Create("5 años"), Guid.NewGuid());
+        act.SubmitForReview(Guid.NewGuid());
+        act.Approve(Guid.NewGuid());
+        return act;
+    }
+
     // ── SystemEntry ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -39,9 +51,7 @@ public class RatSistemasTests
     [Fact]
     public void SetSystems_OnApproved_Throws()
     {
-        var act = BuildDraft();
-        act.SubmitForReview(Guid.NewGuid());
-        act.Approve(Guid.NewGuid());
+        var act = BuildApproved();
         Assert.Throws<InvalidOperationException>(() =>
             act.SetSystems([SystemEntry.Create("SAP")], Guid.NewGuid()));
     }
