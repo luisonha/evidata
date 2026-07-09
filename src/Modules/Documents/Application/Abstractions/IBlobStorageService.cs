@@ -27,6 +27,19 @@ public sealed record SasDownloadResult(
 public interface IBlobStorageService
 {
     /// <summary>
+    /// Sube bytes directamente al blob storage desde el servidor.
+    /// Usado por funciones y servicios que generan archivos internamente (reportes, exports).
+    /// </summary>
+    /// <param name="blobPath">Ruta destino dentro del container (ej: {tenantId}/reports/2026/01/rat.xlsx)</param>
+    /// <param name="content">Bytes del archivo a subir</param>
+    /// <param name="contentType">MIME type del archivo</param>
+    Task<string> UploadAsync(
+        string blobPath,
+        byte[] content,
+        string contentType,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Genera una URL SAS con permiso de escritura para que el cliente
     /// suba un archivo directamente a Azure Blob Storage sin pasar por la API.
     /// </summary>

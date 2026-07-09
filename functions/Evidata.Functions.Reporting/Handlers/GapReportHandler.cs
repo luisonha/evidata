@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.GapManagement.Domain;
 using Evidata.Modules.GapManagement.Infrastructure.Persistence;
 using Evidata.Modules.Reporting.Application.Abstractions;
@@ -8,34 +9,27 @@ using Microsoft.Extensions.Logging;
 namespace Evidata.Functions.Reporting.Handlers;
 
 /// <summary>
-/// Genera el reporte de brechas de cumplimiento como Excel agrupado por severidad.
+/// Genera el reporte de brechas de cumplimiento como Excel y lo sube a Blob Storage.
 ///
-/// Estructura del Excel:
-///   - Sheet 'Resumen': contadores por severidad y estado
-///   - Sheet 'Brechas': listado completo ordenado Critical → High → Medium → Low
-///   - Sheet 'Metadata': TenantId, fecha y totales
-///
-/// Ciclo de vida del job (igual que RatReportHandler):
-///   1. Busca el ReportJob en BD
-///   2. Marca como Running
-///   3. Consulta todas las brechas no cerradas del tenant
-///   4. Genera Excel en memoria
-///   5. Marca como Completed (ArtifactId placeholder)
+/// Path del blob: {tenantId}/reports/{yyyy/MM/dd}/{jobId}_gaps.xlsx
 /// </summary>
 public class GapReportHandler
 {
     private readonly GapManagementDbContext _gaps;
     private readonly IReportJobService _jobs;
+    private readonly IBlobStorageService _blobStorage;
     private readonly ILogger<GapReportHandler> _logger;
 
     public GapReportHandler(
         GapManagementDbContext gaps,
         IReportJobService jobs,
+        IBlobStorageService blobStorage,
         ILogger<GapReportHandler> logger)
     {
-        _gaps = gaps;
-        _jobs = jobs;
-        _logger = logger;
+        _gaps        = gaps;
+        _jobs        = jobs;
+        _blobStorage = blobStorage;
+        _logger      = logger;
     }
 
     public async Task HandleAsync(Guid jobId, Guid tenantId, CancellationToken ct)
@@ -66,11 +60,18 @@ public class GapReportHandler
                 .ToListAsync(ct);
 
             var excelBytes = GenerateExcel(gaps, tenantId);
+
+            var blobPath = $"{tenantId}/reports/{DateTimeOffset.UtcNow:yyyy/MM/dd}/{jobId}_gaps.xlsx";
+            await _blobStorage.UploadAsync(
+                blobPath, excelBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ct);
+
             var artifactId = Guid.NewGuid();
 
             _logger.LogInformation(
-                "✅ Gaps Excel generado: {Rows} brechas, {Bytes} bytes, ArtifactId={ArtifactId}",
-                gaps.Count, excelBytes.Length, artifactId);
+                "✅ Gaps Excel generado y subido: {Rows} brechas, {Bytes} bytes, BlobPath={BlobPath}",
+                gaps.Count, excelBytes.Length, blobPath);
 
             await _jobs.CompleteAsync(jobId, artifactId, ct);
         }

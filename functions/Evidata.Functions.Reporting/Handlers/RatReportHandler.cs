@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.Reporting.Application.Abstractions;
@@ -8,20 +9,10 @@ using Microsoft.Extensions.Logging;
 namespace Evidata.Functions.Reporting.Handlers;
 
 /// <summary>
-/// Genera el Registro de Actividades de Tratamiento (RAT) como archivo Excel.
+/// Genera el Registro de Actividades de Tratamiento (RAT) como Excel
+/// y lo sube a Azure Blob Storage (Azurite en local).
 ///
-/// Columnas exportadas:
-///   Id | Nombre | Departamento | Responsable | Base legal | Versión | Estado | Aprobado el |
-///   Transferencia internacional | Decisión automatizada | Datos sensibles | Brecha crítica abierta
-///
-/// Ciclo de vida del job:
-///   1. Busca el ReportJob en BD
-///   2. Marca como Running
-///   3. Consulta tratamientos aprobados del tenant
-///   4. Genera Excel en memoria
-///   5. Marca como Completed (ArtifactDocumentId = Guid generado — producción: id del blob subido)
-///
-/// Idempotencia: si el job ya está Completed o Failed no hace nada.
+/// Path del blob: {tenantId}/reports/{yyyy/MM/dd}/{jobId}_rat.xlsx
 /// </summary>
 public class RatReportHandler
 {
@@ -29,16 +20,19 @@ public class RatReportHandler
 
     private readonly ProcessingInventoryDbContext _rat;
     private readonly IReportJobService _jobs;
+    private readonly IBlobStorageService _blobStorage;
     private readonly ILogger<RatReportHandler> _logger;
 
     public RatReportHandler(
         ProcessingInventoryDbContext rat,
         IReportJobService jobs,
+        IBlobStorageService blobStorage,
         ILogger<RatReportHandler> logger)
     {
-        _rat = rat;
-        _jobs = jobs;
-        _logger = logger;
+        _rat         = rat;
+        _jobs        = jobs;
+        _blobStorage = blobStorage;
+        _logger      = logger;
     }
 
     public async Task HandleAsync(Guid jobId, Guid tenantId, CancellationToken ct)
@@ -70,13 +64,18 @@ public class RatReportHandler
 
             var excelBytes = GenerateExcel(activities, tenantId);
 
-            // Producción: subir excelBytes a Azure Blob Storage y crear Document entry.
-            // Retorna el DocumentId real. Aquí generamos uno como placeholder.
+            var blobPath = $"{tenantId}/reports/{DateTimeOffset.UtcNow:yyyy/MM/dd}/{jobId}_rat.xlsx";
+            await _blobStorage.UploadAsync(
+                blobPath, excelBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ct);
+
+            // ArtifactDocumentId se usará para enlazar con el Document entry en el módulo Documents
             var artifactId = Guid.NewGuid();
 
             _logger.LogInformation(
-                "✅ RAT Excel generado: {Rows} tratamientos, {Bytes} bytes, ArtifactId={ArtifactId}",
-                activities.Count, excelBytes.Length, artifactId);
+                "✅ RAT Excel generado y subido: {Rows} tratamientos, {Bytes} bytes, BlobPath={BlobPath}",
+                activities.Count, excelBytes.Length, blobPath);
 
             await _jobs.CompleteAsync(jobId, artifactId, ct);
         }
