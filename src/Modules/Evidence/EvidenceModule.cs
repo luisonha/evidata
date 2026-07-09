@@ -27,8 +27,10 @@ public static class EvidenceModule
 
         services.AddScoped<IEvidenceDownloadService, EvidenceDownloadService>();
         services.AddScoped<IEvidenceLinkService, EvidenceLinkService>();
+        services.AddScoped<IEvidenceSummaryQueryService, GetEvidenceSummaryQueryHandler>();
         services.AddScoped<ListEvidenceQueryHandler>();
         services.AddScoped<GetEvidenceQueryHandler>();
+        services.AddScoped<GetEvidenceSummaryQueryHandler>();
         services.AddScoped<CreateEvidenceCommandHandler>();
 
         // EvidencePackService requiere QueueClient — solo disponible si está configurado
