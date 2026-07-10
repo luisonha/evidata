@@ -14,6 +14,7 @@ public class EvidenceController(
     ListEvidenceQueryHandler listHandler,
     GetEvidenceQueryHandler getHandler,
     CreateEvidenceCommandHandler createHandler,
+    ValidateEvidenceCommandHandler validateHandler,
     ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet]
@@ -41,8 +42,33 @@ public class EvidenceController(
         var result = await createHandler.HandleAsync(cmd, ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
+
+    /// <summary>
+    /// Validar o rechazar una validación de evidencia (P1-011a).
+    /// Audita con AUD-EV-001 (ValidateEvidence) o AUD-EV-002 (RejectEvidence).
+    /// SEC-EV-001: Solo el reviewer correcto según ReviewDomain puede validar.
+    /// </summary>
+    [HttpPost("{validationId:guid}/validate")]
+    public async Task<ActionResult<EvidenceValidationResultDto>> ValidateEvidence(
+        Guid validationId,
+        [FromBody] ValidateEvidenceRequest req,
+        CancellationToken ct)
+    {
+        var cmd = new ValidateEvidenceCommand(
+            currentUser.TenantId,
+            validationId,
+            req.Action,
+            req.Comment,
+            currentUser.UserId);
+        var result = await validateHandler.HandleAsync(cmd, ct);
+        return Ok(result);
+    }
 }
 
 public record CreateEvidenceRequest(
     string Title, string Type, string Sensitivity = "Internal",
     string? Description = null, string? Tags = null);
+
+public record ValidateEvidenceRequest(
+    string Action,  // "Validate", "Reject", "MarkInsufficient"
+    string? Comment = null);

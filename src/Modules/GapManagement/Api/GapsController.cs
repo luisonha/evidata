@@ -14,6 +14,7 @@ public class GapsController(
     ListGapsQueryHandler listHandler,
     GetGapsSummaryQueryHandler summaryHandler,
     CreateGapCommandHandler createHandler,
+    AcceptGapWithRiskCommandHandler acceptGapHandler,
     ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet]
@@ -44,9 +45,31 @@ public class GapsController(
         var result = await createHandler.HandleAsync(cmd, ct);
         return CreatedAtAction(nameof(List), new { }, result);
     }
+
+    /// <summary>
+    /// Aceptar una brecha con riesgo (P1-011b).
+    /// Audita con AUD-GAP-001 (AcceptGapWithRisk).
+    /// SEC-GAP-001: Solo TenantOwner/ComplianceAdmin con justificación obligatoria.
+    /// </summary>
+    [HttpPost("{gapId:guid}/accept-with-risk")]
+    public async Task<ActionResult<AcceptGapWithRiskResultDto>> AcceptGapWithRisk(
+        Guid gapId,
+        [FromBody] AcceptGapWithRiskRequest req,
+        CancellationToken ct)
+    {
+        var cmd = new AcceptGapWithRiskCommand(
+            currentUser.TenantId,
+            gapId,
+            req.Justification,
+            currentUser.UserId);
+        var result = await acceptGapHandler.HandleAsync(cmd, ct);
+        return Ok(result);
+    }
 }
 
 public record CreateGapRequest(
     string SourceModule, Guid SourceEntityId,
     string Title, string Description, string Severity = "Medium",
     Guid? LegalObligationId = null, DateTimeOffset? DueAt = null);
+
+public record AcceptGapWithRiskRequest(string Justification);

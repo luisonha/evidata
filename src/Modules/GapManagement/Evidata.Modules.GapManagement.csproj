@@ -22,6 +22,7 @@
     <ProjectReference Include="../ProcessingInventory/Evidata.Modules.ProcessingInventory.csproj" />
     <ProjectReference Include="../../Evidata.Worker.Outbox/Evidata.Worker.Outbox.csproj" />
     <ProjectReference Include="../Identity/Evidata.Modules.Identity.csproj" />
+    <ProjectReference Include="../Audit/Evidata.Modules.Audit.csproj" />
   </ItemGroup>
 
 </Project>
