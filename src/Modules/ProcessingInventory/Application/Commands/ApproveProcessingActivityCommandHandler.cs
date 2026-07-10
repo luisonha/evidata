@@ -6,6 +6,7 @@ using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.Security.Infrastructure.Persistence;
 using Evidata.Modules.Security.Application.Abstractions;
+using Evidata.Modules.Workflow.Application.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,7 @@ namespace Evidata.Modules.ProcessingInventory.Application.Commands;
 /// <summary>
 /// Handler for ApproveProcessingActivityCommand.
 /// 
-/// P1-013: Orchestrates full approval authorization (SEC-APP-001), business blockers, and audit
+/// P1-013 (RFC) & P1-016: Orchestrates full approval authorization (SEC-APP-001), business blockers, and audit
 /// for ProcessingActivity version approval.
 /// 
 /// Autorización (RBAC):
@@ -26,21 +27,14 @@ namespace Evidata.Modules.ProcessingInventory.Application.Commands;
 /// Lógica de negocio (Blockers):
 /// - Valida que versión está en estado UnderReview
 /// - Verifica RiskFlags.BlocksApproval (incluye CriticalGapOpen, MissingLegalBasisEvidence, etc.)
-/// - Retorna 422 BlockingEvidenceMissing | CriticalGapOpen | VersionModifiedAfterReview si bloqueada
+/// - ✓ P1-016: Verifica RequiredReviewPending — si hay reviews para esta versión que NO sean Approved
+/// - ✓ P1-016: Verifica VersionModifiedAfterReview — si LastModifiedAt > ReviewedAt
+/// - Retorna 422 BlockingEvidenceMissing | CriticalGapOpen | RequiredReviewPending | VersionModifiedAfterReview si bloqueada
 /// 
 /// Auditoría:
 /// - Genera AuditEvent ProcessingActivityApproved (success)
 /// - Genera AuditEvent ApprovalBlocked (blocker)
 /// - Genera AuditEvent AccessDenied o ApprovalDenied (authorization failure)
-/// 
-/// Nota sobre blockers implementados vs pendientes:
-/// ✓ RiskFlags.BlocksApproval (CriticalGapOpen, MissingLegalBasisEvidence)
-/// ✓ ProcessOwner cannot approve self (via ResourcePermissionsQueryService.IsBlocked_ApproveOwnActivity)
-/// ✓ Status must be UnderReview
-/// ⚠ BlockingEvidence: parcialmente verificable via RiskFlags.MissingLegalBasisEvidence; 
-///   evidencia bloqueante específica sin modelo dominio (p.ej. "must have X evidence for security review")
-/// ⚠ RequiredReviewPending: no hay modelo Review con estado "requerida" en Workflow.Review aún
-/// ⚠ VersionModifiedAfterReview: no hay timestamp de "reviewedAt" en dominio para comparar vs LastModifiedAt
 /// 
 /// Fail-closed: si hay error en autorización o negocio, retorna 422 o 403; auditoría registra resultado.
 /// </summary>
@@ -49,6 +43,7 @@ public sealed class ApproveProcessingActivityCommandHandler(
     SecurityDbContext securityDb,
     IResourcePermissionsQueryService permissionsService,
     IAuditService auditService,
+    IReviewService reviewService,
     IHttpContextAccessor httpContextAccessor)
 {
     public async Task<ProcessingActivityDto> HandleAsync(
@@ -163,6 +158,68 @@ public sealed class ApproveProcessingActivityCommandHandler(
                     MissingSecurityMeasures = activity.Flags.MissingSecurityMeasures,
                     SensitiveData = activity.Flags.SensitiveData
                 };
+
+                await auditService.LogAsync(
+                    cmd.TenantId,
+                    cmd.ApprovedBy,
+                    AuditEventType.ProcessingActivityApproved.ToString(),
+                    "ProcessingActivity",
+                    cmd.ProcessingActivityId,
+                    AuditEventResult.Blocked,
+                    correlationId,
+                    metadata,
+                    ct: ct);
+
+                throw new InvalidOperationException(
+                    $"ApprovalBlocked ({blockerCode}): {blockerDetail}");
+            }
+
+            // ── Validación: RequiredReviewPending (P1-016) ──────────────────────────
+
+            var reviews = await reviewService.GetOpenReviewsForEntityAsync(
+                cmd.TenantId,
+                cmd.ProcessingActivityId,
+                ct);
+
+            // Any open review (not Approved) means the approval is blocked
+            var pendingReview = reviews.FirstOrDefault(r => r.Status != Evidata.Modules.Workflow.Domain.ReviewStatus.Approved);
+            if (pendingReview != null)
+            {
+                var blockerCode = "RequiredReviewPending";
+                var blockerDetail = $"Required review pending (Status: {pendingReview.Status})";
+
+                metadata["blockerCode"] = blockerCode;
+                metadata["blockerDetail"] = blockerDetail;
+                metadata["pendingReviewId"] = pendingReview.Id;
+                metadata["pendingReviewStatus"] = pendingReview.Status.ToString();
+
+                await auditService.LogAsync(
+                    cmd.TenantId,
+                    cmd.ApprovedBy,
+                    AuditEventType.ProcessingActivityApproved.ToString(),
+                    "ProcessingActivity",
+                    cmd.ProcessingActivityId,
+                    AuditEventResult.Blocked,
+                    correlationId,
+                    metadata,
+                    ct: ct);
+
+                throw new InvalidOperationException(
+                    $"ApprovalBlocked ({blockerCode}): {blockerDetail}");
+            }
+
+            // ── Validación: VersionModifiedAfterReview (P1-016) ──────────────────────
+
+            if (activity.ReviewedAt.HasValue && activity.LastModifiedAt.HasValue &&
+                activity.LastModifiedAt > activity.ReviewedAt)
+            {
+                var blockerCode = "VersionModifiedAfterReview";
+                var blockerDetail = "Version was modified after review completion";
+
+                metadata["blockerCode"] = blockerCode;
+                metadata["blockerDetail"] = blockerDetail;
+                metadata["reviewedAt"] = activity.ReviewedAt?.ToString("O");
+                metadata["lastModifiedAt"] = activity.LastModifiedAt?.ToString("O");
 
                 await auditService.LogAsync(
                     cmd.TenantId,

@@ -65,6 +65,9 @@ public class ProcessingActivity
     public Guid? ApprovedBy { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
 
+    /// <summary>Timestamp cuando se completó la revisión requerida más reciente (null si no revisado).</summary>
+    public DateTimeOffset? ReviewedAt { get; private set; }
+
     /// <summary>ID del tratamiento anterior al que esta versión reemplaza (null si es la primera).</summary>
     public Guid? SupersedesId { get; private set; }
 
@@ -407,7 +410,14 @@ public class ProcessingActivity
             Flags.CriticalGapOpen);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Marks this activity as reviewed (for checking if modified after review).
+    /// Called when a required review is completed.
+    /// </summary>
+    public void MarkAsReviewed()
+    {
+        ReviewedAt = DateTimeOffset.UtcNow;
+    }
 
     private void Touch(Guid modifiedBy)
     {
