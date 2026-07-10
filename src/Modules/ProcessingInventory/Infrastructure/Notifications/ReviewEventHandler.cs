@@ -2,7 +2,7 @@ using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.Audit.Application.Abstractions;
 using Evidata.Modules.Audit.Domain;
-using Evidata.Modules.Workflow.Application.Notifications;
+using Evidata.Modules.Contracts.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
@@ -17,7 +17,7 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 /// 3. Persiste el cambio en la base de datos
 /// 4. Registra un evento de auditoría consistente con el patrón de auditoría del proyecto
 /// </summary>
-public sealed class ReviewEventHandler : IReviewEventHandler
+public sealed class ReviewEventHandler : Contracts.Notifications.IReviewEventHandler
 {
     private readonly ProcessingInventoryDbContext _db;
     private readonly IAuditService _auditService;

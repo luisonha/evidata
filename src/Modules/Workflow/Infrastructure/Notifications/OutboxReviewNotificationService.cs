@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Notifications;
+using Evidata.Modules.Contracts.Notifications;
 using Evidata.Modules.Workflow.Domain;
 using Evidata.Worker.Outbox.Persistence;
 
-// ReSharper disable once RedundantUsingDirective — ReviewEventTypes y ReviewEventPayload viven en este NS
+// ReSharper disable once RedundantUsingDirective — ReviewEventTypes vive en Workflow.Application.Notifications
+// ReviewApprovedEventPayload y otros payloads viven en Contracts.Notifications
 
 namespace Evidata.Modules.Workflow.Infrastructure.Notifications;
 
