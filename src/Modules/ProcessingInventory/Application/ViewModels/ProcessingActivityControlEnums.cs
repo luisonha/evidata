@@ -81,7 +81,9 @@ public enum AuditEventType
     ValidateEvidence,
     RejectEvidence,
     AcceptGapWithRisk,
-    GenerateOfficialExport
+    GenerateOfficialExport,
+    EvidenceDownloaded,
+    EvidenceAccessDenied
 }
 
 public enum AuditEventResult
