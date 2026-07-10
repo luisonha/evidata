@@ -471,4 +471,36 @@ Branch push successful — Same PR #110, NO new PR created
 - SubmitForReview, Activate, Archive, RejectEvidence, GenerateOfficialExport + auditoría
 - Medium priority (P2), will replicate same fail-closed + secure metadata patterns
 - Estimated 6-8 hours total, no new architectural decisions required
-- ✅ Ready for Gandalf re-review and approval
+- ✅ Ready for Gandalf re-review and approval## 2026-07-10T01:25 — P1-011c Analysis
+
+### Found implementations:
+✅ ExportService already audits GenerateOfficialExport (AUD-EXP-001) — RequestExportAsync + CompleteAsync
+✅ ValidateEvidenceCommandHandler audits ValidateEvidence (AUD-EV-001) + RejectEvidence (AUD-EV-002)
+✅ AcceptGapWithRiskCommandHandler audits AcceptGapWithRisk (AUD-GAP-001)
+
+### Domain methods exist:
+- ProcessingActivity.SubmitForReview() ✓ domain method exists
+- ProcessingActivity.Archive() ✓ domain method exists
+- Evidence.Activate() ✓ domain method exists (Draft → Active transition)
+
+### Missing: Command handlers (application layer)
+1. SubmitForReviewCommand/Handler — exposes domain method as command
+2. ArchiveCommand/Handler — exposes domain method as command
+3. **Activate** — AMBIGUOUS:
+   - ProcessingActivity has NO Activate() method (only Draft→UnderReview→Approved→Archived)
+   - Evidence HAS Activate() method (Draft→Active)
+   - Permission RBAC mentions ActivateProcessingActivity
+   - View enum has Active state
+   - Timeline mentions Activate as expected action
+   
+**Decision**: Activate likely refers to Evidence.Activate (not ProcessingActivity).
+- If it were ProcessingActivity, would need new "Active" state (architectural change)
+- Evidence.Activate is simpler and already in domain
+- Tests will validate this assumption
+
+### Plan:
+1. Create SubmitForReviewCommand/Handler for ProcessingActivity
+2. Create ArchiveCommand/Handler for ProcessingActivity
+3. Create ActivateEvidenceCommand/Handler for Evidence
+4. All with audit instrumentation (correlationId, result, metadata)
+5. Tests: success + auth/state blocking cases
