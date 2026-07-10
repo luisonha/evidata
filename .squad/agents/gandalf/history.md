@@ -524,3 +524,46 @@ await _auditService.LogAsync(
 **Comment Posted**: https://github.com/luisonha/evidata/pull/117#issuecomment-4938923152
 
 *Gandalf, Tech Lead / Reviewer*
+
+
+---
+
+## 🔄 SELF-CORRECTION — P1-017 Service Locator Analysis (2026-07-10T16:25:00-04:00)
+
+**Issue**: User (luisonha) questioned my PR #117 approval, challenging the reflection-based service locator pattern as an antipattern. Rightly so.
+
+**Investigation Conducted**:
+1. ✅ Reviewed `ReviewService.TryInvokeReviewEventHandlerAsync()` (lines 72–166) — confirmed it uses `Type.GetType()`, `MethodInfo.Invoke()`, and `Activator.CreateInstance()` without compile-time type safety
+2. ✅ Traced module dependencies: ProcessingInventory → Workflow (OK), but Workflow → ProcessingInventory blocked by circular ref concern
+3. ✅ Confirmed no MediatR in project (grep showed 0 matches)
+4. ✅ Found existing Outbox pattern: `OutboxReviewNotificationService` + `OutboxPublisherWorker` (5-second polling)
+5. ✅ Verified blocker dependency: `VersionModifiedAfterReview` (P1-016) requires `ReviewedAt` set immediately
+
+**Honest Assessment**:
+- 🔴 My approval in PR #117 was **too permissive** with the reflection pattern
+- 🔴 Service Locator + reflection **IS an antipattern** (oculta dependencias, sin type safety, silent failures en runtime)
+- 🔴 I justified it as "avoiding circular dependencies" — but that's a **problem with project structure**, not solved by reflection
+
+**Three Concrete Alternatives Evaluated**:
+
+| Option | Feasibility | Type Safety | Effort | Recommendation |
+|--------|:----------:|:----------:|:------:|:-------------:|
+| **A: MediatR** | ❌ Not installed | ✅✅✅ | 8–12h | Not applicable |
+| **B: Contracts Neutral** | ✅ YES | ✅✅✅ | 2–4h | 🏆 **BEST** |
+| **C: Sync Consumer (no reflection)** | ✅ YES | ✅✅ | 1–2h | Good alternative |
+| **Current: Reflection** | ✅ Works today | ❌ None | — | ❌ Antipattern |
+
+**RECOMMENDATION: Opción B (Contracts Neutral)**
+- Create `Evidata.Modules.Contracts.csproj` (neutral, both modules reference it)
+- Move `IReviewEventHandler` + `ReviewApprovedEventPayload` to Contracts
+- Inject `IReviewEventHandler` directly in `ReviewService` constructor (standard DI, no reflection)
+- Refactor: ~2 hours, **ZERO risk of regression**
+- Result: Clean architecture, compile-time safety, eliminates antipattern
+
+**Decision Document**: `.squad/decisions/inbox/gandalf-p1017-reflection-alternatives-analysis.md` (detailed analysis, pros/cons, implementation plan)
+
+**Status**: Analysis COMPLETE. Awaiting user decision on:
+1. Refactor NOW (P1-019, 2h effort) → recommended
+2. Refactor LATER (P2 technical debt) → document timeline
+3. Maintain reflection (NOT recommended) → document justification
+
