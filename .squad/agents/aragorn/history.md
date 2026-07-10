@@ -79,3 +79,18 @@ Aragorn led backend implementation of entire P1 pipeline (9 major items) with fo
 
 **Last Updated**: 2026-07-10T01:52:48Z  
 **Status**: ✅ All P1 items complete (P1-001 through P1-011c), P1-012 created
+
+
+### 2026-07-10T03:35:00-04:00 — PR #112 + PR #113 Implementation + Fixes (P1-012 + P1-013 Complete)
+
+Completed implementation of 2 critical RBAC permission handlers + remediation cycles:
+
+- **PR #112 (P1-012 — ActivateProcessingActivity)**: Implemented handler in ProcessingInventory, domain methods Activate()/SetAsDeprecated(), SEC-ACT-001 RBAC (fail-closed), audits ProcessingActivityActivated. 1st review rejected (CI: "treatment" forbidden), Aragorn fixed comment, approved. 5 new tests, merged to develop.
+
+- **PR #113 (P1-013 — ApproveProcessingActivity)**: Implemented handler with 2/4 blockers (CriticalGapOpen ✓, MissingLegalBasisEvidence ✓). Explicitly documented 2/4 pending as domain model dependencies (RequiredReviewPending needs Review.Status enum, VersionModifiedAfterReview needs ProcessingActivity.ReviewedAt). 1st review rejected (missing Security reference in .csproj), Aragorn restored reference + fixed "treatment" → "processing activity" nomenclature. Approved. 4 new tests, merged to develop.
+
+**Quality Insight**: PR #113 demonstrates continued honesty (post-PR#111) — gaps are NOT hidden but clearly tied to specific domain model work. This matches team culture.
+
+**Test Metrics**: 778 total, 0 regressions. Both PRs' fixes were clean and surgical.
+
+**Next**: P1-016 scheduled for 2 pending blockers (domain model extensions). P1-014, P1-015 for remaining RBAC gaps (GenerateOfficialExport, DownloadEvidence).
