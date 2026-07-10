@@ -1,5 +1,6 @@
 using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Security.Domain;
+using Evidata.Modules.Evidence.Domain;
 using Evidata.Modules.Security.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -15,13 +16,13 @@ namespace Evidata.Tests.Unit.Security;
 ///        
 /// Test cases:
 ///   - LegalReviewer validates Legal requirement → available
-///   - LegalReviewer attempts to validate Security requirement → blocked (no real test for now; context prep)
+///   - LegalReviewer attempts to validate Security requirement → blocked
 ///   - SecurityReviewer validates Security requirement → available
-///   - SecurityReviewer attempts to validate Legal requirement → blocked (no real test for now; context prep)
+///   - SecurityReviewer attempts to validate Legal requirement → blocked
 ///   - Non-reviewer role → blocked
 ///
-/// Note: Full domain-specific authorization will be tested at application/handler layer
-/// after ValidateEvidenceCommandHandler is implemented.
+/// Note: Domain-specific authorization is tested at unit level with context.ReviewDomain parameter.
+/// Integration testing at application/handler layer will validate end-to-end flows.
 /// </summary>
 public class SecEv001EvidenceValidationAuthzTests
 {
@@ -67,9 +68,10 @@ public class SecEv001EvidenceValidationAuthzTests
 
         var service = new ResourcePermissionsQueryService(db);
 
-        // Act
+        // Act: LegalReviewer with Legal domain context (matching domain)
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Legal);
         var result = await service.GetResourcePermissionsAsync(
-            userId, tenantId, "evidence", Guid.NewGuid());
+            userId, tenantId, "evidence", Guid.NewGuid(), context);
 
         // Assert
         var available = result.AvailableActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");
@@ -95,14 +97,73 @@ public class SecEv001EvidenceValidationAuthzTests
 
         var service = new ResourcePermissionsQueryService(db);
 
-        // Act
+        // Act: SecurityReviewer with Security domain context (matching domain)
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Security);
         var result = await service.GetResourcePermissionsAsync(
-            userId, tenantId, "evidence", Guid.NewGuid());
+            userId, tenantId, "evidence", Guid.NewGuid(), context);
 
         // Assert
         var available = result.AvailableActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");
         Assert.NotNull(available);
         Assert.Equal("permission.validateEvidence", available!.LabelKey);
+    }
+
+    [Fact]
+    public async Task SEC_EV_001_LegalReviewerCannotValidateSecurity_ReturnsBlocked()
+    {
+        // Arrange: LegalReviewer tries to validate a Security domain requirement
+        await using var db = CreateDb();
+        var legalReviewer = CreateAndSeedRole(db, "LegalReviewer");
+        var validatePerm = CreateAndSeedPermission(db, "evidence", "validate");
+
+        legalReviewer.AddPermission(validatePerm);
+        db.RolePermissions.AddRange(legalReviewer.Permissions);
+
+        var userId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        db.UserRoleAssignments.Add(UserRoleAssignment.Create(userId, legalReviewer.Id, tenantId));
+        db.SaveChanges();
+
+        var service = new ResourcePermissionsQueryService(db);
+
+        // Act: LegalReviewer with Security domain context
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Security);
+        var result = await service.GetResourcePermissionsAsync(
+            userId, tenantId, "evidence", Guid.NewGuid(), context);
+
+        // Assert: Must be blocked
+        var blocked = result.BlockedActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");
+        Assert.NotNull(blocked);
+        Assert.Equal("SEC-EV-001", blocked!.ReasonCode);
+    }
+
+    [Fact]
+    public async Task SEC_EV_001_SecurityReviewerCannotValidateLegal_ReturnsBlocked()
+    {
+        // Arrange: SecurityReviewer tries to validate a Legal domain requirement
+        await using var db = CreateDb();
+        var securityReviewer = CreateAndSeedRole(db, "SecurityReviewer");
+        var validatePerm = CreateAndSeedPermission(db, "evidence", "validate");
+
+        securityReviewer.AddPermission(validatePerm);
+        db.RolePermissions.AddRange(securityReviewer.Permissions);
+
+        var userId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        db.UserRoleAssignments.Add(UserRoleAssignment.Create(userId, securityReviewer.Id, tenantId));
+        db.SaveChanges();
+
+        var service = new ResourcePermissionsQueryService(db);
+
+        // Act: SecurityReviewer with Legal domain context
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Legal);
+        var result = await service.GetResourcePermissionsAsync(
+            userId, tenantId, "evidence", Guid.NewGuid(), context);
+
+        // Assert: Must be blocked
+        var blocked = result.BlockedActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");
+        Assert.NotNull(blocked);
+        Assert.Equal("SEC-EV-001", blocked!.ReasonCode);
     }
 
     [Fact]
@@ -113,9 +174,10 @@ public class SecEv001EvidenceValidationAuthzTests
         var viewer = CreateAndSeedRole(db, "Viewer");
         var validatePerm = CreateAndSeedPermission(db, "evidence", "validate");
 
-        // Viewer role does NOT get validate permission
-        viewer.AddPermission(validatePerm); // But permission exists, just no role assignment
-        db.RolePermissions.Add(RolePermission.Create(viewer.Id, validatePerm.Id));
+        // Viewer role DOES have validate permission technically
+        // but will be blocked by SEC-EV-001 because Viewer is not a reviewer role
+        viewer.AddPermission(validatePerm);
+        db.RolePermissions.AddRange(viewer.Permissions);
 
         var userId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
@@ -158,9 +220,10 @@ public class SecEv001EvidenceValidationAuthzTests
 
         var service = new ResourcePermissionsQueryService(db);
 
-        // Act
+        // Act: User with both roles can validate Legal requirements
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Legal);
         var result = await service.GetResourcePermissionsAsync(
-            userId, tenantId, "evidence", Guid.NewGuid());
+            userId, tenantId, "evidence", Guid.NewGuid(), context);
 
         // Assert
         var available = result.AvailableActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");

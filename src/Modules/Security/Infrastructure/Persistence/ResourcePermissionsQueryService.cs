@@ -227,11 +227,13 @@ public class ResourcePermissionsQueryService : IResourcePermissionsQueryService
     /// SEC-EV-001: If reviewDomain is provided in context, validate that the user has the correct domain-specific role.
     /// Legal domain requires LegalReviewer; Security domain requires SecurityReviewer.
     /// Returns true if the user's roles don't match the requirement's reviewDomain.
+    /// FAIL-CLOSED: If ReviewDomain is missing, blocks the action (never auto-allows).
     /// </summary>
     private static bool IsBlocked_ValidateEvidenceWrongDomain(List<Role> userRoles, ResourceContextData? context)
     {
+        // FAIL-CLOSED: If no context or ReviewDomain is null, block the action
         if (context?.ReviewDomain is null)
-            return false; // No specific domain requirement provided, defer to HasEvidenceValidationRole
+            return true; // Block if ReviewDomain is missing — security requirement always needs domain
 
         var roleNames = new HashSet<string>(userRoles.Select(r => r.Name));
         
@@ -258,7 +260,7 @@ public class ResourcePermissionsQueryService : IResourcePermissionsQueryService
             };
         }
 
-        return false; // Unknown type, don't block
+        return true; // Unknown type, block for safety
     }
 
     /// <summary>SEC-GAP-001: Accept gap with risk - only TenantOwner/ComplianceAdmin.</summary>
