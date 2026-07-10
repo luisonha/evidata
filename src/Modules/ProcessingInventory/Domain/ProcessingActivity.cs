@@ -2,14 +2,17 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 
 /// <summary>
 /// Estado del ciclo de vida de un tratamiento RAT (doc 15, sec 11).
-/// Draft → UnderReview → Approved → Archived
+/// Draft → UnderReview → Approved → Active → Archived / Deprecated
 /// Draft también puede ir a Archived directamente (descarte).
+/// Active es la versión vigente; Deprecated la reemplaza.
 /// </summary>
 public enum ProcessingActivityStatus
 {
     Draft,
     UnderReview,
     Approved,
+    Active,
+    Deprecated,
     Archived
 }
 
@@ -64,6 +67,9 @@ public class ProcessingActivity
 
     /// <summary>ID del tratamiento anterior al que esta versión reemplaza (null si es la primera).</summary>
     public Guid? SupersedesId { get; private set; }
+
+    /// <summary>ID de la versión activa (vigente) de este tratamiento. Null si ninguna versión está activa aún.</summary>
+    public Guid? ActiveVersionId { get; set; }
 
     // ── Secciones (owned types / JSONB) ────────────────────────────────────────
 
@@ -245,6 +251,36 @@ public class ProcessingActivity
             throw new InvalidOperationException("El tratamiento ya está archivado.");
 
         Status = ProcessingActivityStatus.Archived;
+        LastModifiedBy = modifiedBy;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Activates this version as the active version.
+    /// Only valid when status is Approved.
+    /// </summary>
+    public void Activate(Guid activatedBy)
+    {
+        if (Status != ProcessingActivityStatus.Approved)
+            throw new InvalidOperationException(
+                $"Solo se puede activar desde estado Approved. Estado actual: {Status}.");
+
+        Status = ProcessingActivityStatus.Active;
+        LastModifiedBy = activatedBy;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Marks this version as deprecated.
+    /// Called when a new version becomes active.
+    /// </summary>
+    public void SetAsDeprecated(Guid modifiedBy)
+    {
+        if (Status != ProcessingActivityStatus.Active)
+            throw new InvalidOperationException(
+                $"Solo se puede deprecar un tratamiento Active. Estado actual: {Status}.");
+
+        Status = ProcessingActivityStatus.Deprecated;
         LastModifiedBy = modifiedBy;
         LastModifiedAt = DateTimeOffset.UtcNow;
     }
