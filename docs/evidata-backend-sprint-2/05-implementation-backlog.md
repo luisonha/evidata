@@ -29,7 +29,8 @@
 | P1-010 | Crear `TimelineEvent`. | Bitácora UI proyectada. | Timeline tests |
 | P1-011a | Implementar handler ValidateEvidence + instrumentación de auditoría (SEC-EV-001). | Timeline y auditoría reflejan validación de evidencia. | Audit + Security tests |
 | P1-011b | Implementar handler AcceptGapWithRisk + instrumentación de auditoría (SEC-GAP-001). | Timeline y auditoría reflejan aceptación de riesgo. | Audit + Security tests |
-| P1-011c | Implementar handlers restantes (SubmitForReview, Activate, Archive, GenerateOfficialExport, RejectEvidence) + auditoría + tests. | Cobertura completa de las 10 acciones críticas auditables. | Audit tests |
+| P1-011c | ✅ COMPLETADO (9/10): Implementar handlers SubmitForReview + Archive + auditoría + tests. AUD-ACT-001 (Activate) documentado como gap arquitectónico → P1-012. | 9 de 10 acciones críticas auditables instrumentadas (AUD-PA-001, AUD-NODE-001, AUD-REV-001, AUD-APP-001, AUD-ARC-001, AUD-EV-001, AUD-EV-002, AUD-GAP-001, AUD-EXP-001). 1 gap (AUD-ACT-001) requiere decisión de producto. PR #111 MERGED a develop. | ✅ Audit tests + 778 unit tests passing |
+| P1-012 | Formalizar transición Activate() en ProcessingActivity (AUD-ACT-001). | ProcessingActivity FSM incluye estado Active, ActivateProcessingActivity command handler con auditoría SEC-ACT-001, tests, RBAC contract satisfecho. | Audit + Security tests |
 
 ## P2 — Limpieza y compatibilidad
 

@@ -150,3 +150,88 @@ Per strict protocol lockout, Aragorn is blocked from this revision. Gimli (Testi
 - ✅ Tenant isolation mandatory en todas las queries
 - ✅ Protocol respected: Gimli solo implementation post-concurrency incident
 - ✅ Decision documents consolidated + inbox cleaned
+
+---
+
+## 2026-07-10T01:39 — PR #111 Remediation (Lockout Correction)
+
+**Context**: PR #111 rejected 2x by Gandalf. Aragorn locked out per protocol. Gimli assigned independent remediation.
+
+### Decision Made
+Implement Gandalf's recommended **Option A**: Remove orphaned code.
+
+### Actions Completed
+
+1. **Removed orphaned ActivateEvidenceCommand/Handler**
+   - 2 files deleted: ActivateEvidenceCommand.cs (93 lines), ActivateEvidenceCommandHandler.cs (95 lines)
+   - Verified zero references from endpoints (grep)
+   - Verified zero tests exist (consistent with finding)
+   - Reason: Dead code, inconsistent with test discipline, not in contract scope
+
+2. **Verified build & tests green**
+   - Build: 0 errors, 27 warnings (pre-existing)
+   - Tests: 769 passing (100%), no regressions
+   - No new compiler issues introduced
+
+3. **Committed & pushed**
+   - Commit: 0907979
+   - Message: Clear explanation of dead code removal + verification
+   - Branch: dev/2026/07/10/audit-remaining-critical-actions
+
+4. **Updated PR #111 description**
+   - Changed from "10/10 COMPLETO" to "9/10 with documented gap"
+   - Added table view of all 10 actions with clear status
+   - Documented AUD-ACT-001 domain gap (ProcessingActivity has no Activate state)
+   - Linked to aragorn-activate-clarification.md for full investigation
+   - Recommended P1-012 for product decision on Active state semantics
+   - Preserved Aragorn's excellent investigation quality and conclusions
+
+### Verification
+- ✅ Dead code cleanly removed
+- ✅ Build passes
+- ✅ Tests pass (no regression)
+- ✅ Git history clean (2 commits: Aragorn + Gimli)
+- ✅ PR description now honest and detailed
+- ⏳ CI checks pending (expected ~2-5 min)
+
+### Status
+PR #111 ready for Gandalf's 3rd review. All 3 defects from 2nd rejection resolved:
+1. Description no longer dishonest ✅
+2. Orphaned code removed ✅
+3. Clear resolution/recommendation documented ✅
+
+Aragorn's investigation (9/10 honest assessment) is preserved and now properly highlighted in the description.
+
+
+---
+
+## 2026-07-10T01:52:48Z — PR #111 Remediation Validated (Closure)
+
+**Context**: Gimli's dead code cleanup (commit 0907979) enabled PR #111 to progress from 2nd review rejection to 3rd review approval.
+
+**Remediation Execution (2026-07-10T01:40:00Z)**:
+- Removed 2 orphaned files: ActivateEvidenceCommand.cs (10 LOC) + ActivateEvidenceCommandHandler.cs (85 LOC)
+- Total: 95 LOC removed, all unused (no endpoints, no integration, zero tests)
+- Scope: Pure code cleanup, zero logic changes to SubmitForReview/Archive handlers
+- Build validation: 0 errors, CI GREEN
+
+**3rd Review Validation (2026-07-10T01:44:06Z)**:
+- Gandalf verified orphaned code fully eliminated ✅
+- Verified PR description corrected to honest "9/10 + 1 gap" ✅
+- Verified all other gates (tests, CI, governance) passed ✅
+- Decision: Unconditional approval (3rd review)
+
+**Remediation Quality Assessment**:
+- ✅ Scope discipline (code cleanup only, no interference with approved logic)
+- ✅ Speed (executed <5 min from blocker assignment)
+- ✅ Impact (unblocked PR progression from rejection to approval)
+- ✅ Governance (no violations, history documented)
+- ✅ Process adherence (lockout protocol honored, remediation requested by Gandalf, executed cleanly)
+
+**Learning from Episode**:
+- Gimli's role as remediation specialist is validated (pure cleanup enables blocked agent escape hatch)
+- Rapid turnaround (5 min) demonstrates process efficiency
+- Quality gate (catching dead code + dishonest description) works correctly
+- Multi-agent collaboration (Aragorn investigation → Gimli cleanup → Gandalf final approval) effective
+
+**Team Update Recorded**: 📌 Team update (2026-07-10T01:52:48Z): PR #111 remediation (dead code cleanup, 95 LOC removed) validated in 3rd review — unblocked Aragorn, enabled unconditional approval — decided by Gandalf

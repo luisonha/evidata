@@ -1,7 +1,7 @@
 ---
-updated_at: 2026-07-10T00:56:16Z
-focus_area: P1-001 a P1-011b COMPLETADOS y MERGEADOS a develop + P1-011c (5 handlers restantes de auditoría, PRIORIDAD MEDIA/P2) + pendientes follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
-active_issues: [P1-011c (Remaining 5 handlers: SubmitForReview/Activate/Archive/RejectEvidence/GenerateOfficialExport, MEDIUM PRIORITY/P2), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (partial degradation tests PR #104, pending)]
+updated_at: 2026-07-10T01:52:48Z
+focus_area: P1-001 a P1-011c COMPLETADOS Y MERGEADOS a develop + P1-012 (Formalizar ActivateProcessingActivity, PENDIENTE DECISIÓN DE PRODUCTO) + pendientes follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
+active_issues: [P1-012 (AUD-ACT-001 gap — ProcessingActivity.Activate state/transition formalization, PENDING PRODUCT DECISION), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (partial degradation tests PR #104, pending)]
 ---
 
 # What We're Focused On
@@ -16,8 +16,32 @@ active_issues: [P1-011c (Remaining 5 handlers: SubmitForReview/Activate/Archive/
 - **P1-008** (Exports) — GenerateOfficialExport command + export formats (ProcessingActivityPdfSummary|GlobalRatExcel|ApprovalHistory|InternalJson) con SEC-EXP-001 fail-closed authorization. ProcessingActivityReadOnlyQueryAdapter (API layer) bridgea Reporting → ProcessingInventory. 3 behavioral tests reales (NSubstitute). 753/753 unit tests passing. **Merged to develop** (PR #109).
 - **P1-011a/b (ValidateEvidence + AcceptGapWithRisk + Auditoría)** ✅ COMPLETADO Y MERGEADO — ValidateEvidenceCommandHandler (SEC-EV-001, fail-closed domain-specific RBAC) + AcceptGapWithRiskCommandHandler (SEC-GAP-001, admin-only + justificación obligatoria) con auditoría AUD-EV-001/AUD-EV-002/AUD-GAP-001, metadata segura (sin texto sensible), CorrelationId E2E. Ciclo: rechazo por fuga de datos sensibles → corrección inmediata Aragorn → re-aprobación Gandalf. 761 tests passing. **Merged to develop** (PR #110).
 
-### 🔄 MEDIUM PRIORITY - P2 PIPELINE
-**P1-011c (Remaining 5 Handlers + Audit)** — PRIORITY: P2 · Status: ⏳ PENDIENTE. Scope: SubmitForReview (AUD-REV-001), Activate (AUD-ACT-001), Archive (AUD-ARC-001), RejectEvidence (AUD-EV-002), GenerateOfficialExport (AUD-EXP-001) + auditoría + tests (mismo patrón fail-closed que P1-011a/b, metadata no-sensible). Estimación: 6-8 horas total.
+- **P1-011c (SubmitForReview + Archive + Auditoría)** ✅ COMPLETADO Y MERGEADO — SubmitForReviewCommandHandler (Draft → UnderReview, AUD-REV-001) + ArchiveCommandHandler (AnyState → Archived, AUD-ARC-001) con auditoría E2E, metadata segura, CorrelationId propagación. **Coverage: 9/10 critical auditable actions** (AUD-PA-001, AUD-NODE-001, AUD-REV-001, AUD-APP-001, AUD-ARC-001, AUD-EV-001, AUD-EV-002, AUD-GAP-001, AUD-EXP-001). **1 gap documented**: AUD-ACT-001 (ActivateProcessingActivity) architectural → P1-012 for product decision. Remediation cycle: Aragorn submitted → Gandalf rejected (dishonest description + orphaned code) → Gimli cleaned (95 LOC removed) → Gandalf approved unconditional (3rd review). 769 unit + 9 integration = 778 tests passing. **Merged to develop** (PR #111).
+
+### 🔄 NEW — P1-012: AUD-ACT-001 Gap (Pending Product Decision)
+**P1-012 (Formalize ProcessingActivity.Activate State/Transition)** — Status: **PENDIENTE DECISIÓN DE PRODUCTO**. Priority: Medium (staggered P2). 
+
+**Context**: PR #111 completed 9/10 critical auditable actions but identified architectural gap:
+- RBAC contract defines `ActivateProcessingActivity` (SEC-ACT-001)
+- ProcessingActivity domain has NO Activate() method in FSM (states: Draft → UnderReview → Approved → Archived)
+- AUD-ACT-001 (auditable action) cannot be implemented without domain semantics
+- This is NOT an engineering shortcut — it's a genuine business decision point
+
+**Requirement**: Product/business must clarify:
+- When/why should ProcessingActivity transition to "Active" state?
+- Is "Active" a new FSM state or a derived property?
+- What triggers activation? What are the preconditions?
+- Does activation have authorization rules (SEC-ACT-001)?
+
+**Implementation Path** (once product decision made):
+- Add "Active" state to ProcessingActivityStatus enum (or equivalent)
+- Implement ProcessingActivity.Activate() method with FSM transition rules
+- Create ActivateProcessingActivityCommandHandler with AUD-ACT-001 audit instrumentation
+- Implement SEC-ACT-001 authorization validation (role-based per RBAC contract)
+- Write tests (behavioral, security, audit)
+- Achieve 10/10 critical auditable action coverage
+
+**Blocked By**: Product decision on Active state semantics (not engineering constraint).
 
 ### 🔄 FOLLOW-UP ADMINISTRATIVE (Secondary Priority)
 - **develop → main reconciliation** — Pending: verify all P1 items stable (✅ done), run integration smoke tests, prepare release branch.
