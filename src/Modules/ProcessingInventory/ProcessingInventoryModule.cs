@@ -1,3 +1,4 @@
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
@@ -24,6 +25,12 @@ public static class ProcessingInventoryModule
         services.AddScoped<ListProcessingActivitiesQueryHandler>();
         services.AddScoped<GetProcessingActivityQueryHandler>();
         services.AddScoped<GetProcessingActivityControlQueryHandler>();
+        
+        // P1-FULL-COMPOSITION: Register the control query service interface
+        // The API layer will override this with the composition handler implementation
+        services.AddScoped<IProcessingActivityControlQueryService>(sp =>
+            sp.GetRequiredService<GetProcessingActivityControlQueryHandler>());
+        
         services.AddScoped<CreateProcessingActivityCommandHandler>();
         services.AddScoped<UpdateProcessingActivityCommandHandler>();
 

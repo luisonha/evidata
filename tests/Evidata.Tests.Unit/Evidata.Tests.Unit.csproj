@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Evidata.Api\Evidata.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\TenantManagement\Evidata.Modules.TenantManagement.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\Evidata.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\Modules\Security\Evidata.Modules.Security.csproj" />
