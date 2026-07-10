@@ -2,6 +2,9 @@ using Evidata.Modules.GapManagement.Domain;
 
 namespace Evidata.Tests.Unit.GapManagement;
 
+/// <summary>
+/// Tests para ComplianceGap con FSM actualizada (nuevos estados per contract sección 4).
+/// </summary>
 public class ComplianceGapTests
 {
     private static ComplianceGap BuildOpen(GapSeverity severity = GapSeverity.Medium) =>
@@ -52,119 +55,60 @@ public class ComplianceGapTests
                 new string('x', 301), "desc", GapSeverity.Low, Guid.NewGuid()));
     }
 
-    // ── Assign ────────────────────────────────────────────────────────────────
+    // ── StartCorrection ───────────────────────────────────────────────────────
 
     [Fact]
-    public void Assign_FromOpen_SetsOwnerAndAssigned()
+    public void StartCorrection_FromOpen_SetsInCorrection()
     {
         var gap = BuildOpen();
         var owner = Guid.NewGuid();
         var due = DateTimeOffset.UtcNow.AddDays(30);
 
-        gap.Assign(owner, Guid.NewGuid(), due);
+        gap.StartCorrection(Guid.NewGuid(), owner, due);
 
-        Assert.Equal(GapStatus.Assigned, gap.Status);
+        Assert.Equal(GapStatus.InCorrection, gap.Status);
         Assert.Equal(owner, gap.OwnerId);
         Assert.Equal(due, gap.DueAt);
     }
 
     [Fact]
-    public void Assign_FromResolved_Throws()
+    public void StartCorrection_FromInCorrection_Throws()
     {
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-        gap.Resolve(Guid.NewGuid());
+        gap.StartCorrection(Guid.NewGuid());
 
-        Assert.Throws<InvalidOperationException>(() =>
-            gap.Assign(Guid.NewGuid(), Guid.NewGuid()));
-    }
-
-    // ── StartProgress ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void StartProgress_FromAssigned_SetsInProgress()
-    {
-        var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-
-        Assert.Equal(GapStatus.InProgress, gap.Status);
-    }
-
-    [Fact]
-    public void StartProgress_FromBlocked_SetsInProgress()
-    {
-        var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.Block(Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-
-        Assert.Equal(GapStatus.InProgress, gap.Status);
-    }
-
-    [Fact]
-    public void StartProgress_FromOpen_Throws()
-    {
-        var gap = BuildOpen();
-        Assert.Throws<InvalidOperationException>(() => gap.StartProgress(Guid.NewGuid()));
-    }
-
-    // ── Block ─────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void Block_FromInProgress_SetsBlocked()
-    {
-        var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-        gap.Block(Guid.NewGuid());
-
-        Assert.Equal(GapStatus.Blocked, gap.Status);
-    }
-
-    [Fact]
-    public void Block_FromResolved_Throws()
-    {
-        var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-        gap.Resolve(Guid.NewGuid());
-
-        Assert.Throws<InvalidOperationException>(() => gap.Block(Guid.NewGuid()));
+        Assert.Throws<InvalidOperationException>(() => 
+            gap.StartCorrection(Guid.NewGuid()));
     }
 
     // ── Resolve ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Resolve_FromInProgress_SetsResolved()
+    public void Resolve_FromInCorrection_SetsResolved()
     {
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
+        gap.StartCorrection(Guid.NewGuid());
         gap.Resolve(Guid.NewGuid());
 
         Assert.Equal(GapStatus.Resolved, gap.Status);
     }
 
     [Fact]
-    public void Resolve_FromAssigned_Throws()
+    public void Resolve_FromOpen_Throws()
     {
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-
         Assert.Throws<InvalidOperationException>(() => gap.Resolve(Guid.NewGuid()));
     }
 
     // ── AcceptRisk ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AcceptRisk_FromOpen_SetsAcceptedRisk()
+    public void AcceptRisk_FromOpen_SetsAcceptedWithRisk()
     {
         var gap = BuildOpen();
         gap.AcceptRisk("Riesgo residual documentado y aceptado por DPO.", Guid.NewGuid());
 
-        Assert.Equal(GapStatus.AcceptedRisk, gap.Status);
+        Assert.Equal(GapStatus.AcceptedWithRisk, gap.Status);
         Assert.Contains("DPO", gap.RiskAcceptanceJustification);
     }
 
@@ -176,15 +120,34 @@ public class ComplianceGapTests
     }
 
     [Fact]
-    public void AcceptRisk_FromResolved_Throws()
+    public void AcceptRisk_FromInCorrection_Throws()
     {
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
-        gap.Resolve(Guid.NewGuid());
+        gap.StartCorrection(Guid.NewGuid());
 
         Assert.Throws<InvalidOperationException>(() =>
             gap.AcceptRisk("justificación", Guid.NewGuid()));
+    }
+
+    // ── Dismiss ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Dismiss_FromOpen_SetsDismissed()
+    {
+        var gap = BuildOpen();
+        gap.Dismiss(Guid.NewGuid(), "No aplicable a la organización");
+
+        Assert.Equal(GapStatus.Dismissed, gap.Status);
+    }
+
+    [Fact]
+    public void Dismiss_FromInCorrection_Throws()
+    {
+        var gap = BuildOpen();
+        gap.StartCorrection(Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(() =>
+            gap.Dismiss(Guid.NewGuid()));
     }
 
     // ── Close ─────────────────────────────────────────────────────────────────
@@ -193,8 +156,7 @@ public class ComplianceGapTests
     public void Close_FromResolved_SetsClosed()
     {
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
+        gap.StartCorrection(Guid.NewGuid());
         gap.Resolve(Guid.NewGuid());
         var closer = Guid.NewGuid();
         gap.Close(closer);
@@ -205,10 +167,20 @@ public class ComplianceGapTests
     }
 
     [Fact]
-    public void Close_FromAcceptedRisk_SetsClosed()
+    public void Close_FromAcceptedWithRisk_SetsClosed()
     {
         var gap = BuildOpen();
         gap.AcceptRisk("Justificación formal", Guid.NewGuid());
+        gap.Close(Guid.NewGuid());
+
+        Assert.Equal(GapStatus.Closed, gap.Status);
+    }
+
+    [Fact]
+    public void Close_FromDismissed_SetsClosed()
+    {
+        var gap = BuildOpen();
+        gap.Dismiss(Guid.NewGuid());
         gap.Close(Guid.NewGuid());
 
         Assert.Equal(GapStatus.Closed, gap.Status);
@@ -224,18 +196,26 @@ public class ComplianceGapTests
     // ── BlocksApproval ────────────────────────────────────────────────────────
 
     [Fact]
+    public void Critical_InCorrection_DoesNotBlockApproval()
+    {
+        var gap = BuildOpen(GapSeverity.Critical);
+        gap.StartCorrection(Guid.NewGuid());
+
+        Assert.False(gap.BlocksApproval);
+    }
+
+    [Fact]
     public void Critical_Resolved_DoesNotBlockApproval()
     {
         var gap = BuildOpen(GapSeverity.Critical);
-        gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        gap.StartProgress(Guid.NewGuid());
+        gap.StartCorrection(Guid.NewGuid());
         gap.Resolve(Guid.NewGuid());
 
         Assert.False(gap.BlocksApproval);
     }
 
     [Fact]
-    public void Critical_AcceptedRisk_DoesNotBlockApproval()
+    public void Critical_AcceptedWithRisk_DoesNotBlockApproval()
     {
         var gap = BuildOpen(GapSeverity.Critical);
         gap.AcceptRisk("Aceptado formalmente", Guid.NewGuid());

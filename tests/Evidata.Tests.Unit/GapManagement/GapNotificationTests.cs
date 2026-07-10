@@ -47,7 +47,7 @@ public class GapNotificationTests
     {
         var (svc, outbox) = Build();
         var gap = BuildOpen();
-        gap.Assign(Guid.NewGuid(), _actorId);
+        gap.StartCorrection(_actorId);
 
         await svc.NotifyAssignedAsync(gap, _actorId);
 

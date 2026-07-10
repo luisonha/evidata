@@ -102,8 +102,8 @@ public class GapReportHandler
     {
         var ws = wb.Worksheets.Add("Resumen");
 
-        // Cabeceras
-        var headers = new[] { "Severidad", "Total", "Abierto", "En Progreso", "Bloqueado", "Resuelto", "Riesgo Aceptado" };
+        // Cabeceras (nuevos estados per contract section 4)
+        var headers = new[] { "Severidad", "Total", "Abierto", "En Corrección", "Resuelto", "Riesgo Aceptado", "Descartado" };
         for (var i = 0; i < headers.Length; i++)
         {
             var cell = ws.Cell(1, i + 1);
@@ -123,10 +123,10 @@ public class GapReportHandler
             ws.Cell(row, 1).Value = sev.ToString();
             ws.Cell(row, 2).Value = subset.Count;
             ws.Cell(row, 3).Value = subset.Count(g => g.Status == GapStatus.Open);
-            ws.Cell(row, 4).Value = subset.Count(g => g.Status == GapStatus.InProgress);
-            ws.Cell(row, 5).Value = subset.Count(g => g.Status == GapStatus.Blocked);
-            ws.Cell(row, 6).Value = subset.Count(g => g.Status == GapStatus.Resolved);
-            ws.Cell(row, 7).Value = subset.Count(g => g.Status == GapStatus.AcceptedRisk);
+            ws.Cell(row, 4).Value = subset.Count(g => g.Status == GapStatus.InCorrection);
+            ws.Cell(row, 5).Value = subset.Count(g => g.Status == GapStatus.Resolved);
+            ws.Cell(row, 6).Value = subset.Count(g => g.Status == GapStatus.AcceptedWithRisk);
+            ws.Cell(row, 7).Value = subset.Count(g => g.Status == GapStatus.Dismissed);
 
             if (sev == GapSeverity.Critical)
                 ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFE0E0");
