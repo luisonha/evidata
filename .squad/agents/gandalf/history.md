@@ -37,6 +37,16 @@ Gandalf managed technical quality gates across entire P1 pipeline:
    - 2nd Approval (Unconditional): Verified fix (commit 74e5375), nomenclature fix (commit 22d191c), build SUCCESS, 773/773 tests PASS, CI GREEN
 
 
+8. **PR #114** (GenerateOfficialExport P1-014, SEC-EXP-001 Compliance) — Approved Conditional (1 iteration):
+   - Scope: Fix 4 compliance audit gaps identified by Gandalf in 04-rbac-audit-evidence-gaps-contract.md
+   - Gap #1 (Active state validation) ✅ FIXED
+   - Gap #2 (Auto-detect export warnings) ⚠️ DOCUMENTED AS P2 — architectural decision to defer
+   - Gap #3 (HTTP 422 mapping with OfficialExportRequiresApproval) ✅ FIXED
+   - Gap #4 (Audit ExportGenerationBlocked) ✅ FIXED
+   - Quality: 782/782 tests pass (+4 new), CI GREEN, zero nomenclature violations, metadata safe, description honest
+   - Gandalf Finding: Gap #2 boundary argument is PARTIAL — abstractions exist (IGapSummaryQueryService, IEvidenceSummaryQueryService) for safe cross-module composition, but P2 deferral is architecturally valid choice
+   - Approval: CONDITIONAL (merge approved, but requires formal P2 backlog item for complete SEC-EXP-001 compliance)
+   - Review Document: .squad/decisions/inbox/gandalf-pr114-review.md
 
 ---
 
