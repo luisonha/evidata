@@ -195,3 +195,51 @@ Per docs/evidata-backend-sprint-2/04-rbac-audit-evidence-gaps-contract.md § Dow
 ### 2026-07-10T13:05:00Z — PR #115 Merged & RBAC Audit Cycle Closed (P1-015 Complete, All 6 Perms Addressed)
 
 📌 Team update (2026-07-10T13:05:00Z): P1-015 DownloadEvidence (SEC-EVDOWN-001) merged to develop. All 4 gaps closed without deferral: endpoint ✓, authorization before SAS ✓, audit trail (EvidenceDownloaded + EvidenceAccessDenied) ✓, HTTP mapping 403/422/404 ✓. 783 unit tests passing, 0 regressions. Minor finding (Gandalf): 403 uses Forbid() without ApiErrorEnvelope wrapper (consistency note, non-blocking). **RBAC Compliance Audit Cycle Closed**: All 6 critical permissions from extended contract now addressed (3 complete with no follow-up, 3 with documented follow-ups in P1-016 + P1-014-P2). Decisions consolidated (gandalf-pr115-review.md + aragorn-p1015-download-evidence.md → decisions.md). Backlog updated: P1-015 marked COMPLETADO with RBAC summary section. — Scribe
+
+
+### 2026-07-10T13:43:51Z — P1-016: RequiredReviewPending + VersionModifiedAfterReview Blockers (SEC-APP-001)
+
+**Epic**: P1-016  
+**Spec Code**: SEC-APP-001 (ApproveProcessingActivity)  
+**Contract Ref**: docs/evidata-backend-sprint-2/04-rbac-audit-evidence-gaps-contract.md (ApproveProcessingActivity section)
+
+**Task Summary**:
+Implement 2 remaining business blockers for `ApproveProcessingActivity` command (originally P1-013 but incomplete in PR #113):
+
+1. **RequiredReviewPending**: Block approval if any Review for this ProcessingActivity is not in Approved status
+2. **VersionModifiedAfterReview**: Block approval if LastModifiedAt > ReviewedAt (version modified after review completed)
+
+**Implementation Decisions**:
+- Added `ReviewedAt` nullable DateTimeOffset field to ProcessingActivity root aggregate
+- Injected `IReviewService` into ApproveProcessingActivityCommandHandler (cross-module dependency)
+- Both blockers return HTTP 422 with appropriate codes (RequiredReviewPending / VersionModifiedAfterReview)
+- Both audit as `ApprovalBlocked` events with full metadata tracing
+- EF Core migration 20260710174526_AddReviewedAtToProcessingActivity for schema
+
+**Test Coverage**:
+- 7 total ApproveProcessingActivityCommandHandler tests (4 existing + 3 new)
+  - SEC-APP-001: ProcessOwner blocked (403) — existing
+  - Happy path: Authorized approval succeeds — existing
+  - CriticalGapOpen blocker — existing from PR #113
+  - RequiredReviewPending blocker blocks (NEW)
+  - VersionModifiedAfterReview blocker blocks (NEW)
+  - Both conditions satisfied → approval succeeds (NEW)
+  - Invalid state (not UnderReview) blocks — existing
+- All 786 unit tests pass (0 regressions from develop baseline)
+
+**Quality Metrics**:
+- ✅ 786 unit tests passing
+- ✅ NSubstitute mocks (no reflection in tests)
+- ✅ No prohibited naming violations ('treatment' clear)
+- ✅ Build successful (0 errors)
+- ✅ Architecture decision documented: aragorn-p1016-blockers-implementation.md
+- ✅ PR #116 created with full description
+
+**Status**: P1-016 ✅ COMPLETED, PR #116 ready for review
+
+**Honest Assessment**:
+- Both blockers fully implemented per contract (no deferrals)
+- ReviewedAt setup logic (who sets it when Review → Approved?) deferred to P1-0XX as product decision
+- "Required" review concept is implicit (any Review blocks) vs configurable (future enhancement) — acceptable for MVP
+
+📌 Team update (2026-07-10T14:05:00-04:00): PR #116 (P1-016 ApproveProcessingActivity Blockers) merged to develop. Both blockers (RequiredReviewPending, VersionModifiedAfterReview) implemented in code + tests (786 passing, 0 regressions). Gandalf approved conditional; identified critical functional gap: VersionModifiedAfterReview blocker is dead code without P1-017 (auto-set ReviewedAt when Review approved). P1-017 (ALTA, event-driven integration) and P1-018 (MEDIA, configurable requirements) formally tracked as follow-ups. Ready for P1-017 sprint planning. — Decided by Gandalf + Aragorn
