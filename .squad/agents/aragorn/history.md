@@ -43,3 +43,59 @@ Due to GapManagement module dependency on ProcessingInventory, direct compositio
 4. Full integration tests
 5. Update OpenAPI contract
 
+## 2026-07-10 · P1-005 & P1-006 Evidence Requirement and Validation
+
+### What
+- **P1-005**: Formalizado `EvidenceRequirement` con campo `reviewDomain` (Legal | Security)
+- **P1-006**: Formalizado `EvidenceValidation` con estado machine (Pending → Attached → Validated/Insufficient/Rejected)
+- Integración SEC-EV-001 con reviewDomain en ResourcePermissionsQueryService
+- EF Core entities, migrations, y tests de comportamiento real
+
+### Cambios
+1. **Nuevos archivos de dominio**:
+   - `src/Modules/Evidence/Domain/EvidenceRequirement.cs` (97 líneas, reviewDomain crítico)
+   - `src/Modules/Evidence/Domain/EvidenceValidation.cs` (201 líneas, máquina de estados)
+
+2. **Actualización EF Core**:
+   - `EvidenceDbContext`: agregados DbSets + configuración (73 líneas)
+   - Migration automática: `AddEvidenceRequirementAndValidation` (generada vía `dotnet ef`)
+
+3. **Seguridad (RBAC)**:
+   - `ResourceContextData`: agregado campo `ReviewDomain?` (backward compatible)
+   - `ResourcePermissionsQueryService.IsBlocked_ValidateEvidenceWrongDomain()`: valida reviewer role vs. domain
+   - SEC-EV-001 ahora diferencia LegalReviewer (para Legal) vs. SecurityReviewer (para Security)
+
+4. **Tests** (398 líneas):
+   - `EvidenceRequirementAndValidationDomainTests.cs`: 29 test cases
+     - Creación, mutaciones, validación de campos obligatorios
+   - `SecEv001EvidenceValidationAuthzTests.cs`: 5 test cases
+     - LegalReviewer puede validar Legal, no Security
+     - SecurityReviewer puede validar Security, no Legal
+
+### Why (Contrato)
+- **02-domain-implementation-contract.md**: define EvidenceRequirement como entidad de dominio con reviewDomain
+- **04-rbac-audit-evidence-gaps-contract.md**: SEC-EV-001 must validate against reviewDomain, NOT file name/MIME/text
+
+### Status
+- ✓ Dominio: creado con máquina de estados correcta
+- ✓ EF Core: mapeo de entidades y relaciones (DbContext + migration)
+- ✓ RBAC: ResourcePermissionsQueryService extendido; backward compatible
+- ✓ Tests unitarios: 34 casos, todas las transiciones de estado cubiertas
+- ✓ Tenant isolation: multi-tenant en todas las entidades
+- ✓ Commit: `fd8da15` (11 files, 1705 insertions)
+
+### Arquitectura
+- Ningún cambio de API pública (handlers/endpoints son P1 en siguiente ciclo)
+- Auditoría: integración delegada a handlers (AUD-EV-001, AUD-EV-002)
+- Waived state: excluido del MVP (será P2 si se añade)
+
+### Decision Document
+- Creado: `.squad/decisions/inbox/aragorn-evidence-requirement-validation.md`
+- Documenta contexto, decisiones, riesgos, impacto, y responsabilidades fuera de scope
+
+### Próximos Pasos (P1 posterior)
+1. ValidateEvidenceCommandHandler (con AuditService integration)
+2. Query handlers para EvidenceRequirements y EvidenceValidations
+3. API endpoints (POST /requirements, POST /validations/{id}/validate, etc.)
+4. Integration tests de autorización (LegalReviewer vs SecurityReviewer)
+

@@ -93,7 +93,19 @@ public class ResourcePermissionsQueryService : IResourcePermissionsQueryService
         // SEC-EV-001: Validate evidence - role depends on evidence domain
         if (CanEvaluateActionForResource(userPermissions, "evidence:validate"))
         {
-            if (HasEvidenceValidationRole(userRoles))
+            if (IsBlocked_ValidateEvidenceWrongDomain(userRoles, context))
+            {
+                blocked.Add(new BlockedActionResult(
+                    "ValidateEvidence",
+                    "permission.validateEvidence",
+                    "SEC-EV-001",
+                    "block.validateEvidenceWrongRole",
+                    "High",
+                    "severity.high",
+                    "Evidence",
+                    "node.evidence"));
+            }
+            else if (HasEvidenceValidationRole(userRoles))
             {
                 available.Add(new AvailableActionResult(
                     "ValidateEvidence",
@@ -209,6 +221,46 @@ public class ResourcePermissionsQueryService : IResourcePermissionsQueryService
     {
         var roleNames = new HashSet<string>(userRoles.Select(r => r.Name));
         return roleNames.Contains("LegalReviewer") || roleNames.Contains("SecurityReviewer");
+    }
+
+    /// <summary>
+    /// SEC-EV-001: If reviewDomain is provided in context, validate that the user has the correct domain-specific role.
+    /// Legal domain requires LegalReviewer; Security domain requires SecurityReviewer.
+    /// Returns true if the user's roles don't match the requirement's reviewDomain.
+    /// FAIL-CLOSED: If ReviewDomain is missing, blocks the action (never auto-allows).
+    /// </summary>
+    private static bool IsBlocked_ValidateEvidenceWrongDomain(List<Role> userRoles, ResourceContextData? context)
+    {
+        // FAIL-CLOSED: If no context or ReviewDomain is null, block the action
+        if (context?.ReviewDomain is null)
+            return true; // Block if ReviewDomain is missing — security requirement always needs domain
+
+        var roleNames = new HashSet<string>(userRoles.Select(r => r.Name));
+        
+        // If context.ReviewDomain is a string representation of the enum
+        if (context.ReviewDomain is string domainStr)
+        {
+            return domainStr switch
+            {
+                "Legal" => !roleNames.Contains("LegalReviewer"),
+                "Security" => !roleNames.Contains("SecurityReviewer"),
+                _ => true // Unknown domain = blocked
+            };
+        }
+
+        // If context.ReviewDomain is already the enum type (from Evidence module)
+        if (context.ReviewDomain.GetType().Name == "ReviewDomain")
+        {
+            var domainValue = context.ReviewDomain.ToString() ?? "";
+            return domainValue switch
+            {
+                "Legal" => !roleNames.Contains("LegalReviewer"),
+                "Security" => !roleNames.Contains("SecurityReviewer"),
+                _ => true
+            };
+        }
+
+        return true; // Unknown type, block for safety
     }
 
     /// <summary>SEC-GAP-001: Accept gap with risk - only TenantOwner/ComplianceAdmin.</summary>

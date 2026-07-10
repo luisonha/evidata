@@ -1,5 +1,6 @@
 using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Security.Domain;
+using Evidata.Modules.Evidence.Domain;
 using Evidata.Modules.Security.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -181,8 +182,9 @@ public class CriticalRbacRulesTests
 
         var service = new ResourcePermissionsQueryService(db);
 
-        // Act
-        var result = await service.GetResourcePermissionsAsync(userId, tenantId, "evidence", Guid.NewGuid());
+        // Act: LegalReviewer with Legal domain context
+        var context = new ResourceContextData(ReviewDomain: ReviewDomain.Legal);
+        var result = await service.GetResourcePermissionsAsync(userId, tenantId, "evidence", Guid.NewGuid(), context);
 
         // Assert
         var available = result.AvailableActions.FirstOrDefault(a => a.ActionCode == "ValidateEvidence");
