@@ -171,3 +171,61 @@
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
+
+
+### 2026-07-10T03:35:00-04:00: PR #112 + PR #113 Consolidación — P1-012 Activate + P1-013 Approve (Merged, Gandalf Review)
+
+**By:** Gandalf (Tech Lead), Aragorn (Implementor), Scribe (Consolidation)
+
+**What:**
+
+PR #112 (P1-012 ActivateProcessingActivity / SEC-ACT-001) y PR #113 (P1-013 ApproveProcessingActivity / SEC-APP-001) han sido aprobadas y fusionadas a `develop` en el ciclo de today (2026-07-10).
+
+**PR #112 Results:**
+- Implementación: ActivateProcessingActivityCommandHandler en ProcessingInventory, métodos dominio Activate()/SetAsDeprecated(), auditoría ProcessingActivityActivated
+- Ciclo: 1RA REVISIÓN ❌ (CI nomenclature: "treatment" forbidden), 2DA REVISIÓN ✅ (Aragorn fijo, aprobado)
+- Tests: 774 total, +5 new for SEC-ACT-001, 0 regressions
+- State Transitions: Active + Deprecated estados en ProcessingActivityStatus
+- Authorization: RBAC SEC-ACT-001 (ProcessOwner cannot activate) fail-closed pattern
+- Status: ✅ MERGED (commit 97f8a61 CI-FIX nomenclature fix applied)
+
+**PR #113 Results:**
+- Implementación: ApproveProcessingActivityCommandHandler en ProcessingInventory, 2 de 4 blockers implementados (CriticalGapOpen, MissingLegalBasisEvidence), 2 pendientes documentados honestamente (RequiredReviewPending, VersionModifiedAfterReview)
+- Ciclo: 1RA REVISIÓN ❌ (Compilation: Security.csproj reference removida accidentalmente), 2DA REVISIÓN ✅ (Aragorn fijo, error message nomenclature "treatment"→"processing activity" corregida, aprobado)
+- Tests: 773 total, +4 new for SEC-APP-001, 0 regressions
+- Blockers 1/2: ✓ CriticalGapOpen validation, ✓ MissingLegalBasisEvidence validation, ⚠ RequiredReviewPending (requires Review.Status enum "Requerida"), ⚠ VersionModifiedAfterReview (requires ProcessingActivity.ReviewedAt timestamp)
+- Authorization: RBAC SEC-APP-001 (ProcessOwner ≠ Approver) implemented via ResourcePermissionsQueryService fail-closed pattern
+- Status: ✅ MERGED (commit 22d191c nomenclature fix, commit 74e5375 Security reference restored)
+
+**Key Decisions Made:**
+
+1. **P1-012 Architecture:** Dedicated handler in ProcessingInventory module (consistent with ArchiveCommandHandler pattern), direct RBAC check via SecurityDbContext (fail-closed), domain methods Activate/SetAsDeprecated for state transitions. Constraints accepted: linear version chains, public setter ActiveVersionId for EF Core mutation.
+
+2. **P1-013 Blocker Honesty:** 2 of 4 blockers implemented (CriticalGapOpen, MissingLegalBasisEvidence). 2 blockers correctly documented as PENDING due to missing domain model fields (not engineering defects):
+   - RequiredReviewPending: Requires Review.Status enum with "Requerida" state (Workflow module domain change)
+   - VersionModifiedAfterReview: Requires ProcessingActivity.ReviewedAt timestamp field (ProcessingInventory domain change)
+   These are NOT hidden defects — they are explicit domain model dependencies. Decision: Create P1-016 follow-up item.
+
+3. **Lockout Consideration:** No lockout issues. Both PRs had single rejection + fix cycle (per policy: 1st fix ✓, 2nd rejection = 24h lockout). Both fixed cleanly and resubmitted successfully.
+
+**Why:**
+
+These PRs close 2 of the 5 critical RBAC permissions identified in Gandalf's audit of the extended RBAC contract (docs/evidata-backend-sprint-2/04-rbac-audit-evidence-gaps-contract.md):
+- SEC-ACT-001 (ActivateProcessingActivity) ✅ CLOSED
+- SEC-APP-001 (ApproveProcessingActivity) ✅ CLOSED (2/4 blockers, follow-up P1-016)
+
+Remaining compliance gaps (from audit):
+- P1-014: GenerateOfficialExport (SEC-EXP-001) — Partial: missing state "Active" validation, missing automatic ExportWarning generation, wrong error code
+- P1-015: DownloadEvidence endpoint (SEC-EVDOWN-001) — Partial: missing HTTP endpoint, missing audits, missing 403/422 validation
+
+**Impact:**
+- 778 total tests passing (769 baseline + 9 new tests), 0 regressions
+- CI: Both PRs green (build-and-test passing)
+- Compliance: 4/5 RBAC permissions addressed (2 complete, 2 in progress as backlog items)
+- Trust: Honest gap documentation post-PR#111 incident continues (2 pending blockers explicitly declared with rationale)
+
+**Next Steps:**
+1. Create P1-016: Implement 2 remaining approval blockers (RequiredReviewPending, VersionModifiedAfterReview) — requires domain model changes (Review.Status "Requerida", ProcessingActivity.ReviewedAt)
+2. Schedule P1-014 (GenerateOfficialExport completeness)
+3. Schedule P1-015 (DownloadEvidence endpoint + authorization)
+4. Update backlog: Mark P1-012 ✅ done, P1-013 ✅ done (with P1-016 follow-up), add P1-016 to pending
