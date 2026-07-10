@@ -142,6 +142,7 @@ app.MapGet("/api/version", () =>
     });
 })
 .WithName("GetVersion")
+.AllowAnonymous()
 .ExcludeFromDescription(); // no aparece en OpenAPI público
 
 // Configure the HTTP request pipeline.
