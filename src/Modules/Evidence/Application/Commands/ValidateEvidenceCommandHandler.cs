@@ -72,7 +72,7 @@ public sealed class ValidateEvidenceCommandHandler(
             { "evidenceRequirementId", requirement.Id },
             { "reviewDomain", requirement.ReviewDomain.ToString() },
             { "action", cmd.Action },
-            { "comment", cmd.Comment }
+            { "commentLength", (cmd.Comment?.Length ?? 0) }
         };
 
         AuditEventType auditEventType = AuditEventType.ValidateEvidence; // Default
