@@ -27,6 +27,9 @@
 | P1-008 | Mapear Reporting a Exports. | Exportaciones oficiales y warnings. | Export tests |
 | P1-009 | Mapear AuditLog a AuditEvent o extenderlo. | Acciones críticas auditables. | Audit tests |
 | P1-010 | Crear `TimelineEvent`. | Bitácora UI proyectada. | Timeline tests |
+| P1-011a | Implementar handler ValidateEvidence + instrumentación de auditoría (SEC-EV-001). | Timeline y auditoría reflejan validación de evidencia. | Audit + Security tests |
+| P1-011b | Implementar handler AcceptGapWithRisk + instrumentación de auditoría (SEC-GAP-001). | Timeline y auditoría reflejan aceptación de riesgo. | Audit + Security tests |
+| P1-011c | Implementar handlers restantes (SubmitForReview, Activate, Archive, GenerateOfficialExport, RejectEvidence) + auditoría + tests. | Cobertura completa de las 10 acciones críticas auditables. | Audit tests |
 
 ## P2 — Limpieza y compatibilidad
 
@@ -44,4 +47,5 @@
 2. P1-001 a P1-004: `/control`, versionado, nodos y permisos.
 3. P1-005 a P1-007: evidencia y brechas.
 4. P1-008 a P1-010: exports, audit y timeline.
+4.5. P1-011a/b/c: cerrar huecos de auditoría en acciones de seguridad crítica (ValidateEvidence + SecEv001, AcceptGapWithRisk + SecGap001, remaining 5 handlers). **CRÍTICO PARA CIERRE DE SEGURIDAD** — ejecutar inmediatamente post-P1-010, antes de P2.
 5. P2 según necesidad de compatibilidad.

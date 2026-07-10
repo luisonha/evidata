@@ -99,68 +99,128 @@ Due to GapManagement module dependency on ProcessingInventory, direct compositio
 3. API endpoints (POST /requirements, POST /validations/{id}/validate, etc.)
 4. Integration tests de autorización (LegalReviewer vs SecurityReviewer)
 
-## 2026-07-10 · P1-009 AuditEvent Contract Formalization (PR #107)
+## 2026-07-10 · P1-010 TimelineEvent API + 3 Critical Handlers Audit Instrumentation (PR #108)
 
 ### What
-Implementación formal del contrato AuditEvent (P1-009) extendiendo `AuditLog` per **docs/evidata-backend-sprint-2/04-rbac-audit-evidence-gaps-contract.md** §2.1:
-- **Shape de AuditEvent (10 campos)**: id, tenantId, eventType (enum: 10 valores AUD-PA-001..AUD-EXP-001), resourceType, resourceId, actorUserId, occurredAt (UTC), result (enum: Success|Failure|Blocked), correlationId, metadata (Dictionary<string,object?> → JSON).
-- **Decisiones clave**:
-  - Extender AuditLog vs. crear AuditEvent paralelo → menor complejidad migratoria, reutilización de índices.
-  - Metadata como Dictionary tipada en código → JSON string en DB (portabilidad futura, JSON queries).
-  - CorrelationId propagado vía middleware global (header X-Correlation-Id o Guid.NewGuid().ToString("N")) → disponible antes de autenticación.
-  - Enum filtering: eventos con eventType no mapeables excluidos de timeline (catálogo cerrado, no Unknown).
-  - Backward compatibility: CreateLegacy() + LogLegacyAsync() para migración gradual.
-- **Gaps cerrados**: Result (null → enum), CorrelationId (null → middleware+persistido), Metadata (string → Dictionary), EventType (strings libres → enum cerrado), UserId (nullable confuso → Guid.Empty placeholder).
+Implementación formal de P1-010: TimelineEvent API read-model endpoint exposing AuditLog projection + audit instrumentation para 3 critical command handlers (CreateProcessingActivity, UpdateNode, Approve).
 
-### Cambios
-1. **Nuevos archivos de dominio**:
-   - `src/Modules/Audit/Domain/AuditLog.cs` (extendido con nuevos campos)
-   - `src/Modules/Audit/Domain/AuditEventType.cs` (enum, 10 valores)
-   - `src/Modules/Audit/Domain/AuditEventResult.cs` (enum: Success=1, Failure=2, Blocked=3)
+### Scope
+- **TimelineEvent API Endpoint**: `GET /api/v1/processing-activities/{id:guid}/timeline`
+  - Paginación: skip ≥ 0, 1 ≤ take ≤ 500
+  - Tenant isolation via currentUser.TenantId
+  - OpenAPI documentation (ProducesResponseType 200/400/401/403/404)
+  - Returns TimelineEventViewModelEnvelope con IReadOnlyList<TimelineEventViewModel>
+  - Shape: EventType, EventTypeLabelKey, ResourceType, ResourceId, ActorUserId, OccurredAt, Result, ResultLabelKey, CorrelationId, Metadata, Id
+  - Ordenamiento: OccurredAt descending (más reciente primero)
+  - Metadata handling: Robust deserialization, silent degradation si JSON malformado
 
-2. **Middleware**:
-   - `src/Middleware/CorrelationIdMiddleware.cs`: Acepta header X-Correlation-Id o genera Guid; almacena en context.Items; propaga a respuesta.
-   - Extension method: `GetCorrelationId()` para retrieval en handlers.
+- **3 Handlers Instrumentados**:
+  1. **CreateProcessingActivityCommandHandler** (AUD-PA-001)
+    - Audit logging post-SaveChangesAsync (fire-and-forget, non-blocking)
+    - Metadata: name, description, controller, department
+  2. **UpdateProcessingActivityCommandHandler** (AUD-NODE-001)
+    - Constructor nuevo requires IAuditService injection
+    - Metadata: field updates (name, description, controller, department changes)
+    - Fire-and-forget pattern
+  3. **ProcessingActivityVersionService.ApproveAndSnapshotAsync** (AUD-APP-001)
+    - Constructor nuevo requires IAuditService injection
+    - Metadata: snapshotVersion, retentionRequired
+    - Fire-and-forget pattern
 
-3. **Service**:
-   - `src/Modules/Audit/Application/AuditService.cs`: Signature actualizada LogAsync(..., correlationId, ...).
+- **Architectural Decisions**:
+  - ITimelineQueryService abstraction (DI swappable)
+  - Enum name alignment fix (UpdateNode vs UpdateProcessingActivityNode, etc.)
+  - Metadata Dictionary→JSON serialization
+  - Tenant isolation at repository level
+  - In-memory pagination (MVP, migrará DB-level en P2 si large resultsets)
+  - Fire-and-forget (no-blocking, riesgo audit loss si failure)
 
-4. **API**:
-   - `src/Modules/Audit/API/AuditController.cs` (DTO incluye correlationId).
+### Changes
+1. **Nuevos archivos**:
+   - `tests/Evidata.Tests.Unit/Api/Queries/GetProcessingActivityTimelineQueryHandlerTests.cs` (11 test cases)
 
-5. **Query Handler**:
-   - `GetProcessingActivityTimelineQueryHandler`: Mapea AuditLog → TimelineEventDto con todos los nuevos campos.
-
-6. **Migration**:
-   - `20260710032536_FormalizAuditEvent.cs`: RenameColumn (Details→Metadata, Action→EventType), AddColumn (CorrelationId varchar(256) nullable, Result int default=0), CreateIndex (IX_audit_logs_CorrelationId).
-
-7. **Tests** (40 nuevos):
-   - `AuditServiceTests.cs` (11 tests): LogAsync_WithFormalEventType, WithFailureResult, WithBlockedResult, WithMetadata (serialización JSON), GetMetadata (deserialization), severity compat, empty metadata, null userId.
-   - `TimelineQueryHandlerTests.cs` (19 tests): EventWithValidEventType_MapsCorrectly, WithFailureResult_MapsFailure, WithBlockedResult_MapsBlocked, WithUnmatchableEventType_ExcludedFromTimeline, WithNullUserId_UsesGuidEmpty, pagination, ordering, metadata deserialization.
-   - Total: 689 unit tests passing.
+2. **Modificados**:
+   - `src/Modules/ProcessingInventory/Api/ProcessingActivitiesController.cs` (added GetTimeline endpoint)
+   - `src/Modules/ProcessingInventory/Evidata.Modules.ProcessingInventory.csproj` (added Audit reference)
+   - `src/Modules/Audit/Application/DTOs/TimelineEventViewModel.cs` (added envelope)
+   - `src/Modules/ProcessingInventory/Application/Commands/CreateProcessingActivityCommandHandler.cs` (added audit logging)
+   - `src/Modules/ProcessingInventory/Application/Commands/UpdateProcessingActivityCommandHandler.cs` (added audit logging + IAuditService injection)
+   - `src/Modules/ProcessingInventory/Infrastructure/Versioning/ProcessingActivityVersionService.cs` (added audit logging + IAuditService injection)
+   - `src/Modules/Audit/Application/Queries/GetProcessingActivityTimelineQueryHandler.cs` (fixed enum names)
+   - `tests/Evidata.Tests.Unit/Audit/TimelineQueryHandlerTests.cs` (updated test event names)
 
 ### Why (Contrato)
-- Cierra P1-009 shape contract completo.
-- Establece base para P1-010 (TimelineEvent, UI projection).
-- Correlación E2E crítica para trazabilidad y debugging distribuido.
-- Responde a necesidad de auditoría formal y RBAC enforcement.
+- Cierra P1-010 scope (TimelineEvent API read-model + 3 handlers instrumentados)
+- Establece base infraestructura para P1-011a/b/c (ValidateEvidence + AcceptGapWithRisk + remaining 5 handlers con auditoría)
+- Responde a necesidad de bitácora UI auditada y trazabilidad E2E
 
-### Status
-- ✓ Dominio: forma formal con enums y backward compatibility
-- ✓ Middleware: correlationId propagado E2E (header → service → domain → API)
-- ✓ Tests: comportamiento real (enum parsing, serialization, state transitions), 40 nuevos
-- ✓ CI: 689 unit tests passing en 506ms
-- ✓ Commits: 8 incrementales (~400 LOC nuevas)
-- ✓ Migration: RenameColumn safe, AddColumn con defaults sensatos, legacy methods para compat
-- ✓ **MERGED to develop** (PR #107)
+### Status (Pre-Corrections)
+- ✓ Endpoint structure correct: paginación, tenant isolation, OpenAPI doc
+- ✓ 3 handlers audit-instrumented correctly
+- ✓ Tests: 11 cases covering projection, pagination, chronological order, tenant isolation, metadata handling
+- ⚠️ ISSUE 1: 2 tests violated "CERO reflection-based tests" quality gate
+  - ChronologicalOrder_ShouldBeMostRecentFirst: used `typeof(AuditLog).GetProperty("OccurredAt").SetValue(...)`
+  - MalformedMetadata_ShouldNotBreakTimeline: used `typeof(AuditLog).GetProperty("Metadata").SetValue(...)`
+- ⚠️ ISSUE 2: DI verification needed for 2 new dependencies (UpdateProcessingActivityCommandHandler, ProcessingActivityVersionService)
+- ⏳ CI: Pending (build-and-test jobs not complete at initial review)
 
-### Trabajo Futuro (P1-010, P2)
-1. **P1-010 (TimelineEvent)**: Proyección UI derivada de auditoría. Propagar correlationId a todos handlers.
-2. **P2 refinements**:
-   - Definir SYSTEM constant para userId=null
-   - Agregar Unknown enum si es necesario
-   - Step-up para acciones críticas
-3. Cross-module: Asegurar todos los LogAsync() nuevos pasen correlationId.
+### Status (Post-Corrections)
+- ✅ Reflection tests FIXED: ChronologicalOrder now uses `occurredAtOverride` factory param, MalformedMetadata now uses `metadataJsonRaw` factory param
+- ✅ CI GREEN: build-and-test checks passed
+- ✅ DI VERIFIED: All three handlers correctly registered with IAuditService dependency
+- ✅ Governance: No .squad/decisions.md or .squad/identity/now.md modifications
+- ✅ Follow-up DOCUMENTED: aragorn-timeline-followup.md registers all three post-merge items (P1-011a/b/c)
+- ✅ **APPROVED AND MERGED to develop** (PR #108)
 
+### Test Results
+```
+dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj --no-build
 
+Result:
+  Con error:     0
+  Superado:    700
+  Omitido:     0
+  Total:       700
+  Duración: 520 ms
+```
 
+### Known Limitations / Phase 2 Work
+1. **CorrelationId propagation**: Contract specifies X-Correlation-Id header. Currently not captured in endpoint or command handlers. Requires middleware enhancement (Phase 2).
+2. **IP Address capture**: AuditService accepts `ipAddress` parameter; currently not passed from API layer. Requires HttpContext.Connection.RemoteIpAddress extraction (Phase 2).
+3. **Pagination performance**: Skip/take applied in-memory. For large audit logs, should migrate to DB-level paging (Phase 2+).
+4. **Silent event exclusion**: Unmappable event types excluded from timeline without warning. Should log warning for debugging (Phase 2).
+5. **Fire-and-forget audit loss**: If IAuditService fails, audit is lost without retry. Mitigation depends on infrastructure (queue/retry pattern) outside scope (Phase 2+).
+
+### Post-Merge Backlog (CRITICAL)
+- **P1-011a**: Implement ValidateEvidence handler + audit instrumentation (SEC-EV-001). PRIORITY: P1, BLOCKING: YES.
+- **P1-011b**: Implement AcceptGapWithRisk handler + audit instrumentation (SEC-GAP-001). PRIORITY: P1, BLOCKING: YES.
+- **P1-011c**: Implement remaining 5 handlers (SubmitForReview, Activate, Archive, RejectEvidence, GenerateOfficialExport) + audit + tests. PRIORITY: P2, BLOCKING: DEFER.
+- All registered explicitly in `.squad/decisions/inbox/aragorn-timeline-followup.md` (consolidated to decisions.md by Scribe).
+
+### Commits (Incremental)
+1. `84fb1bd` – feat(timeline): expose GET /api/v1/processing-activities/{id}/timeline endpoint
+2. `0015059` – feat(audit): implement audit logging in command handlers
+3. `f35b881` – test(timeline): comprehensive tests for P1-010 TimelineEvent projection
+4. `7971909` – fix(test): update enum names in timeline tests to match canonical domain enum
+5. (Post-corrections) – fix(test): refactor reflection-based tests to use factory methods with override params
+6. (Post-corrections) – verify(di): confirm IAuditService DI registration for all new handler dependencies
+
+### Quality Checklist
+| Criterion | Status | Note |
+|---|---|---|
+| CERO reflection-based tests | ✅ | All tests refactored to use factory methods |
+| CERO smoke tests | ✅ | Each test validates specific projection/pagination/isolation feature |
+| Tenant isolation explicit | ✅ | Test case verifies two tenants cannot leak events |
+| Pagination tested | ✅ | Skip/take validation in endpoint; in-memory apply verified |
+| Metadata handling | ✅ | Malformed JSON handled gracefully |
+| No manual decisions edits | ✅ | Decision written to `.squad/decisions/inbox/` (consolidated by Scribe) |
+| Build passes | ✅ | `dotnet build Evidata.sln --no-restore` → 0 errors, 25 warnings (pre-existing) |
+| All tests pass | ✅ | 700/700 unit tests passing |
+| CI GREEN | ✅ | AWS CodeBuild checks passed |
+| DI verified | ✅ | All IAuditService dependencies correctly registered |
+
+### Next Steps (Aragorn — PRIORITY POST-MERGE)
+1. **PRIORITY: Start P1-011a immediately** — ValidateEvidence + audit instrumentation (3-4 hours, BLOCKING)
+2. **Follow-up: P1-011b** — AcceptGapWithRisk + audit instrumentation (3-4 hours, BLOCKING)
+3. **Then: P1-011c** — Remaining 5 handlers + audit + tests (6-8 hours, P2 but recommended immediate)
+4. **Parallel: P1-008** — Exports handler (no blocker, lower priority vs. security-critical items)
