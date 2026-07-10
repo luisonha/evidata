@@ -8,6 +8,8 @@ using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Application.ViewModels;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Microsoft.AspNetCore.Mvc;
+using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Application.DTOs;
 
 namespace Evidata.Modules.ProcessingInventory.Api;
 
@@ -21,6 +23,7 @@ public class ProcessingActivitiesController(
     CreateProcessingActivityCommandHandler createHandler,
     UpdateProcessingActivityCommandHandler updateHandler,
     IProcessingActivityControlQueryService controlService,
+    ITimelineQueryService timelineQueryService,
     ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet]
@@ -58,6 +61,55 @@ public class ProcessingActivitiesController(
             return NotFound();
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get paginated timeline of audit events for a specific ProcessingActivity.
+    /// Implements P1-010: TimelineEvent as a read model projection of AuditLog.
+    /// 
+    /// Timeline events represent the 10 critical auditable actions:
+    /// CreateProcessingActivity, UpdateNode, SubmitForReview, Approve, Activate, Archive,
+    /// ValidateEvidence, RejectEvidence, AcceptGapWithRisk, GenerateOfficialExport.
+    /// </summary>
+    /// <param name="id">ProcessingActivity identifier</param>
+    /// <param name="skip">Number of events to skip (0-based pagination)</param>
+    /// <param name="take">Number of events to take (default: 50, max: 500)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Paginated list of TimelineEventViewModel ordered by OccurredAt descending</returns>
+    [HttpGet("{id:guid}/timeline")]
+    [ProducesResponseType(typeof(TimelineEventViewModelEnvelope), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<TimelineEventViewModelEnvelope>> GetTimeline(
+        Guid id,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50,
+        CancellationToken ct = default)
+    {
+        // Pagination validation
+        if (skip < 0)
+            return BadRequest(CreateApiError("INVALID_SKIP", "query.pagination.skip.negative", "Skip must be >= 0"));
+
+        if (take <= 0 || take > 500)
+            return BadRequest(CreateApiError("INVALID_TAKE", "query.pagination.take.invalid", "Take must be between 1 and 500"));
+
+        try
+        {
+            // Tenant isolation: query service enforces tenant isolation internally
+            var events = await timelineQueryService.GetTimelineAsync(
+                currentUser.TenantId,
+                id,
+                resource: "ProcessingActivity",
+                skip,
+                take,
+                ct);
+
+            return Ok(new TimelineEventViewModelEnvelope(events));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     [HttpPost]
@@ -110,6 +162,14 @@ public class ProcessingActivitiesController(
             error.Message,
             HttpContext.TraceIdentifier,
             null));
+
+    private ApiErrorEnvelope CreateApiError(string code, string labelKey, string message) =>
+       new(new ApiErrorResponse(
+           code,
+           labelKey,
+           message,
+           HttpContext.TraceIdentifier,
+           null));
 }
 
 public record CreateProcessingActivityRequest(

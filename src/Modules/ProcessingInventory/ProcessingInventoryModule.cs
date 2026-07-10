@@ -3,6 +3,7 @@ using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
+using Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,9 @@ public static class ProcessingInventoryModule
         
         services.AddScoped<CreateProcessingActivityCommandHandler>();
         services.AddScoped<UpdateProcessingActivityCommandHandler>();
+        
+        // P1-010: Register version service with IAuditService dependency
+        services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
 
         return services;
     }

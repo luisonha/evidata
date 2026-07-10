@@ -1,6 +1,8 @@
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
+using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Evidata.Modules.ProcessingInventory.Application.Commands;
@@ -13,7 +15,9 @@ public sealed record CreateProcessingActivityCommand(
     string? Department,
     Guid CreatedBy);
 
-public sealed class CreateProcessingActivityCommandHandler(ProcessingInventoryDbContext db)
+public sealed class CreateProcessingActivityCommandHandler(
+    ProcessingInventoryDbContext db,
+    IAuditService auditService)
 {
     public async Task<ProcessingActivityDto> HandleAsync(
         CreateProcessingActivityCommand cmd, CancellationToken ct = default)
@@ -32,6 +36,24 @@ public sealed class CreateProcessingActivityCommandHandler(ProcessingInventoryDb
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync(ct);
+
+        // Audit: CreateProcessingActivity (AUD-PA-001)
+        await auditService.LogAsync(
+            tenantId: cmd.TenantId,
+            userId: cmd.CreatedBy,
+            eventType: AuditEventType.CreateProcessingActivity.ToString(),
+            resource: "ProcessingActivity",
+            resourceId: activity.Id,
+            result: AuditEventResult.Success,
+            metadata: new Dictionary<string, object?>
+            {
+                { "name", cmd.Name },
+                { "description", cmd.Description },
+                { "controller", cmd.Controller },
+                { "department", cmd.Department }
+            },
+            ct: ct);
+
         return ProcessingActivityDto.From(activity);
     }
 }

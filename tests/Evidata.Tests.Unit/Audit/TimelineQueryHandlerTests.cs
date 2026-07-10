@@ -100,7 +100,7 @@ public class TimelineQueryHandlerTests
         var tenantId = Guid.NewGuid();
         var resourceId = Guid.NewGuid();
         var log = AuditLog.Create(
-            tenantId, Guid.NewGuid(), "ApproveProcessingActivity", "ProcessingActivity",
+            tenantId, Guid.NewGuid(), "Approve", "ProcessingActivity",
             resourceId, AuditEventResult.Blocked);
 
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
@@ -143,7 +143,7 @@ public class TimelineQueryHandlerTests
         var tenantId = Guid.NewGuid();
         var resourceId = Guid.NewGuid();
         var log = AuditLog.Create(
-            tenantId, null, "ActivateProcessingActivity", "ProcessingActivity",
+            tenantId, null, "Activate", "ProcessingActivity",
             resourceId);
 
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
@@ -167,7 +167,7 @@ public class TimelineQueryHandlerTests
         var userId = Guid.NewGuid();
 
         var log1 = AuditLog.Create(tenantId, userId, "CreateProcessingActivity", "ProcessingActivity", resourceId);
-        var log2 = AuditLog.Create(tenantId, userId, "ActivateProcessingActivity", "ProcessingActivity", resourceId);
+        var log2 = AuditLog.Create(tenantId, userId, "Activate", "ProcessingActivity", resourceId);
 
         // Repository retorna ordenados por OccurredAt descendente
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
@@ -178,7 +178,7 @@ public class TimelineQueryHandlerTests
 
         // Assert
         Assert.Equal(2, result.Count);
-        Assert.Equal("ActivateProcessingActivity", result[0].EventType);
+        Assert.Equal("Activate", result[0].EventType);
         Assert.Equal("CreateProcessingActivity", result[1].EventType);
     }
 
@@ -241,7 +241,7 @@ public class TimelineQueryHandlerTests
         var metadata = new Dictionary<string, object?> { { "key", "value" }, { "nested", new { data = "test" } } };
 
         var log = AuditLog.Create(
-            tenantId, userId, "UpdateProcessingActivityNode", "ProcessingActivity",
+            tenantId, userId, "UpdateNode", "ProcessingActivity",
             resourceId, metadata: metadata);
 
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
@@ -268,7 +268,7 @@ public class TimelineQueryHandlerTests
 
         // Crear log con metadata JSON inválido manualmente (acceso a campo privado)
         var log = AuditLog.Create(
-            tenantId, userId, "UpdateProcessingActivityNode", "ProcessingActivity", resourceId);
+            tenantId, userId, "UpdateNode", "ProcessingActivity", resourceId);
 
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
             .ReturnsForAnyArgs(new List<AuditLog> { log });
@@ -291,7 +291,7 @@ public class TimelineQueryHandlerTests
         var userId = Guid.NewGuid();
 
         var log = AuditLog.Create(
-            tenantId, userId, "ApproveProcessingActivity", "ProcessingActivity",
+            tenantId, userId, "Approve", "ProcessingActivity",
             resourceId, metadata: null);
 
         _repository.GetByResourceAsync(tenantId, "ProcessingActivity", resourceId, default)
@@ -317,11 +317,11 @@ public class TimelineQueryHandlerTests
         var eventTypes = new[]
         {
             "CreateProcessingActivity",
-            "UpdateProcessingActivityNode",
-            "SubmitProcessingActivityForReview",
-            "ApproveProcessingActivity",
-            "ActivateProcessingActivity",
-            "ArchiveProcessingActivity",
+            "UpdateNode",
+            "SubmitForReview",
+            "Approve",
+            "Activate",
+            "Archive",
             "ValidateEvidence",
             "RejectEvidence",
             "AcceptGapWithRisk",

@@ -28,3 +28,10 @@ public record TimelineEventViewModel(
     string ResultLabelKey,
     string? CorrelationId = null,
     object? Metadata = null);
+
+/// <summary>
+/// Wrapper envelope for paginated timeline results.
+/// Returns the list of TimelineEventViewModel for /api/v1/processing-activities/{id}/timeline endpoint.
+/// </summary>
+public record TimelineEventViewModelEnvelope(
+    IReadOnlyList<TimelineEventViewModel> Events);
