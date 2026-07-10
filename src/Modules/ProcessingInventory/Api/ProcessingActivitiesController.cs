@@ -2,6 +2,7 @@ using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Identity.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Application.ViewModels;
@@ -19,7 +20,7 @@ public class ProcessingActivitiesController(
     GetProcessingActivityQueryHandler getHandler,
     CreateProcessingActivityCommandHandler createHandler,
     UpdateProcessingActivityCommandHandler updateHandler,
-    GetProcessingActivityControlQueryHandler controlHandler,
+    IProcessingActivityControlQueryService controlService,
     ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet]
@@ -50,7 +51,9 @@ public class ProcessingActivitiesController(
         Guid id,
         CancellationToken ct)
     {
-        var result = await controlHandler.HandleAsync(currentUser.TenantId, id, currentUser.UserId, ct);
+        // P1-FULL-COMPOSITION: Use the injected service which is the composition handler
+        // This allows the API layer to override the implementation with full composition
+        var result = await controlService.HandleAsync(currentUser.TenantId, id, currentUser.UserId, ct);
         if (result is null)
             return NotFound();
 

@@ -1,3 +1,4 @@
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.ViewModels;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,7 @@ namespace Evidata.Modules.ProcessingInventory.Application.Queries;
 /// 
 /// P1-001: Endpoint implementation stub pending full composition with Evidence, Gap, Review, Timeline, Exports.
 /// </summary>
-public sealed class GetProcessingActivityControlQueryHandler
+public sealed class GetProcessingActivityControlQueryHandler : IProcessingActivityControlQueryService
 {
     private readonly ProcessingInventoryDbContext _db;
 
