@@ -22,6 +22,7 @@ public class ProcessingActivitiesController(
     GetProcessingActivityQueryHandler getHandler,
     CreateProcessingActivityCommandHandler createHandler,
     UpdateProcessingActivityCommandHandler updateHandler,
+    ApproveProcessingActivityCommandHandler approveHandler,
     IProcessingActivityControlQueryService controlService,
     ITimelineQueryService timelineQueryService,
     ICurrentUserContext currentUser) : ControllerBase
@@ -153,6 +154,75 @@ public class ProcessingActivitiesController(
             UpdateProcessingActivityOutcome.UnprocessableEntity => UnprocessableEntity(CreateApiError(result.Error!)),
             _ => StatusCode(StatusCodes.Status500InternalServerError)
         };
+    }
+
+    /// <summary>
+    /// Approve a ProcessingActivity for formal compliance.
+    /// 
+    /// P1-013: Approves a ProcessingActivity version from UnderReview to Approved state.
+    /// 
+    /// Authorization: User must have ApproveProcessingActivity permission and cannot be ProcessOwner
+    /// if attempting to approve their own activity (SEC-APP-001).
+    /// 
+    /// Business Rules:
+    /// - Version must be in UnderReview state
+    /// - No critical gaps or missing evidence
+    /// - ProcessingActivity.Flags.BlocksApproval must be false
+    /// 
+    /// Response:
+    /// - 200 OK: Approval succeeded
+    /// - 403 Forbidden: User lacks permission or is blocked (SEC-APP-001)
+    /// - 404 Not Found: ProcessingActivity not found
+    /// - 422 Unprocessable Entity: Business blocker (CriticalGapOpen, BlockingEvidenceMissing, etc.)
+    /// </summary>
+    [HttpPost("{id:guid}/approve")]
+    [ProducesResponseType(typeof(ProcessingActivityDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<ProcessingActivityDto>> Approve(
+        Guid id,
+        CancellationToken ct)
+    {
+        try
+        {
+            var cmd = new ApproveProcessingActivityCommand(
+                currentUser.TenantId,
+                id,
+                currentUser.UserId);
+
+            var result = await approveHandler.HandleAsync(cmd, ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(CreateApiError("NOT_FOUND", "error.processingActivity.notFound", ex.Message));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("ApprovalBlocked"))
+        {
+            // Extract blocker code from exception message
+            var message = ex.Message;
+            var blockerCode = message.Contains("CriticalGapOpen") ? "CriticalGapOpen"
+                : message.Contains("BlockingEvidence") ? "BlockingEvidenceMissing"
+                : message.Contains("RequiredReview") ? "RequiredReviewPending"
+                : message.Contains("Modified") ? "VersionModifiedAfterReview"
+                : "ApprovalBlocked";
+
+            return UnprocessableEntity(CreateApiError(
+                blockerCode,
+                $"error.approval.{blockerCode.ToLowerInvariant()}",
+                message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                CreateApiError("INTERNAL_ERROR", "error.internal", ex.Message));
+        }
     }
 
     private ApiErrorEnvelope CreateApiError(UpdateProcessingActivityError error) =>

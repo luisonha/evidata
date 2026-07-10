@@ -18,6 +18,12 @@ public enum AuditEventType
     /// <summary>Aprobar (AUD-APP-001)</summary>
     Approve = 4,
 
+    /// <summary>Aprobación exitosa de ProcessingActivity (AUD-APP-001-SUCCESS, P1-013)</summary>
+    ProcessingActivityApproved = 4_001,
+
+    /// <summary>Aprobación bloqueada por condición de negocio (AUD-APP-001-BLOCKED, P1-013)</summary>
+    ApprovalBlocked = 4_002,
+
     /// <summary>Activar (AUD-ACT-001)</summary>
     Activate = 5,
 
