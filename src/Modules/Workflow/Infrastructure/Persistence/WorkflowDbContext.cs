@@ -6,6 +6,7 @@ namespace Evidata.Modules.Workflow.Infrastructure.Persistence;
 public sealed class WorkflowDbContext : DbContext
 {
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReviewRequirement> ReviewRequirements => Set<ReviewRequirement>();
     public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
 
     public WorkflowDbContext(DbContextOptions<WorkflowDbContext> options) : base(options) { }
@@ -35,6 +36,28 @@ public sealed class WorkflowDbContext : DbContext
 
             e.HasIndex(r => new { r.TenantId, r.Status }).HasDatabaseName("ix_reviews_tenant_status");
             e.HasIndex(r => new { r.TenantId, r.TargetEntityId }).HasDatabaseName("ix_reviews_tenant_entity");
+        });
+
+        modelBuilder.Entity<ReviewRequirement>(e =>
+        {
+            e.ToTable("review_requirements");
+            e.HasKey(r => r.Id);
+
+            e.Property(r => r.Id).HasColumnName("id");
+            e.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(r => r.ReviewType).HasColumnName("review_type")
+                .HasConversion<int>().IsRequired();
+            e.Property(r => r.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(r => r.IsRequired).HasColumnName("is_required").IsRequired();
+            e.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(r => r.ModifiedAt).HasColumnName("modified_at").IsRequired();
+            e.Property(r => r.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(r => r.ModifiedBy).HasColumnName("modified_by").IsRequired();
+
+            e.HasIndex(r => new { r.TenantId, r.EntityType, r.ReviewType })
+                .HasDatabaseName("ix_review_requirements_tenant_entity_type")
+                .IsUnique();
+            e.HasIndex(r => r.TenantId).HasDatabaseName("ix_review_requirements_tenant");
         });
 
         modelBuilder.Entity<WorkflowTask>(e =>

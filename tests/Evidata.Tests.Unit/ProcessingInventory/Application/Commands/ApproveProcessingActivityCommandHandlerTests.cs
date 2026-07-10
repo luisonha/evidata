@@ -124,10 +124,19 @@ public class ApproveProcessingActivityCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, ownerUserId);
 
@@ -201,10 +210,19 @@ public class ApproveProcessingActivityCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -290,10 +308,19 @@ public class ApproveProcessingActivityCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -362,10 +389,19 @@ public class ApproveProcessingActivityCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -449,11 +485,19 @@ public class ApproveProcessingActivityCommandHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult((IReadOnlyList<Review>)new[] { review }.ToList()));
 
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                tenantId,
+                "ProcessingActivity",
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -542,10 +586,19 @@ public class ApproveProcessingActivityCommandHandlerTests
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
         var auditService = Substitute.For<IAuditService>();
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -619,10 +672,19 @@ public class ApproveProcessingActivityCommandHandlerTests
             .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
 
         var auditService = Substitute.For<IAuditService>();
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<ReviewType>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Default: all reviews are required
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
