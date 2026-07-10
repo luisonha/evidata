@@ -18,6 +18,7 @@ using Evidata.Modules.Workflow;
 using Evidata.Worker.Outbox.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
@@ -92,7 +93,14 @@ if (builder.Environment.IsDevelopment())
         _ => { });
 }
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Default policy: all endpoints require authentication unless explicitly marked [AllowAnonymous]
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -128,6 +136,7 @@ app.MapGet("/api/version", () =>
         environment   = app.Environment.EnvironmentName
     });
 })
+.AllowAnonymous()
 .WithName("GetVersion")
 .ExcludeFromDescription(); // no aparece en OpenAPI público
 
