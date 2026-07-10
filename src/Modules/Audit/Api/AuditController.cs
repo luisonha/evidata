@@ -47,5 +47,5 @@ public class AuditController : ControllerBase
     }
 
     private static AuditLogDto MapToDto(AuditLog x) =>
-        new(x.Id, x.TenantId, x.UserId, x.Action, x.Resource, x.ResourceId, x.Details, x.IpAddress, x.OccurredAt, x.Severity);
+        new(x.Id, x.TenantId, x.UserId, x.EventType, x.Resource, x.ResourceId, x.Result, x.CorrelationId, x.Metadata, x.IpAddress, x.OccurredAt, x.Severity);
 }
