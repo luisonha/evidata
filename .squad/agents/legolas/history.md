@@ -91,3 +91,41 @@
 **PR**: #99 created against develop
 **ADR**: legolas-tenant-owner-compliance-admin-policy.md (documents architectural decision)
 
+## Session 2026-07-10
+
+### Health Endpoints AllowAnonymous Gap Fix (PR #101)
+
+**Gap Discovered & Fixed**:
+- FallbackPolicy(RequireAuthenticatedUser) was implemented in PR #98 with explicit documentation: "health endpoints must mark [AllowAnonymous]"
+- However, 7 health/version endpoints were never marked:
+  - /health, /alive (ServiceDefaults MapDefaultEndpoints)
+  - /health/ready, /health/db, /health/storage, /health/queue (HealthCheckExtensions MapEvidataHealthEndpoints)
+  - /api/version (Program.cs MapGet)
+- PR #99 accidentally removed .AllowAnonymous() from /api/version (unrequired change in commit, not documented)
+
+**Real Impact**:
+- Kubernetes/Aspire orchestrator probes hitting /health without credentials now receive 401/403
+- Services marked unhealthy and restarted without cause
+- Operational/availability risk introduced accidentally by security hardening of PR #98
+
+**Lesson Learned**:
+- Always `git pull origin develop` before auditing/branching to ensure merge-base is current
+- Previous session (audit for #100, never merged) used stale develop; this session reproduced the real gap correctly
+- Documentation + code drift: ADR said [AllowAnonymous] required but wasn't enforced; must audit actual deployed state vs. documented intent
+
+**Changes Made**:
+1. Added `.AllowAnonymous()` to all 7 health/version endpoints
+2. Created HealthEndpointsAuthorizationTests (5 new tests):
+   - ✅ Unauthenticated user fails FallbackPolicy (confirms policy works)
+   - ✅ Authenticated TenantOwner can access protected endpoints
+   - ✅ Unauthenticated user cannot access role management
+   - ✅ Viewer role cannot access role management
+   - ✅ Cross-tenant isolation: TenantOwner of tenant A cannot manage roles in tenant B
+
+**Build**: 0 errors, 0 warnings
+**Tests**: 595/595 passing (no regression)
+**PR**: #101 created against develop
+
+**Security Backlog (Non-Blocking, Not Implemented)**:
+- Response headers: HSTS, X-Content-Type-Options, X-Frame-Options, CSP
+- Rate limiting on sensitive endpoints: /api/roles/assign, /api/roles/remove, document exports, tenant creation
