@@ -1,7 +1,7 @@
 ---
-updated_at: 2026-07-10T03:35:00-04:00
-focus_area: P1-001 a P1-013 COMPLETADOS Y MERGEADOS a develop (778 tests passing, 0 regressions) + P1-014/P1-015/P1-016 PENDIENTES (RBAC compliance gaps) + follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
-active_issues: [P1-014 (GenerateOfficialExport state "Active" validation + auto ExportWarning), P1-015 (DownloadEvidence endpoint + 403/422 RBAC), P1-016 (2 blockers restantes de ApproveProcessingActivity: RequiredReviewPending, VersionModifiedAfterReview — domain model dependencies), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (pending)]
+updated_at: 2026-07-10T16:44:00Z
+focus_area: P1-001 a P1-014 COMPLETADOS Y MERGEADOS a develop (782 tests passing, 0 regressions, P1-014 3/4 gaps closed + P1-014-P2 backlog created) + P1-015/P1-016 PENDIENTES (RBAC compliance gaps) + P1-014-P2 (non-blocking, P2 priority) + follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
+active_issues: [P1-015 (DownloadEvidence endpoint + 403/422 RBAC), P1-016 (2 blockers restantes de ApproveProcessingActivity: RequiredReviewPending, VersionModifiedAfterReview — domain model dependencies), P1-014-P2 (ExportWarning auto-detection, non-blocking P2), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (pending)]
 ---
 
 # What We're Focused On
@@ -57,32 +57,77 @@ active_issues: [P1-014 (GenerateOfficialExport state "Active" validation + auto 
 
 ---
 
-### 🔄 PENDING — P1-014: GenerateOfficialExport Completeness (SEC-EXP-001)
-**P1-014 (Complete GenerateOfficialExport Compliance)** — Status: **PENDIENTE**. Priority: **HIGH**. 
+### ✅ COMPLETADO — P1-014: GenerateOfficialExport Completeness (SEC-EXP-001 — 3/4 Gaps)
+**P1-014 (Complete GenerateOfficialExport Compliance)** — Status: **✅ COMPLETADO Y MERGEADO A DEVELOP (2026-07-10)**.
 
-**Background**: Gandalf's RBAC audit (2026-07-10) identified compliance gaps in SEC-EXP-001 implementation.
+**Implementation** (PR #114):
+- ✅ **Gap #1 CLOSED**: ExportService now validates `ProcessingActivityStatus.Active` in addition to `Approved`
+- ✅ **Gap #3 CLOSED**: HTTP 422 UnprocessableEntity with `OfficialExportRequiresApproval` error code
+- ✅ **Gap #4 CLOSED**: Audit trail `ExportGenerationBlocked` logged with result.Blocked, safe metadata, correlationId preserved
+- ⚠️ **Gap #2 DEFERRED P2**: Auto-detection of ExportWarning (requires cross-module coordination: GapManagement/Evidence). Interim solution: `AddWarningAsync()` for external orchestration. P2 solution formalized (IProcessingActivityRiskAssessmentService in ProcessingInventory per Gandalf's recommendation).
 
-**Gaps Found**:
-1. State "Active" NOT validated — handler only accepts "Approved", but contract requires "Approved OR Active"
-2. ExportWarning NOT generated automatically — handler should auto-warn if risks/gaps/evidence pending exist
-3. HTTP error code incorrect — InvalidOperationException thrown instead of 422 UnprocessableEntity with code `OfficialExportRequiresApproval`
+**Quality Metrics**:
+- 782 unit tests passing (778 baseline + 4 new behavioral tests, zero reflection violations)
+- 0 regressions from P1-013
+- Code quality: Excellent (fail-closed pattern, safe metadata, E2E correlationId)
+- PR description honesty: ✅ Gap #2 declared as PENDING
+
+**Architectural Decision — Gap #2 (Gandalf Review)**:
+- Boundary argument PARTIALLY VALID (abstractions exist: IGapSummaryQueryService, IEvidenceSummaryQueryService)
+- Could be implemented in P1 using existing interfaces
+- Deferral to P2 is architectural choice (not constraint) for cleaner encapsulation
+- **Recommended P2 solution**: Option B (IProcessingActivityRiskAssessmentService in ProcessingInventory) per Gandalf's technical verdict
+
+**Contract Compliance**:
+- SEC-EXP-001 Gap #1: ✅ Resolved
+- SEC-EXP-001 Gap #3: ✅ Resolved  
+- SEC-EXP-001 Gap #4: ✅ Resolved
+- SEC-EXP-001 Gap #2: ⚠️ Deferred P2 (documented, non-blocking)
+
+**Condition for Merge Met**:
+✅ Formal P2 backlog item created (P1-014-P2)
+✅ User (luisonha) explicitly accepted Gandalf's recommendation
+✅ Decisions archived with full rationale
+
+**Outcome**: P1-014 ✅ COMPLETED (3/4 gaps), P1-014-P2 ✅ CREATED (backlog item, priority P2).
+
+---
+
+### 🔄 PENDING — P1-014-P2: ExportWarning Auto-Detection (Non-Blocking P2)
+**P1-014-P2 (Implement Auto-Detection of Export Warnings)** — Status: **PENDING**. Priority: **P2 (non-blocking)**.
+
+**Background**: Gap #2 from P1-014. Gandalf's technical verdict: deferral is architectural choice for cleaner design.
 
 **Requirements**:
-- Accept status `ProcessingActivityStatus.Active` in addition to `Approved`
-- Implement automatic ExportWarning generation when:
-  - Blocking evidence pending
-  - Critical gaps open
-  - Required reviews pending
-- Return HTTP 422 with `OfficialExportRequiresApproval` code for invalid state
-- Audit: `OfficialExportGenerated` (Success) / `ExportGenerationBlocked` (Denied)
+- Query open critical gaps via `IGapSummaryQueryService`
+- Query pending evidence via `IEvidenceSummaryQueryService`
+- Create `ExportWarning` entries when thresholds met (critical gap open, blocking evidence pending, required reviews pending)
+- Auto-warnings generated at export request time
 
-**Implementation Path**:
-- Update ExportService.RequestExportAsync() validation logic
-- Add ExportWarning.CreateAutomatic() logic to detect riskFlags/gaps/evidence state
-- Ensure 422 error code propagates to API layer
-- Add test cases for Active state + automatic warning generation
+**Three Solution Options (Evaluated by Aragorn)**:
+1. **Option A** (Direct Injection): Reporting inyecta IGapSummaryQueryService + IEvidenceSummaryQueryService directly into ExportService
+   - Pros: Simple, direct, testable
+   - Cons: Reporting module becomes tightly coupled to functional modules
 
-**Blocked By**: None (ready to start).
+2. **Option B** (Aggregate Service) — **PREFERRED by Gandalf**: Create `IProcessingActivityRiskAssessmentService` in ProcessingInventory that internally queries GapManagement + Evidence
+   - Pros: Centralized, encapsulated, follows RatEvidenceService pattern
+   - Cons: Requires new service abstraction
+
+3. **Option C** (External Orchestration) — **Current Interim**: External caller (API/workflow) detects gaps/evidence and calls `AddWarningAsync()`
+   - Pros: Zero module changes, flexible
+   - Cons: Caller must know business logic for warning detection
+
+**Recommended Path (P2)**:
+- Implement Option B (IProcessingActivityRiskAssessmentService in ProcessingInventory)
+- Inyect into ExportService for automatic warning detection
+- Write integration tests for end-to-end warning scenarios
+- Achieve **5/5 SEC-EXP-001 gaps complete**
+
+**Estimated Complexity**: Low to Medium (8-16 story points)
+
+**Dependencies**: None (abstractions already exist in codebase)
+
+**Blocked By**: None. Scheduled post-P1-015/P1-016 for backlog prioritization.
 
 ---
 

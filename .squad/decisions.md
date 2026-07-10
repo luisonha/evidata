@@ -229,3 +229,158 @@ Remaining compliance gaps (from audit):
 2. Schedule P1-014 (GenerateOfficialExport completeness)
 3. Schedule P1-015 (DownloadEvidence endpoint + authorization)
 4. Update backlog: Mark P1-012 ✅ done, P1-013 ✅ done (with P1-016 follow-up), add P1-016 to pending
+
+### 2026-07-10T03:45:00Z: PR #114 Review — GenerateOfficialExport Compliance Gaps (P1-014) ✅ APROBADO CONDICIONAL
+**By:** Gandalf (Tech Lead), Aragorn (Backend Dev)
+**What:** PR #114 (dev/2026/07/10/p1-014-generate-official-export → develop) implementa 3 de 4 gaps de SEC-EXP-001 (GenerateOfficialExport):
+1. ✅ **Gap #1 CERRADO**: Estado "Active" ahora aceptado además de "Approved" para autorizar exportación
+2. ✅ **Gap #3 CERRADO**: HTTP 422 con código de error correcto (OfficialExportRequiresApproval)
+3. ✅ **Gap #4 CERRADO**: Auditoría ExportGenerationBlocked logged correctamente con AuditEventResult.Blocked, metadata completa, correlationId preservado
+
+**Gap #2 DIFERIDO A P2** (Arquitectura documentada honestamente):
+- Requisito: Auto-detectar ExportWarning cuando hay brechas críticas/evidencia pendiente
+- Raiz: Detección requiere coordinación cross-module (GapManagement + Evidence)
+- Solución interim: ExportService.AddWarningAsync() para orquestación externa
+- Solución P2 recomendada (Opción B preferida por Gandalf): Crear `IProcessingActivityRiskAssessmentService` en ProcessingInventory que agregue datos de riesgo de todos módulos, inyectado en ExportService. Alternativa (Opción A): Inyectar directamente IGapSummaryQueryService + IEvidenceSummaryQueryService en ExportService (más riesgoso, acoplamiento).
+
+**Verificación Completa (11 criterios)** ✅:
+- Git Hygiene: 2 commits (code + history), cero cambios erráticos. LIMPIO.
+- Diff Scope: 4 archivos (2 fuente, 1 test, 1 history). Cero archivos governance mutados.
+- Nomenclatura: Cero violaciones "treatment" (grep verificado).
+- HTTP 422: Mapeo correcto (OfficialExportRequiresApproval → 422 UnprocessableEntity).
+- Auditoría: ExportGenerationBlocked logged, result.Blocked, metadata completa, correlationId preservado.
+- Tests: 4 nuevos tests (NSubstitute mocks, cero reflection), bien documentados.
+- Build & Tests: `dotnet build` PASA, `dotnet test` PASA (782/782, +4 new, cero regressions).
+- CI Status: build-and-test job COMPLETADO con conclusión SUCCESS.
+- Governance: decisions.md e identity/now.md intactos (read-only).
+- PR Description Honesty: ✅ EXCELENTE — Gap #2 declarado como ⚠️ PENDING (no ocultado).
+
+**Análisis Arquitectura Gap #2 (Gandalf)**:
+- Claim Aragorn: "Módulo Reporting no puede referenciar GapManagement/Evidence (loose coupling)."
+- Evidencia PRO "boundary válido":
+  - ✅ Reporting module NO tiene dependencias proyecto a GapManagement/Evidence
+  - ✅ RatEvidenceService patrón en ProcessingInventory respeta boundaries
+  - ✅ Solución P2 (IProcessingActivityRiskAssessmentService) es arquitectónicamente sólida
+- Evidencia CONTRA "boundary inviolable":
+  - 🔴 **Abstracciones YA EXISTEN**: IGapSummaryQueryService (GapManagement.Application.Abstractions), IEvidenceSummaryQueryService (Evidence.Application.Abstractions) con DTOs dedicados (ProcessingActivityGapSummaryDto, EvidenceSummaryDto) que replican shape sin introducir cross-project reference
+  - 🔴 **ProcessingInventory YA cruza boundaries seguramente**: RatEvidenceService depende de IEvidenceLinkService (abstracción Evidence module), probando el patrón funciona
+  - 🔴 **Reporting.ReportingModule.cs NO registra estas abstracciones**: ExportService PODRÍA inyectar IGapSummaryQueryService + IEvidenceSummaryQueryService sin referencia proyecto
+- **Veredicto Gandalf**: Boundary es PARCIALMENTE VÁLIDO pero NO justifica diferir a P2. Arquitectura permite implementación inmediata (~10-15 LOC). **Sin embargo**, aceptamos diferimiento a P2 porque:
+  - Servicio agregado (IProcessingActivityRiskAssessmentService) es arquitectura más limpia
+  - PR es honesto sobre deferimiento (no ocultado)
+  - Gap #2 NO bloquea deployment de Gaps #1/#3/#4 (críticos seguridad)
+
+**Calidad de Código** ✅ EXCELENTE:
+- Separación de concerns clara (validación estado → lógica negocio → auditoría → error handling)
+- Patrón fail-closed mantenido
+- Construcción metadata dictionary sigue patrones establecidos
+- Logging y audit correlationIds precisos
+
+**Calidad Tests** ✅ EXCELENTE:
+- 4 tests cubren happy path (estado Active) + todos escenarios error
+- Naming claro, mapeo directo a gaps (P1_014_GAP_1, etc.)
+- Gap #2 test documenta limitación explícitamente (no barido bajo alfombra)
+- NSubstitute mocks correctamente utilizados, cero reflection
+
+**Conformidad SEC-EXP-001**:
+1. ✅ "Sólo roles autorizados" — Authorization check presente (UnauthorizedAccessException catch)
+2. ✅ "Estado debe ser Approved O Active" — AHORA FIXED (Gap #1)
+3. ⚠️ "Si existen advertencias, deben incluirse como ExportWarning" — DIFERIDO P2 (Gap #2)
+4. ✅ "Debe quedar AuditEvent" — ExportGenerationBlocked logged cuando se bloquea (Gap #4)
+5. ✅ "Trazabilidad usuario, versión, fecha, tipo, parámetros" — metadata completa
+
+Puntuación Conformidad: 4/5 gaps satisfied P1-014; 1/5 deferred P2 (documented honestly).
+
+**Riesgos Identificados**:
+- Seguridad: ✅ NINGUNO (fail-closed mantenido, estados inválidos bloqueados, auditoría completa)
+- Arquitectura: ⚠️ MENOR (Gap #2 PODRÍA implementarse inmediatamente, pero deferimiento es CHOICE no constraint)
+- Regresión: ✅ NINGUNO (782/782 tests passing, cero regressions)
+
+**Decisión: ✅ APROBADO CONDICIONAL**
+
+Condición: Crear ítem formal P2 en backlog para Gap #2 (IProcessingActivityRiskAssessmentService) antes de merge final (luisonha ya ACEPTÓ EXPLÍCITAMENTE esta recomendación).
+
+**Owner:** Aragorn (implementation) + Gandalf (review/approval).
+
+---
+
+### 2026-07-10T03:50:00Z: P1-014 Gap #2: Auto-Detection de Export Warnings — Punto Arquitectónico (P2)
+**By:** Aragorn (Backend Dev)
+**Status:** DECISION POINT — Deferred to P2 (but formalized)
+**Related:** PR #114, SEC-EXP-001
+
+**Raíz del Problema**:
+Contrato SEC-EXP-001 (04-rbac-audit-evidence-gaps-contract.md) requiere: "Si existen advertencias, deben incluirse como ExportWarning. Debe registrar advertencias si hay riesgos, brechas o evidencias pendientes."
+
+Detección requiere datos de:
+1. **GapManagement module**: IGapSummaryQueryService → brechas abiertas
+2. **Evidence module**: IEvidenceSummaryQueryService → evidencia pendiente
+
+Decisión arquitectura actual: Reporting NO referencia módulos funcionales (GapManagement, Evidence, ProcessingInventory).
+
+**Rationale Boundary**:
+- Reporting es horizontal (cross-cutting), no vertical
+- Referencias directas crearían acoplamiento circular/tight
+- Módulos funcionales deben ser independently deployable
+
+**Soluciones Propuestas (P2)**:
+
+**Opción A: IProcessingActivityRiskAssessmentService en ProcessingInventory** (RECOMENDADA Gandalf)
+```csharp
+public interface IProcessingActivityRiskAssessmentService
+{
+    Task<ExportWarningDto[]> AssessWarningsForExportAsync(
+        Guid tenantId, Guid processingActivityId, Guid versionId, 
+        CancellationToken ct);
+}
+```
+- Reporting depende de ProcessingInventory (dueño de ProcessingActivity root)
+- ProcessingInventory internamente consulta GapManagement + Evidence
+- Separación concerns limpia
+- Patrón idéntico a RatEvidenceService
+
+**Opción B: IExportWarningDetector Orchestrator**
+```csharp
+public interface IExportWarningDetector
+{
+    Task<string[]> DetectWarningsAsync(
+        Guid tenantId, Guid processingActivityId, CancellationToken ct);
+}
+```
+- Reporting inyecta opcionalmente
+- Composition root lo wirea si disponible
+- Flexible pero menos type-safe
+
+**Opción C: External Orchestration** (Status Actual)
+- AddWarningAsync() existe y funciona
+- Caller externo (API layer o workflow) detecta gaps/evidence y llama AddWarningAsync()
+- Simple pero requiere caller knowledge
+
+**Solución Interim P1-014**:
+Implementar Opción C con documentación clara:
+1. ExportService.AddWarningAsync() existe y funciona
+2. Caller externo puede detectar gaps/evidence y llamar AddWarningAsync()
+3. P2 formalizará Opción A
+
+**Rationale Deferimiento**:
+- Unblocks SEC-EXP-001 authorization (Gaps #1, #3, #4 críticos seguridad)
+- Gap #2 (warnings) es informacional, NO-BLOQUEANTE
+- Da equipo tiempo diseñar Opción A apropiadamente
+- Use case real de warnings viene de orchestrator workflow anyway
+
+**Trade-offs Opciones**:
+| Aspecto | Opción A | Opción B | Opción C |
+|---------|----------|----------|----------|
+| Type safety | Alta | Media | Baja |
+| Module coupling | ProcessInv→Reporting | Reporting→both | Ninguno |
+| Flexibility | Buena (centralized) | Excelente (optional) | Alta (external) |
+| Cost | Medio | Bajo | Mínimo |
+| Test complexity | Medio | Medio | Bajo (until P2) |
+
+**Recomendación Equipo**:
+- Short term (P1): Merge PR #114 con Gap #2 documentado
+- Medium term (P2): Implementar Opción A (IProcessingActivityRiskAssessmentService en ProcessingInventory)
+- Long term: Event-driven warnings (gaps/evidence raise events, Export listens)
+
+**Owner:** Aragorn (backend) + Product (roadmap alignment).
+

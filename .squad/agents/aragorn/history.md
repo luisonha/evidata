@@ -94,3 +94,37 @@ Completed implementation of 2 critical RBAC permission handlers + remediation cy
 **Test Metrics**: 778 total, 0 regressions. Both PRs' fixes were clean and surgical.
 
 **Next**: P1-016 scheduled for 2 pending blockers (domain model extensions). P1-014, P1-015 for remaining RBAC gaps (GenerateOfficialExport, DownloadEvidence).
+
+
+### 2026-07-10T16:44:00Z — PR #114 Completion + P2 Formalization (P1-014 Complete, P1-014-P2 Created)
+
+📌 Team update (2026-07-10T16:44:00Z): PR #114 (P1-014 GenerateOfficialExport) aprobado condicional + merged to develop, 782 unit tests passing, zero regressions. 3 of 4 SEC-EXP-001 gaps resolved (state "Active" now accepted, HTTP 422 with correct error code, audit trail complete). Gap #2 (auto-detection ExportWarning) formalized as P1-014-P2 in backlog with clear architectural recommendation (IProcessingActivityRiskAssessmentService in ProcessingInventory per Gandalf's technical verdict). Decisions consolidated: gandalf-pr114-review.md + aragorn-p1014-gap2-warning-detection.md merged to decisions.md. Backlog updated. Condition met: P2 item created per Gandalf's conditional approval. — Scribe (Memory Manager)
+
+**What Happened**:
+- Gandalf completed comprehensive PR #114 review: APROBADO CONDICIONAL
+- Technical verdict on Gap #2: Boundary argument PARTIALLY VALID but not blocker (abstractions exist in codebase)
+- Architectural recommendation: Option B (IProcessingActivityRiskAssessmentService) preferred for P2 (cleaner encapsulation than Option A direct injection)
+- Aragorn decision point documented: Three options evaluated (A: aggregate service, B: orchestrator, C: external)
+- Interim solution (Option C): AddWarningAsync() available for external orchestration
+
+**Quality Metrics**:
+- 782 unit tests passing (+4 new from PR #114 behavioral tests, zero reflection violations)
+- 0 regressions from baseline
+- PR description honesty: ✅ Gap #2 declared as PENDING (not hidden)
+- Code quality: Excellent (fail-closed pattern maintained, metadata safe, correlationId preserved)
+
+**Condition for Merge Met**:
+✅ Formal P2 backlog item created (P1-014-P2: ExportWarning auto-detection)
+✅ User (luisonha) explicitly accepted Gandalf's recommendation
+✅ Decisions archived with full rationale
+✅ Backlog updated
+
+**Contract Compliance**:
+- SEC-EXP-001 Gap #1: ✅ Resolved (state "Active" accepted)
+- SEC-EXP-001 Gap #3: ✅ Resolved (HTTP 422 OfficialExportRequiresApproval)
+- SEC-EXP-001 Gap #4: ✅ Resolved (ExportGenerationBlocked audit)
+- SEC-EXP-001 Gap #2: ⚠️ Deferred P2 (auto-warning detection) — architecture documented, no blocker
+
+**Status**: P1-014 ✅ COMPLETED (3/4 gaps), P1-014-P2 ✅ CREATED (backlog item)
+
+**Next**: P2 planning should prioritize P1-014-P2 alongside P1-015 (DownloadEvidence) for contract completeness.
