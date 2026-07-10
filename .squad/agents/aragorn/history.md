@@ -224,3 +224,95 @@ Result:
 2. **Follow-up: P1-011b** — AcceptGapWithRisk + audit instrumentation (3-4 hours, BLOCKING)
 3. **Then: P1-011c** — Remaining 5 handlers + audit + tests (6-8 hours, P2 but recommended immediate)
 4. **Parallel: P1-008** — Exports handler (no blocker, lower priority vs. security-critical items)
+
+## 2026-07-10 · P1-008 Exports Module SEC-EXP-001 Authorization (PR #109)
+
+### What
+Implementación formal de P1-008: Mapping del módulo Reporting a Exports con autorización fail-closed SEC-EXP-001 para GenerateOfficialExport.
+
+### Scope
+- **Export Aggregate** (14 campos): id, tenantId, processingActivityId, exportType (enum), status (Requested|Generating|Completed|Failed), version, warnings, contentType, artifactDocumentId, requestedByUserId, requestedAt, generatedAt, correlationId, errorMessage
+- **ExportType Enum**: ProcessingActivityPdfSummary, GlobalRatExcel, ApprovalHistory, InternalJson
+- **SEC-EXP-001 Authorization Fail-Closed**:
+  - Verifica rol autorizado (ComplianceAdmin, TenantOwner) via IResourcePermissionsQueryService
+  - Verifica estado (Solo Approved permite exports) via IProcessingActivityReadOnlyQueryService
+  - Bloquea inmediatamente con UnauthorizedAccessException (403) o InvalidOperationException (400)
+  - Patrón idéntico a SEC-EV-001 (PR #105)
+- **Endpoints**:
+  - POST /api/v1/processing-activities/{id}/exports → Create export
+  - GET /api/v1/exports/{exportId} → Query export status
+  - GET /api/v1/exports/{exportId}/download → Download (only if Completed)
+- **Auditoría**: GenerateOfficialExport events (AUD-EXP-001) con metadata + correlationId propagado
+- **Tests**: 3 behavioral tests reales (NSubstitute, NO reflection):
+  - SEC_EXP_001_AuthorizedUserWithApprovedActivity_CreatesExport
+  - SEC_EXP_001_UnauthorizedRole_Forbids (DidNotReceive verification)
+  - SEC_EXP_001_ActivityNotApproved_FailsClosed (DidNotReceive verification)
+
+### Changes
+1. **Domain entities** (~600 LOC):
+   - `Export.cs` (14 fields, factory methods)
+   - `ExportType.cs` (enum with mapping metadata)
+   - `ExportStatus.cs` (state machine enforcement)
+   - `ExportRepository.cs` (GetNextVersionAsync per (processingActivityId, exportType))
+
+2. **Services**:
+   - `ExportService.cs` (RequestExportAsync with SEC-EXP-001 checks)
+   - `ProcessingActivityReadOnlyQueryAdapter.cs` (bridges Reporting → ProcessingInventory)
+   - `IProcessingActivityReadOnlyQueryService.cs` (Reporting abstraction)
+
+3. **DbContext & Migration**:
+   - EF Core mapping (ExportType, ExportStatus converted to string, warnings stored as JSONB)
+   - Migration `20260710040900_AddExportsTable` (indices on tenantId, processingActivityId, status)
+
+4. **Tests**:
+   - `ExportServiceTests.cs` (3 behavioral tests)
+   - All 753 unit tests passing
+
+### Why (Contrato)
+- Cierra P1-008 scope (Exports module formal implementation)
+- Establece precedente para fail-closed SEC-* patterns (sigue PR #105 SEC-EV-001)
+- Reutiliza composición limpia de PR #103/104 (ResourcePermissionsQueryService)
+- Preparada auditoría para P1-011c (GenerateOfficialExport handler adicional)
+
+### Status
+- ✅ SEC-EXP-001 genuinamente fail-closed en ExportService
+- ✅ Tests reales (NSubstitute, no reflection)
+- ✅ Shape Export cumple 100% contrato (14 campos)
+- ✅ Auditoría GenerateOfficialExport con correlationId propagado
+- ✅ ProcessingActivityReadOnlyQueryAdapter sin dependencias circulares
+- ✅ Backward compatibility mantengida (ReportsController intacto)
+- ✅ CI verde (753/753 tests)
+- ✅ **APPROVED AND MERGED to develop** (PR #109)
+
+### Architecture Decision
+- **Adapter Pattern**: ProcessingActivityReadOnlyQueryAdapter (API layer) implementa IProcessingActivityReadOnlyQueryService (Reporting abstraction) usando GetProcessingActivityQueryHandler (ProcessingInventory handler)
+- **Composición**: En Program.cs → services.AddScoped<IProcessingActivityReadOnlyQueryService>(sp => new ProcessingActivityReadOnlyQueryAdapter(...))
+- **Beneficio**: Evita dependencia circular (Reporting → ProcessingInventory), mantiene límites módulos limpios, reutilizable para futuras queries cross-module
+
+### Quality Checklist
+| Criterion | Status | Note |
+|---|---|---|
+| SEC-EXP-001 fail-closed | ✅ | Bloquea por defecto; no defaults silenciosos |
+| Shape compliance | ✅ | All 14 fields present with correct types |
+| Tests real (NSubstitute) | ✅ | No reflection, clear mock patterns |
+| Auditoría with correlationId | ✅ | AUD-EXP-001 logged with correlation |
+| Backward compat | ✅ | ReportsController untouched |
+| Circular dependencies | ✅ | ProcessingActivityReadOnlyQueryAdapter breaks cycle |
+| Build passes | ✅ | dotnet build → 0 errors |
+| All tests pass | ✅ | 753/753 unit tests passing |
+| CI GREEN | ✅ | AWS CodeBuild checks passed |
+
+### Commits
+1. `db518ed` – feat(exports): add Export domain entities with SEC-EXP-001 authorization
+2. (incremental) – feat(exports): implement ExportService with fail-closed authorization checks
+3. (incremental) – feat(reporting): add ProcessingActivityReadOnlyQueryAdapter and abstraction
+4. (incremental) – test(exports): behavioral tests for SEC-EXP-001 fail-closed patterns
+5. (incremental) – migration: create AddExportsTable with indexes for tenant isolation
+
+### Follow-up (P1-011c)
+- **GenerateOfficialExport handler** (5th remaining handler) will extend ExportService.RequestExportAsync with additional command-handler wrapper + audit instrumentation (scheduled in P1-011c backlog)
+
+### Next Steps (Aragorn — IMMEDIATE POST-MERGE)
+1. **PRIORITY: P1-011a immediately** — ValidateEvidence + audit (3-4 hrs, BLOCKING)
+2. **Follow-up: P1-011b** — AcceptGapWithRisk + audit (3-4 hrs, BLOCKING)
+3. **Then: P1-011c** — 5 remaining handlers including GenerateOfficialExport

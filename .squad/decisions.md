@@ -104,6 +104,30 @@
 **Owner:** Aragorn (implementation) + Gandalf (review/approval).
 **Recomendación futura**: P1-010 debe propagar correlationId a TODOS los handlers via context.GetCorrelationId() → IAuditService.LogAsync(). P1-011a/b/c deben instrumentar ValidateEvidence, AcceptGapWithRisk, y 5 handlers restantes como follow-up inmediato.
 
+### 2026-07-10T00:24:19Z: PR #109 - Mapeo de Reporting a Exports con SEC-EXP-001 Authorization ✅ APROBADO + MERGED
+**By:** Aragorn (Backend Core Engineer) → Gandalf (Architect/Lead, Code Review Approved)
+**What:** PR #109 (P1-008) implementa mapeo completo de Reporting module a Exports module con autorización fail-closed SEC-EXP-001:
+- **P1-008 Shape (14 campos)**: id, tenantId, processingActivityId, exportType (enum: ProcessingActivityPdfSummary|GlobalRatExcel|ApprovalHistory|InternalJson), status (Requested|Generating|Completed|Failed), version, warnings, contentType, artifactDocumentId, requestedByUserId, requestedAt, generatedAt, correlationId, errorMessage.
+- **SEC-EXP-001 Autorización fail-closed**: 
+  - Verifica rol (ComplianceAdmin, TenantOwner) via IResourcePermissionsQueryService
+  - Verifica estado (Solo Approved permite exports) via IProcessingActivityReadOnlyQueryService
+  - Bloquea inmediatamente si no autorizado o actividad no aprobada (throw UnauthorizedAccessException / InvalidOperationException)
+- **Endpoints**: POST /api/v1/processing-activities/{id}/exports (crear export), GET /api/v1/exports/{exportId} (consultar status), GET /api/v1/exports/{exportId}/download (descargar si Completed)
+- **Auditoría**: GenerateOfficialExport events (AUD-EXP-001) con metadata logged (exportType, status, requestedBy), correlationId propagado E2E
+- **Tests**: 3 behavioral tests reales (NSubstitute, NO reflection) + 753/753 unit tests passing
+  - SEC_EXP_001_AuthorizedUserWithApprovedActivity_CreatesExport
+  - SEC_EXP_001_UnauthorizedRole_Forbids (verifica DidNotReceive().AddAsync())
+  - SEC_EXP_001_ActivityNotApproved_FailsClosed (verifica DidNotReceive().AddAsync())
+- **Arquitectura**: ProcessingActivityReadOnlyQueryAdapter (API layer) bridgea Reporting → ProcessingInventory sin dependencias circulares. Patrón idéntico a PR #103/104 (ResourcePermissionsQueryService).
+- **Backward Compatibility**: ReportsController (legacy /api/reports) intacto, sin breaking changes.
+- **Implementation**: ~600 LOC (domain entities, services, adapter, migrations), migration (AddExportsTable con indices óptimos).
+- **Result**: 753/753 unit tests passing, CI GREEN, merged to develop.
+**Why:** Cierra P1-008 contrato exports. Establece precedente para fail-closed SEC-* patterns (sigue PR #105 SEC-EV-001). Reutiliza composición limpia de PR #103/104. Preparada la auditoría para P1-011c (GenerateOfficialExport handler).
+**Status:** ✅ APROBADO + MERGED
+**Process:** 1 iteración (pre-review + Gandalf comprehensive review, 9 criteria: authorization, shape, tests, auditoría, backward compat, CI, governance, endpoints). Gandalf approved sin cambios obligatorios.
+**Owner:** Aragorn (implementation) + Gandalf (review/approval).
+**Patrón de Excelencia**: Sigue fail-closed de PR #105 (SEC-EV-001) + composición de PR #103/104 + auditoría con correlationId de PR #107/108. Replicable para acciones críticas futuras.
+
 ### ⚠️ PENDIENTE - SEGUIMIENTO OBLIGATORIO: P1-011a/b/c (Acciones Críticas de Auditoría de Seguridad)
 **By:** Aragorn (decisión arquitectónica)
 **What:** Tres items POST-MERGE registrados explícitamente como **CRÍTICOS para cierre de seguridad**. Estos son gaps deliberados de P1-010 que MUST ser completados INMEDIATAMENTE en ciclo siguiente (no dejar a limbo organizacional):
@@ -155,7 +179,7 @@
 - [ ] Contract compliance: Metadata keys match P1-009, eventTypes match AuditEventType enum, result uses AuditEventResult enum
 
 **Timeline**:
-- **P1-011a**: Start immediately post-merge PR #108, target completion within 1 sprint
+- **P1-011a**: Start immediately post-merge PR #109, target completion within 1 sprint
 - **P1-011b**: Start after P1-011a (may have dependencies), target completion within 1 sprint
 - **P1-011c**: Start after both CRITICAL items complete, stagger across 1-2 sprints
 

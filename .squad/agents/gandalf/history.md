@@ -306,3 +306,114 @@ All three decision artifacts consolidated to `.squad/decisions.md` by Scribe (20
 - Scribe: Update now.md, history.md, backlog.md to reflect post-merge priorities
 
 **Session End**: 2026-07-10T03:01:00-04:00
+
+## 2026-07-10 — PR #109 Review (P1-008: Exports Module SEC-EXP-001)
+
+**Task:** Revisar PR #109 (map-reporting-to-exports) contra contrato P1-008.
+
+**Veredicto:** ✅ **APROBADO**
+
+### Hallazgos clave:
+- SEC-EXP-001 **fail-closed genuino** en ExportService (líneas 43-48, 54-66)
+- Tests reales (NSubstitute, 3 behavioral tests específicos)
+- Shape Export cumple 100% contrato (14 campos presentes)
+- Auditoría GenerateOfficialExport con correlationId propagado
+- ProcessingActivityReadOnlyQueryAdapter sin dependencias circulares
+- CI verde (753/753 tests)
+- Backward compatibility mantengida (ReportsController intacto)
+
+### Violaciones encontradas:
+Ninguna. PR cumple íntegramente el contrato.
+
+### Decisión:
+Aprobado para merge. Patrón de excelencia: sigue fail-closed de PR #105 + composición limpia de PR #104.
+
+**Registro:** `.squad/decisions/inbox/gandalf-pr109-review.md`
+
+---
+
+## 2026-07-10 — PR #109 Review (P1-008: Exports Module SEC-EXP-001) — FINAL APPROVAL ✅
+
+**Task:** Revisar PR #109 (map-reporting-to-exports → develop) contra contrato P1-008: Exports module with SEC-EXP-001 fail-closed authorization.
+
+**Review Methodology:**
+1. Verificar SEC-EXP-001 es genuinamente fail-closed (no defaults, bloquea por defecto)
+2. Validar Shape Export (14 campos contractuales)
+3. Verificar tests: ¿comportamiento real o smoke/reflection?
+4. Auditoría GenerateOfficialExport con correlationId
+5. Backward compatibility (ReportsController intacto)
+6. Circular dependencies (ProcessingActivityReadOnlyQueryAdapter)
+7. Endpoint design (tenant isolation, error handling)
+8. CI status
+
+**Findings & Verdict: ✅ APROBADO**
+
+### 1. SEC-EXP-001 Genuinamente Fail-Closed ✅
+**ExportService.cs líneas 43-66:**
+```csharp
+// Authorization fail-closed
+if (permissions.BlockedActions.Any(a => a.ActionCode == "GenerateOfficialExport"))
+    throw new UnauthorizedAccessException(...);
+
+// State fail-closed
+if (string.IsNullOrEmpty(activityStatus))
+    throw new InvalidOperationException(...);
+if (activityStatus != "Approved")
+    throw new InvalidOperationException(...);
+```
+- **Resultado**: No defaults, bloquea inmediatamente si ambigüedad. Patrón idéntico a SEC-EV-001 (PR #105).
+
+### 2. Shape Export Cumple 100% Contrato ✅
+**Export.cs 14 campos contractuales todos presentes con tipos correctos.**
+
+### 3. Tests Reales (NSubstitute, No Reflection) ✅
+**3 behavioral tests:**
+- SEC_EXP_001_AuthorizedUserWithApprovedActivity_CreatesExport (real behavior, clear mocking)
+- SEC_EXP_001_UnauthorizedRole_Forbids (verifica DidNotReceive, fail-closed)
+- SEC_EXP_001_ActivityNotApproved_FailsClosed (verifica DidNotReceive, fail-closed)
+
+### 4. Auditoría GenerateOfficialExport ✅
+- AuditEventType.GenerateOfficialExport logged con correlationId propagado
+- Eventos: Request, Complete, Fail, Download
+- Propagación E2E via X-Correlation-Id header
+
+### 5. Backward Compatibility ✅
+- ReportsController (legacy) intacto
+- ExportsController nuevo (/api/v1/)
+- No breaking changes
+
+### 6. Architecture (No Circular Dependencies) ✅
+- ProcessingActivityReadOnlyQueryAdapter (API layer)
+- Implementa IProcessingActivityReadOnlyQueryService (Reporting abstraction)
+- Usa GetProcessingActivityQueryHandler (ProcessingInventory)
+- Patrón idéntico a PR #104
+
+### 7. Endpoint Design ✅
+- POST /api/v1/processing-activities/{id}/exports (create)
+- GET /api/v1/exports/{exportId} (status)
+- GET /api/v1/exports/{exportId}/download (only if Completed)
+- Tenant isolation applied correctly
+
+### 8. CI Status ✅
+- 753/753 tests passing
+- 0 errors
+- AWS CodeBuild GREEN
+
+### Pattern of Excellence
+- Sigue fail-closed de PR #105 (SEC-EV-001)
+- Reutiliza composición de PR #103/104
+- Auditoría con correlationId de PR #107/108
+- Replicable para acciones críticas futuras
+
+### Verdict
+**✅ APROBADO SIN CAMBIOS**
+
+PR #109 ready for unconditional merge. Complies fully with P1-008 contract. Excellent pattern of fail-closed security + clean architecture + comprehensive testing.
+
+**Next Steps:**
+1. Merge PR #109
+2. Aragorn: PRIORITY post-merge: P1-011a (ValidateEvidence) + P1-011b (AcceptGapWithRisk)
+3. Scribe: Update now.md — all P1-001 to P1-010 complete, P1-011a/b/c CRITICAL next
+
+**Session End**: 2026-07-10T03:15:00-04:00
+
