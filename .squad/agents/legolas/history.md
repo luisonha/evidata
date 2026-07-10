@@ -91,3 +91,34 @@
 **PR**: #99 created against develop
 **ADR**: legolas-tenant-owner-compliance-admin-policy.md (documents architectural decision)
 
+**ADR**: legolas-global-fallback-authorization-policy.md documents FallbackPolicy decision
+
+## Session 2026-07-10
+
+### Main→Develop Reconciliation (PR #102)
+
+**Problem Discovered**:
+- PR #98 was accidentally merged into `main` (merge commit 50ee9a5) instead of `develop`
+- Root cause: `gh pr create` without `--base develop` flag used repo's default (`main`)
+- Divergence: main has [Authorize] + AuthorizationAttributeTests; develop has FallbackPolicy + TenantOwnerOrComplianceAdminRequirement
+
+**Security Status**: develop NOT vulnerable today (fail-closed by FallbackPolicy), but lacks defense-in-depth and regression tests.
+
+**Reconciliation Actions**:
+1. Cherry-picked ce2b1b8 + dcb5225 from main into develop branch
+2. Resolved conflict in Program.cs: kept FallbackPolicy (identical) + added TenantOwnerOrComplianceAdminRequirement policy
+3. Verified all 7 public endpoints have .AllowAnonymous(): /health, /alive, /health/ready, /health/db, /health/storage, /health/queue, /api/version
+4. Confirmed RolesController maintains [Authorize] + policy enforcement on AssignRole/RemoveRole
+5. All 5 protected controllers now have explicit [Authorize]: UserProfileController, DocumentsController, SearchController, TenantsController, McpController
+
+**Test Results**:
+- Build: 0 errors (19 pre-existing warnings in AuthorizationAttributeTests related to null safety)
+- Tests: 597/597 passing (includes 7 AuthorizationAttributeTests from cherry-pick)
+
+**Process Correction**:
+- Established rule: always use `gh pr create --base develop --head <branch>` explicitly
+- Never rely on repo's default base branch; always specify `--base develop` for evidata
+- Documented in .squad/decisions/inbox/legolas-branching-process-fix.md
+
+**PR**: #102 created against develop
+**Status**: Ready for merge after review

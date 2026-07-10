@@ -65,25 +65,25 @@ public static class HealthCheckExtensions
         {
             Predicate = r => r.Tags.Contains("ready"),
             ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-        });
+        }).AllowAnonymous();
 
         app.MapHealthChecks("/health/db", new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("db"),
             ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-        });
+        }).AllowAnonymous();
 
         app.MapHealthChecks("/health/storage", new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("storage"),
             ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-        });
+        }).AllowAnonymous();
 
         app.MapHealthChecks("/health/queue", new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("queue"),
             ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-        });
+        }).AllowAnonymous();
 
         return app;
     }

@@ -2,11 +2,13 @@ using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.Documents.Application.Queries;
 using Evidata.Modules.Documents.Infrastructure.Persistence;
 using Evidata.Modules.Identity.Application.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Evidata.Modules.Documents.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/documents")]
 public class DocumentsController(
     ListDocumentsQueryHandler listHandler,

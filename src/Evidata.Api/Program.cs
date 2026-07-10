@@ -96,11 +96,13 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.AddAuthorization(options =>
 {
-    // Default policy: all endpoints require authentication
+    // FallbackPolicy: por defecto, todo endpoint requiere autenticación.
+    // Los endpoints públicos legítimos (health, swagger, version) deben marcar explícitamente [AllowAnonymous].
+    // Esto evita que nuevos controllers queden desprotegidos por omisión.
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
-    
+     
     // Fine-grained policy for role management operations (assign/remove roles)
     // Requires user to have TenantOwner or ComplianceAdmin role in the current tenant
     options.AddPolicy("TenantOwnerOrComplianceAdmin", policy =>
@@ -142,6 +144,7 @@ app.MapGet("/api/version", () =>
     });
 })
 .WithName("GetVersion")
+.AllowAnonymous()
 .ExcludeFromDescription(); // no aparece en OpenAPI público
 
 // Configure the HTTP request pipeline.
