@@ -56,29 +56,27 @@ public class GapSummaryByProcessingActivityQueryHandlerTests : IDisposable
             CreateGap(_processingActivityId, GapSeverity.Critical),
             CreateGap(_processingActivityId, GapSeverity.High, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
+                gap.StartCorrection(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.Medium, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
+                gap.Resolve(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.Low, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
-                gap.Block(_userId);
+                gap.StartCorrection(_userId);
+                gap.Resolve(_userId);
+                gap.Close(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.High, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
                 gap.Resolve(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.Medium, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
                 gap.Resolve(_userId);
                 gap.Close(_userId);
             }),
@@ -115,13 +113,11 @@ public class GapSummaryByProcessingActivityQueryHandlerTests : IDisposable
         _db.ComplianceGaps.AddRange(
             CreateGap(_processingActivityId, GapSeverity.Medium, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.Critical, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
                 gap.Resolve(_userId);
             }),
             CreateGap(_processingActivityId, GapSeverity.Critical, gap =>
@@ -130,8 +126,7 @@ public class GapSummaryByProcessingActivityQueryHandlerTests : IDisposable
             }),
             CreateGap(_processingActivityId, GapSeverity.Critical, gap =>
             {
-                gap.Assign(Guid.NewGuid(), _userId);
-                gap.StartProgress(_userId);
+                gap.StartCorrection(_userId);
                 gap.Resolve(_userId);
                 gap.Close(_userId);
             }));

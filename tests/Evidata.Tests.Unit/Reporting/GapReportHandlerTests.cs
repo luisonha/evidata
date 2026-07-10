@@ -16,11 +16,16 @@ public class GapReportHandlerTests
             TenantId, "ProcessingInventory", Guid.NewGuid(),
             title, "Descripción de prueba", severity, Guid.NewGuid());
 
-        // Avanzar estado si es necesario
-        if (status == GapStatus.Assigned || status == GapStatus.InProgress)
-            gap.Assign(Guid.NewGuid(), Guid.NewGuid());
-        if (status == GapStatus.InProgress)
-            gap.StartProgress(Guid.NewGuid());
+        // Avanzar estado si es necesario (map old states to new FSM)
+        if (status == GapStatus.InCorrection)
+            gap.StartCorrection(Guid.NewGuid());
+        if (status == GapStatus.Resolved)
+        {
+            gap.StartCorrection(Guid.NewGuid());
+            gap.Resolve(Guid.NewGuid());
+        }
+        if (status == GapStatus.AcceptedWithRisk)
+            gap.AcceptRisk("Riesgo aceptado en prueba", Guid.NewGuid());
 
         return gap;
     }
@@ -48,7 +53,7 @@ public class GapReportHandlerTests
         var gaps = new[]
         {
             BuildGap(GapSeverity.Critical, GapStatus.Open, "Sin política de privacidad"),
-            BuildGap(GapSeverity.High, GapStatus.InProgress, "Falta retención"),
+            BuildGap(GapSeverity.High, GapStatus.InCorrection, "Falta retención"),
             BuildGap(GapSeverity.Low, GapStatus.Open, "Brecha menor")
         };
         var bytes = GapReportHandler.GenerateExcel(gaps, TenantId);
@@ -99,15 +104,15 @@ public class GapReportHandlerTests
         Assert.NotEmpty(bytes);
     }
 
-    // ── GapStatus Assigned / InProgress incluidos ─────────────────────────────
+    // ── GapStatus InCorrection incluido ────────────────────────────────────────
 
     [Fact]
-    public void GenerateExcel_AssignedAndInProgressGaps_DoNotThrow()
+    public void GenerateExcel_InCorrectionGaps_DoNotThrow()
     {
         var gaps = new[]
         {
-            BuildGap(GapSeverity.High, GapStatus.Assigned),
-            BuildGap(GapSeverity.Medium, GapStatus.InProgress)
+            BuildGap(GapSeverity.High, GapStatus.InCorrection),
+            BuildGap(GapSeverity.Medium, GapStatus.InCorrection)
         };
         var exception = Record.Exception(
             () => GapReportHandler.GenerateExcel(gaps, TenantId));
