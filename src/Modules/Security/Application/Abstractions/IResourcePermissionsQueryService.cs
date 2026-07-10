@@ -26,12 +26,13 @@ public interface IResourcePermissionsQueryService
 }
 
 /// <summary>
-/// Context data for permission evaluation (e.g., ProcessingActivity owner, status, evidence flags).
+/// Context data for permission evaluation (e.g., ProcessingActivity owner, status, evidence flags, review domain).
 /// </summary>
 public record ResourceContextData(
     Guid? ResourceOwnerId = null,
     object? Status = null,
-    IReadOnlyDictionary<string, object>? CustomFlags = null);
+    IReadOnlyDictionary<string, object>? CustomFlags = null,
+    object? ReviewDomain = null);
 
 /// <summary>
 /// Generic result containing available and blocked actions.
