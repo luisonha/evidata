@@ -1,5 +1,6 @@
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Queries;
+using Evidata.Modules.Reporting.Application.Services;
 using Evidata.Modules.Reporting.Infrastructure.Jobs;
 using Evidata.Modules.Reporting.Infrastructure.Persistence;
 using Evidata.Modules.Reporting.Infrastructure.Persistence.Factories;
@@ -23,6 +24,8 @@ public static class ReportingModule
                 b => b.MigrationsAssembly(typeof(ReportingDbContextFactory).Assembly.FullName)));
 
         services.AddScoped<IReportJobService, ReportJobService>();
+        services.AddScoped<IExportRepository, ExportRepository>();
+        services.AddScoped<IExportService, ExportService>();
         services.AddScoped<GetExportOptionsQueryHandler>();
         services.AddScoped<IExportOptionsQueryService>(sp => sp.GetRequiredService<GetExportOptionsQueryHandler>());
 
