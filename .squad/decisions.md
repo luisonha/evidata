@@ -622,3 +622,33 @@ Implemented two remaining blockers:
 Approve merge. Link PR #116 to P1-017 (required for functional activation) and P1-018 (backlog enhancement).
 
 ---
+
+## 2026-07-10 — PR #117 (P1-017): Auto-set ReviewedAt via Event Integration
+
+**Author**: Gandalf (Tech Lead / Reviewer), implementation by Aragorn
+
+**Decision**: ✅ **APROBADO Y MERGED** tras 3 rondas de revisión.
+
+### Ciclo de revisión
+1. **1ra revisión**: 2 blockers — logging silencioso (`Debug.WriteLine`) y falta de test E2E real del flujo por reflection. Corregidos por Aragorn (mismo PR, sin lockout — 1er rechazo).
+2. **2da revisión**: 2 defectos nuevos — `MarkAsReviewed()` no idempotente (sobrescribía `ReviewedAt` en cada invocación) y `ReviewEventHandler` sin registro de auditoría. Corregidos por Aragorn.
+3. **3ra revisión**: ✅ Aprobación final. 792 tests, 0 regresiones.
+
+### Decisión arquitectónica clave: Service Locator vía Reflection
+Para conectar Workflow (Review→Approved) con ProcessingInventory (`MarkAsReviewed()`) sin crear referencia circular de proyectos, se usó un mecanismo de **service locator vía reflection** en `ReviewService`, combinado con **Outbox pattern** (para consistencia eventual/auditoría) + **invocación síncrona en la misma transacción** (para que el blocker `VersionModifiedAfterReview` de P1-016 sea efectivo de inmediato).
+
+**Gandalf evaluó el trade-off como aceptable** bajo estas condiciones:
+- ✅ Aceptable para: coordinación entre módulos, desacoplamiento orientado a eventos.
+- ❌ No aceptable para: DI general, rutas críticas de alta frecuencia.
+- Requiere: logging estructurado real (`ILogger`, no `Debug.WriteLine`), tests de integración reales (no mockear el paso crítico), documentación explícita.
+
+### Impacto funcional
+**El blocker `VersionModifiedAfterReview` de P1-016 ahora es funcional end-to-end en producción** — antes era código muerto porque nada invocaba `MarkAsReviewed()` automáticamente. Con P1-017: Review aprobada → evento → `ReviewedAt` seteado → actividad modificada después → intento de aprobar bloqueado (HTTP 422).
+
+### Estado RBAC (6 permisos críticos del contrato)
+Todos completos. `ApproveProcessingActivity` (SEC-APP-001) es ahora el único de los 6 con ambos blockers (P1-016) 100% funcionales gracias a P1-017. Único pendiente restante: **P1-018** (configurabilidad de ReviewRequirement por tenant, prioridad MEDIA, no bloqueante).
+
+### Lección de proceso (para futuros PRs con múltiples rondas de revisión)
+Durante este ciclo, el coordinador tuvo que reconstruir manualmente el archivo `.squad/agents/gandalf/history.md` porque un `git stash` intermedio (para limpiar el working directory antes de un nuevo spawn) descartó temporalmente una entrada de historial que un agente posterior sobrescribió sin conocerla. **Regla reforzada**: antes de usar `git stash` sobre archivos de estado de agentes (`history.md`, decisions, etc.), guardar una copia de respaldo (`cp` a `/tmp`) o preferir `git add`+commit provisional en vez de stash, para no depender de recordar hacer `stash pop` antes de que otro agente reescriba el mismo archivo.
+
+**Referencias**: PR #117, decisiones originales en `.squad/decisions/inbox/gandalf-p1017-*.md` (consolidadas y eliminadas de inbox tras este merge).

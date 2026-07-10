@@ -35,7 +35,7 @@
 | P1-014 | ✅ COMPLETADO (3/4 gaps, P1-014-P2 follow-up): Completar GenerateOfficialExport handler (SEC-EXP-001 compliance). | **Gap #1 ✅**: ExportService ahora valida estado "Active" ADEMÁS "Approved". **Gap #3 ✅**: HTTP 422 con código OfficialExportRequiresApproval correcto. **Gap #4 ✅**: ExportGenerationBlocked auditado con result.Blocked, metadata completa, correlationId preservado. **Gap #2 ⚠️ DEFERRED P2**: Auto-detección de ExportWarning (requiere coordinación cross-module GapManagement/Evidence). PR #114 MERGED a develop (2026-07-10), 782 unit tests passing, 0 regressions, Gandalf aprobó condicional a ítem P2 formal. | ✅ Export tests + 782 unit tests passing |
 | P1-015 | ✅ COMPLETADO: Implementar DownloadEvidence endpoint + autorización (SEC-EVDOWN-001 — 4/4 gaps cerrados sin deferral). | Endpoint HTTP `[HttpGet("{id:guid}/download")]` en EvidenceController ✓, validación RBAC antes de SAS (fail-closed: 403 SensitiveEvidenceRestricted si Viewer intenta acceso sensible) ✓, auditoría con AuditEventType.EvidenceDownloaded (éxito) + EvidenceAccessDenied (denegación) ✓, validación `reason` obligatorio para Sensitive ✓. PR #115 MERGED a develop (2026-07-10). 783 unit tests passing, 0 regressions. Hallazgo menor (Gandalf): respuesta 403 usa Forbid() sin ApiErrorEnvelope (inconsistencia formato, no seguridad) — nota de calidad, no requiere backlog nuevo. | ✅ Security + Evidence tests + 783 unit tests passing |
 | P1-016 | ✅ COMPLETADO: Implementar 2 blockers restantes de ApproveProcessingActivity (P1-013 follow-up). | ProcessingActivity.ReviewedAt (nullable timestamp) + MarkAsReviewed() método ✓, ApproveProcessingActivityCommandHandler validación RequiredReviewPending (bloquea si ANY review != Approved) ✓, VersionModifiedAfterReview (bloquea si LastModifiedAt > ReviewedAt) ✓, 7 handler tests pass, 786 total tests passing, 0 regressions. PR #116 aprobado condicional por Gandalf, merged a develop (2026-07-10). **CRÍTICA LIMITACIÓN FUNCIONAL**: VersionModifiedAfterReview blocker es código muerto en producción porque ReviewedAt nunca se setea automáticamente (MarkAsReviewed() existe pero nadie la invoca). P1-017 requerido para activar funcionalidad real. | ✅ Security + Domain tests; P1-017/P1-018 follow-ups requeridos |
-| P1-017 | **[NEW — ALTA PRIORIDAD]** Auto-set ReviewedAt en ProcessingActivity cuando Review es aprobada (integración Workflow→ProcessingInventory). | **Acción**: Cuando Workflow.Review.Status transiciona a Approved, emitir DomainEvent "ReviewApproved". ProcessingInventory escucha evento, invoca ProcessingActivity.MarkAsReviewed() para setear ReviewedAt = UtcNow. **Por qué**: VersionModifiedAfterReview blocker de P1-016 es código muerto sin esto; ReviewedAt never gets set automáticamente en producción. Con P1-017, blocker se vuelve funcional y auditable. **Alcance**: Workflow domain events, ProcessingInventory listener, P1-016 integration test. **Estimado**: 2 story points. **Criticidad**: ALTA — bloquea efectividad real de P1-016. | Event-driven integration; links to PR #116 P1-016 |
+| P1-017 | ✅ COMPLETADO: Auto-set ReviewedAt en ProcessingActivity cuando Review es aprobada (integración Workflow→ProcessingInventory). | **Implementación**: `ReviewApprovedEventPayload` + `IReviewNotificationService`/`OutboxReviewNotificationService` en Workflow; `ReviewService.ApproveAsync()` emite evento a Outbox y además invoca síncronamente (vía service locator/reflection, evitando referencia circular de proyectos) al handler `IReviewEventHandler`/`ReviewEventHandler` en ProcessingInventory, que llama `ProcessingActivity.MarkAsReviewed()`. `MarkAsReviewed()` ahora es idempotente (`if (ReviewedAt.HasValue) return;`). `ReviewEventHandler` registra auditoría vía `IAuditService` (mismo patrón que `ApproveProcessingActivityCommandHandler`). Logging estructurado con `ILogger` (no `Debug.WriteLine`) para fallos de resolución/invocación del handler. Test E2E real (`ReviewService_ApproveAsync_WithReflection_E2E_SetsReviewedAtAndBlocksVersionModified`) confirma: Review aprobada → ReviewedAt seteado → actividad modificada → blocker VersionModifiedAfterReview se dispara (HTTP 422). 792 tests totales pasando, 0 regressions. PR #117, 3 rondas de revisión de Gandalf (2 rondas de fixes: logging/test E2E, luego idempotencia/auditoría), aprobado y merged a develop (2026-07-10). **VersionModifiedAfterReview blocker de P1-016 ahora es funcional end-to-end en producción.** | ✅ Unit + integration tests; P1-018 pendiente (configurabilidad) |
 | P1-018 | **[NEW — MEDIA PRIORIDAD]** Modelo de ReviewRequirement configurable por tenant. | **Acción**: Crear tabla ReviewRequirement (ReviewType enum, TenantId, IsRequiredForEntityType). En RequiredReviewPending blocker (P1-016), filtrar reviews por active requirements solamente. **Por qué**: MVP "cualquier review bloquea aprobación" es conservador pero rígido; necesita configurabilidad por tenant para tipos de review opcionales. **Alcance**: Domain model + policy service + tenant configuration endpoints. **Estimado**: 5 story points. **Criticidad**: MEDIA — MVP funciona fine; enhancement para flexibilidad futura. | Policy engine; tenant admin UI |
 
 ## RBAC Compliance Closure — Contrato Ampliado (04-rbac-audit-evidence-gaps-contract.md)
@@ -44,7 +44,7 @@
 
 | Permiso | Contrato | Implementación | Estado | Seguimiento |
 |---------|----------|-----------------|--------|-------------|
-| ApproveProcessingActivity | SEC-APP-001 | P1-013 / P1-016 | ✅ Completo | P1-017 (funcional), P1-018 (configurabilidad) |
+| ApproveProcessingActivity | SEC-APP-001 | P1-013 / P1-016 / P1-017 | ✅ Completo (blocker funcional end-to-end) | P1-018 (configurabilidad) |
 | ActivateProcessingActivity | SEC-ACT-001 | P1-012 | ✅ Completo | Ninguno |
 | ValidateEvidence | SEC-EV-001 | Prior | ✅ Completo | Ninguno |
 | AcceptGapWithRisk | SEC-GAP-001 | Prior | ✅ Completo | Ninguno |
@@ -52,16 +52,16 @@
 | DownloadEvidence | SEC-EVDOWN-001 | P1-015 | ✅ 4/4 gaps (Completo) | Ninguno |
 
 **Resumen:**
-- ✅ **3 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk)
-- ✅ **3 permisos completamente implementados** con follow-ups formales documentados (ApproveProcessingActivity P1-016 completo + P1-017/018, GenerateOfficialExport P1-014 3/4 gaps + P1-014-P2, DownloadEvidence completo)
-- 📊 **786 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116)
-- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-016 sistemáticamente cierra cada permiso
+- ✅ **4 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk, DownloadEvidence)
+- ✅ **1 permiso completamente implementado y funcional end-to-end** con follow-up de mejora documentado (ApproveProcessingActivity P1-016+P1-017 completo, P1-018 pendiente para configurabilidad)
+- ✅ **1 permiso 3/4 gaps** con follow-up no bloqueante (GenerateOfficialExport, P1-014-P2)
+- 📊 **792 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117)
+- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-017 sistemáticamente cierra cada permiso, incluyendo la funcionalidad real de los blockers de aprobación
 
 **Próximas Tareas:**
-1. P1-017: Auto-set ReviewedAt (integración Workflow→ProcessingInventory, bloqueador de funcionalidad P1-016)
-2. P1-018: ConfigureReviewRequirement (configurabilidad por tenant, mejora MVP P1-016)
-3. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
-4. Transición a develop→main y follow-up administrativo
+1. P1-018: ConfigureReviewRequirement (configurabilidad por tenant, mejora MVP P1-016)
+2. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
+3. Transición a develop→main y follow-up administrativo
 
 
 
