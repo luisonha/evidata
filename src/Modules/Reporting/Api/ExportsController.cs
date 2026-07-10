@@ -1,6 +1,7 @@
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Domain;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Evidata.Modules.Identity.Application.Abstractions;
 
@@ -23,8 +24,18 @@ public class ExportsController(
     /// POST /api/v1/processing-activities/{processingActivityId}/exports
     /// Creates a new export request for a processing activity.
     /// Implements SEC-EXP-001: Requires valid authorization and approved activity.
+    /// 
+    /// Responses:
+    /// - 201 Created: Export request created successfully
+    /// - 400 Bad Request: Invalid ExportType
+    /// - 403 Forbidden: User not authorized (SEC-EXP-001)
+    /// - 422 Unprocessable Entity: Activity not in Approved/Active state (OfficialExportRequiresApproval)
     /// </summary>
     [HttpPost("processing-activities/{processingActivityId:guid}/exports")]
+    [ProducesResponseType(typeof(ExportDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ExportErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ExportErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ExportErrorResponse), StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<ExportDto>> CreateExport(
         Guid processingActivityId,
         [FromBody] CreateExportRequest req,
@@ -59,9 +70,16 @@ public class ExportsController(
             // SEC-EXP-001: User not authorized
             return Forbid();
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("OfficialExportRequiresApproval"))
+        {
+            // Business logic blocker: Activity not in Approved/Active state (SEC-EXP-001)
+            return UnprocessableEntity(new ExportErrorResponse(
+                "OfficialExportRequiresApproval",
+                ex.Message));
+        }
         catch (InvalidOperationException ex)
         {
-            // Activity not found or not in approved state (SEC-EXP-001)
+            // Activity not found or other operational error
             return BadRequest(new ExportErrorResponse("InvalidOperation", ex.Message));
         }
     }

@@ -121,6 +121,118 @@ public class ExportServiceTests
         await _repositoryMock.DidNotReceive().AddAsync(Arg.Any<Export>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// P1-014-GAP-1: Accept Active status in addition to Approved.
+    /// PR #112 added Active state to ProcessingActivityStatus. Export should accept both.
+    /// </summary>
+    [Fact]
+    public async Task P1_014_GAP_1_ActivityInActiveState_CreatesExport()
+    {
+        // Arrange: User with permission + Activity in Active state (not Draft/UnderReview)
+        Setup();
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("Active");
+        _repositoryMock.GetNextVersionAsync(Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(1);
+
+        // Act
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Assert: Export was created successfully
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal(ExportStatus.Requested, result.Status);
+        await _repositoryMock.Received(1).AddAsync(Arg.Any<Export>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// P1-014-GAP-3: Invalid state should throw with OfficialExportRequiresApproval message.
+    /// Controller will map this to HTTP 422.
+    /// </summary>
+    [Fact]
+    public async Task P1_014_GAP_3_InvalidState_ThrowsWithCorrectErrorCode()
+    {
+        // Arrange: Activity in UnderReview state (neither Approved nor Active)
+        Setup();
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("UnderReview");
+
+        // Act & Assert: Throws with OfficialExportRequiresApproval marker
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RequestExportAsync(
+                _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+                _contentType, _user, _correlationId, CancellationToken.None));
+        
+        // Verify the error message contains the marker that controller uses to extract the code
+        Assert.Contains("OfficialExportRequiresApproval", ex.Message);
+        Assert.Contains("UnderReview", ex.Message);
+    }
+
+    /// <summary>
+    /// P1-014-GAP-4: Audit logging for ExportGenerationBlocked when state is invalid.
+    /// </summary>
+    [Fact]
+    public async Task P1_014_GAP_4_InvalidState_LogsExportGenerationBlocked()
+    {
+        // Arrange: Activity in Archived state (invalid for export)
+        Setup();
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("Archived");
+
+        // Act & Assert: Throws exception
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RequestExportAsync(
+                _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+                _contentType, _user, _correlationId, CancellationToken.None));
+
+        // Verify audit was logged with Blocked result
+        await _auditMock.Received(1).LogAsync(
+            _tenant,
+            _user,
+            "ExportGenerationBlocked",  // Event type for blocked exports
+            "Export",
+            _activity,
+            AuditEventResult.Blocked,   // Result must be Blocked
+            _correlationId,
+            Arg.Any<Dictionary<string, object?>>(),
+            null,
+            AuditSeverity.Info,
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// P1-014-GAP-2: Note on auto-detection of export warnings.
+    /// This gap is documented as requiring architecture changes (P2 work).
+    /// For now, the service accepts warnings added externally via AddWarningAsync.
+    /// </summary>
+    [Fact]
+    public async Task P1_014_GAP_2_ExternalWarningsCanBeAdded()
+    {
+        // Arrange: Create export with Active status
+        Setup();
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("Active");
+        _repositoryMock.GetNextVersionAsync(Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(1);
+
+        var export = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Act: Add warning externally (simulating the auto-detection that should happen via composition)
+        _repositoryMock.GetByIdAsync(export.Id, Arg.Any<CancellationToken>())
+            .Returns(export);
+        
+        await _service.AddWarningAsync(
+            export.Id,
+            "There are 2 open compliance gaps. Highest severity: critical.",
+            CancellationToken.None);
+
+        // Assert: Warning was added to export
+        Assert.Contains("open compliance gaps", export.Warnings.First());
+    }
+
     // ── RequestExportAsync ────────────────────────────────────────────────────
 
     [Fact]
