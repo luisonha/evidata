@@ -652,3 +652,27 @@ Todos completos. `ApproveProcessingActivity` (SEC-APP-001) es ahora el único de
 Durante este ciclo, el coordinador tuvo que reconstruir manualmente el archivo `.squad/agents/gandalf/history.md` porque un `git stash` intermedio (para limpiar el working directory antes de un nuevo spawn) descartó temporalmente una entrada de historial que un agente posterior sobrescribió sin conocerla. **Regla reforzada**: antes de usar `git stash` sobre archivos de estado de agentes (`history.md`, decisions, etc.), guardar una copia de respaldo (`cp` a `/tmp`) o preferir `git add`+commit provisional en vez de stash, para no depender de recordar hacer `stash pop` antes de que otro agente reescriba el mismo archivo.
 
 **Referencias**: PR #117, decisiones originales en `.squad/decisions/inbox/gandalf-p1017-*.md` (consolidadas y eliminadas de inbox tras este merge).
+
+## 2026-07-10 — PR #118 (P1-019): Refactor P1-017 — eliminar reflection, usar proyecto Contracts neutral
+
+**Autor**: Aragorn (implementación), Gandalf (diseño original + revisión), origen: cuestionamiento directo del usuario sobre la calidad del diseño de P1-017.
+
+**Decisión**: ✅ **APROBADO Y MERGED sin condiciones.**
+
+### Contexto
+El usuario cuestionó el "service locator vía reflection" introducido en P1-017 (PR #117) para conectar Workflow→ProcessingInventory sin dependencia circular. Gandalf, en análisis honesto posterior, reconoció que su aprobación original fue demasiado permisiva y recomendó refactorizar a un **proyecto de Contratos neutral** (Opción B de 3 evaluadas).
+
+### Cambio arquitectónico
+- Nuevo proyecto `Evidata.Modules.Contracts` (neutral, sin lógica) alberga `IReviewEventHandler` y `ReviewApprovedEventPayload`.
+- `Workflow` y `ProcessingInventory` referencian únicamente `Contracts` — cero referencia circular entre ellos.
+- `ReviewService` ahora recibe `IReviewEventHandler` por **inyección de dependencias estándar** en el constructor — eliminados por completo `Type.GetType()`, `IServiceProvider.GetService()`, `MethodInfo.Invoke()`, `Activator.CreateInstance()`.
+- Lógica de negocio intacta: idempotencia de `MarkAsReviewed()`, auditoría vía `IAuditService`, logging estructurado, patrón Outbox para entrega eventual — todo preservado, solo cambió el mecanismo de invocación.
+- Test E2E renombrado (ya no menciona "reflection"), sigue ejercitando el flujo real sin mocks que oculten comportamiento.
+
+### Resultado
+792 tests, 0 regresiones, 0 referencias residuales a reflection en el flujo. Refactor puramente mecánico validado por Gandalf con re-verificación de 7 puntos críticos (ausencia de reflection, neutralidad de Contracts, DI real con fail-fast, lógica de negocio intacta, test E2E genuino, CI verde, sin regresiones de comportamiento).
+
+### Lección de proceso
+Cuando el usuario cuestiona una decisión ya aprobada, el equipo debe re-evaluar con la misma honestidad que aplicaría a cualquier otro PR — Gandalf documentó explícitamente que su aprobación original fue "demasiado permisiva", lo cual reforzó la confianza en el proceso de revisión en vez de debilitarla.
+
+**Referencias**: PR #118, links a P1-017/PR #117. Decisiones originales en `.squad/decisions/inbox/{aragorn-p1-019-*,gandalf-p1-019-*,gandalf-p1017-reflection-*}.md` (consolidadas y eliminadas del inbox).

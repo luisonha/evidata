@@ -501,3 +501,34 @@ Three findings in PR #117 review, 2 marked as critical blockers:
 - ✅ No regressions: All tests passing
 
 📌 Team update (2026-07-10T15:40:00-04:00): P1-017 defect fixes complete. MarkAsReviewed() now idempotent (guards against double invocation). ReviewEventHandler now audits state transition (IAuditService injection, consistent with project pattern). 792 unit tests passing (0 regressions). Commit e175d06 pushed to origin/dev/2026/07/10/p1-017-review-approved-event. Requesting re-review from Gandalf.
+
+## 2026-07-10 — P1-019: Remove Reflection in ReviewService
+
+**Task**: Refactor ReviewService to eliminate reflection-based service locator (P1-017 follow-up)
+
+**Completed**:
+- ✅ Created `Evidata.Modules.Contracts` project (neutral contracts module)
+- ✅ Moved `IReviewEventHandler` and `ReviewApprovedEventPayload` to Contracts
+- ✅ Updated Workflow.csproj and ProcessingInventory.csproj to reference Contracts
+- ✅ Refactored ReviewService to inject `IReviewEventHandler` directly (eliminated reflection)
+- ✅ Removed all reflection code: Type.GetType, MethodInfo.Invoke, Activator.CreateInstance, IServiceProvider.GetService
+- ✅ Updated OutboxReviewNotificationService imports
+- ✅ Updated ReviewEventHandler to implement Contracts interface explicitly
+- ✅ Refactored E2E test to use direct DI instead of reflection
+- ✅ Updated solution file (.sln) with Contracts project and build configurations
+- ✅ All 792 unit tests pass
+- ✅ Zero compilation errors (30 pre-existing warnings unrelated to changes)
+- ✅ Verified no reflection references remain in ReviewService
+
+**Design Decision**: Implemented Gandalf's recommended "Opción B" from P1-017 analysis
+- Neutral Contracts project eliminates circular dependencies
+- Direct DI injection replaces service locator anti-pattern
+- Full compile-time type safety
+- Clean, maintainable, production-grade architecture
+
+**Branch**: dev/2026/07/10/p1-019-remove-reflection-review-events  
+**PR**: #118 (Created via gh pr create, pending review)  
+**Decision Doc**: .squad/decisions/inbox/aragorn-p1-019-contracts-neutral-di-injection.md
+
+**Impact**: ReviewService now uses standard ASP.NET Core DI pattern instead of reflection. Handler invocation is type-safe and testable. No change to business logic (idempotency, auditing, logging preserved).
+
