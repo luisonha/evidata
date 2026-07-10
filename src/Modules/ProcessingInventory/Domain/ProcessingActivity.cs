@@ -413,9 +413,14 @@ public class ProcessingActivity
     /// <summary>
     /// Marks this activity as reviewed (for checking if modified after review).
     /// Called when a required review is completed.
+    /// 
+    /// Idempotent: if already marked, this method returns without updating the timestamp.
+    /// This ensures that multiple invocations (sync + eventual consistency) don't overwrite ReviewedAt.
     /// </summary>
     public void MarkAsReviewed()
     {
+        if (ReviewedAt.HasValue)
+            return; // Already marked, guard against double invocation
         ReviewedAt = DateTimeOffset.UtcNow;
     }
 

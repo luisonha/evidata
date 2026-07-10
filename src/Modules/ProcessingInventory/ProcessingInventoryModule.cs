@@ -1,6 +1,7 @@
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
+using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
@@ -22,6 +23,9 @@ public static class ProcessingInventoryModule
         services.AddDbContext<ProcessingInventoryDbContext>(options =>
             options.UseNpgsql(connectionString,
                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
+
+        // P1-017: Review event handler — called when reviews are approved
+        services.AddScoped<IReviewEventHandler, ReviewEventHandler>();
 
         services.AddScoped<ListProcessingActivitiesQueryHandler>();
         services.AddScoped<GetProcessingActivityQueryHandler>();
