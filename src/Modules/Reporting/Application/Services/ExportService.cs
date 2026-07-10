@@ -47,7 +47,7 @@ public sealed class ExportService(
                 $"User {requestedByUserId} is not authorized to generate exports. Reason: {reason}");
         }
 
-        // ── SEC-EXP-001: Verify ProcessingActivity is in Approved state ────
+        // ── SEC-EXP-001: Verify ProcessingActivity is in Approved or Active state ────
         var activityStatus = await processingActivityQueryService.GetStatusAsync(
             tenantId, processingActivityId, ct);
 
@@ -57,12 +57,37 @@ public sealed class ExportService(
                 $"ProcessingActivity {processingActivityId} not found or not accessible in tenant {tenantId}");
         }
 
-        // Fail-closed: Only Approved status allows export generation
-        if (activityStatus != "Approved")
+        var metadata = new Dictionary<string, object?>
         {
+            { "processingActivityId", processingActivityId },
+            { "exportType", exportType.ToString() },
+            { "requestedByUserId", requestedByUserId },
+            { "currentStatus", activityStatus }
+        };
+
+        // Fail-closed: Only Approved or Active status allows export generation (PR #112 added Active state)
+        if (activityStatus != "Approved" && activityStatus != "Active")
+        {
+            // Audit: Export generation blocked by invalid state
+            await auditService.LogAsync(
+                tenantId: tenantId,
+                userId: requestedByUserId,
+                eventType: "ExportGenerationBlocked",
+                resource: "Export",
+                resourceId: processingActivityId,
+                result: AuditEventResult.Blocked,
+                correlationId: correlationId,
+                metadata: metadata,
+                ct: ct);
+
+            logger.LogWarning(
+                "Export generation blocked for activity {ActivityId}: invalid state '{Status}' (must be Approved or Active)",
+                processingActivityId, activityStatus);
+
+            // Throw with specific blocker code that controller can extract
             throw new InvalidOperationException(
-                $"Cannot generate export for ProcessingActivity in state '{activityStatus}'. " +
-                "Only 'Approved' state allows export generation (SEC-EXP-001).");
+                $"OfficialExportRequiresApproval: Cannot generate export for ProcessingActivity in state '{activityStatus}'. " +
+                "Only 'Approved' or 'Active' state allows export generation (SEC-EXP-001).");
         }
 
         // Calculate next version for this activity + type combination
@@ -78,6 +103,13 @@ public sealed class ExportService(
             version: version,
             requestedByUserId: requestedByUserId,
             correlationId: correlationId.Trim());
+
+        // TODO: P1-014-GAP-2: Auto-detect warnings from gaps and evidence
+        // This requires cross-module coordination with GapManagement and Evidence modules.
+        // Implementation blocked by architecture decision to not introduce direct dependencies.
+        // Recommended for P2: Create an IProcessingActivityRiskAssessmentService in ProcessingInventory
+        // that aggregates risk data from all modules for export warnings.
+        // For now, warnings can be added by external orchestration or left empty.
 
         // Persist
         await exportRepository.AddAsync(export, ct);
@@ -97,13 +129,14 @@ public sealed class ExportService(
                 { "exportType", exportType.ToString() },
                 { "processingActivityId", processingActivityId },
                 { "version", version },
-                { "contentType", contentType }
+                { "contentType", contentType },
+                { "warningsCount", export.Warnings.Count }
             },
             ct: ct);
 
         logger.LogInformation(
-            "Export requested: {ExportId} for activity {ActivityId}, type {ExportType}, version {Version}, correlation {CorrelationId}",
-            export.Id, processingActivityId, exportType, version, correlationId);
+            "Export requested: {ExportId} for activity {ActivityId}, type {ExportType}, version {Version}, correlation {CorrelationId}, warnings: {WarningsCount}",
+            export.Id, processingActivityId, exportType, version, correlationId, export.Warnings.Count);
 
         return export;
     }
