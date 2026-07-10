@@ -151,7 +151,7 @@ public sealed class ApproveProcessingActivityCommandHandler(
                 else if (activity.Flags.MissingLegalBasisEvidence)
                 {
                     blockerCode = "BlockingEvidenceMissing";
-                    blockerDetail = "Legal basis evidence is missing for this treatment";
+                    blockerDetail = "Legal basis evidence is missing for this processing activity";
                 }
 
                 metadata["blockerCode"] = blockerCode;
