@@ -122,18 +122,18 @@ public sealed class GetProcessingActivityTimelineQueryHandler(IAuditLogRepositor
 internal static class ProcessingActivityControlEnums
 {
     // NOTE: These enum values are sourced from
-    // src/Modules/ProcessingInventory/Application/ViewModels/ProcessingActivityControlEnums.cs
+    // src/Modules/Audit/Domain/AuditEventType.cs (canonical source)
     // We shadow them locally as strings for the query handler logic and for Enum.TryParse.
     // The DTO returns string values; any normalization to the canonical enum is the frontend's concern.
 
     public enum AuditEventType
     {
         CreateProcessingActivity,
-        UpdateProcessingActivityNode,
-        SubmitProcessingActivityForReview,
-        ApproveProcessingActivity,
-        ActivateProcessingActivity,
-        ArchiveProcessingActivity,
+        UpdateNode,
+        SubmitForReview,
+        Approve,
+        Activate,
+        Archive,
         ValidateEvidence,
         RejectEvidence,
         AcceptGapWithRisk,
