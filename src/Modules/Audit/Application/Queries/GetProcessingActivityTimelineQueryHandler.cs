@@ -7,7 +7,7 @@ namespace Evidata.Modules.Audit.Application.Queries;
 
 /// <summary>
 /// Queries the audit log to build timeline events visible in the /control view.
-/// Handles model gaps as documented in TimelineEventViewModel.
+/// Ahora usa el shape formal del contrato P1-009: eventType, result, correlationId, metadata.
 /// </summary>
 public sealed class GetProcessingActivityTimelineQueryHandler(IAuditLogRepository repository)
 {
@@ -45,7 +45,7 @@ public sealed class GetProcessingActivityTimelineQueryHandler(IAuditLogRepositor
             .Take(take)
             .ToList();
 
-        // Map to ViewModels, filtering out unmappable events (Action doesn't match any AuditEventType)
+        // Map to ViewModels, filtering out unmappable events (EventType doesn't match any AuditEventType)
         var events = new List<TimelineEventViewModel>();
         foreach (var log in paged)
         {
@@ -58,52 +58,44 @@ public sealed class GetProcessingActivityTimelineQueryHandler(IAuditLogRepositor
     }
 
     /// <summary>
-    /// Map AuditLog to TimelineEventViewModel, handling model gaps.
-    /// Returns null if Action cannot be parsed to AuditEventType (event excluded from timeline).
+    /// Map AuditLog to TimelineEventViewModel.
+    /// Returns null if EventType cannot be parsed to enum (event excluded from timeline).
     /// </summary>
     private static TimelineEventViewModel? MapToViewModel(AuditLog log)
     {
-        // GAP 1: Action is free string, not a closed enum. Try to parse to AuditEventType.
-        // If no match, exclude event from timeline (return null).
-        // TODO: If many events are filtered out, consider adding a catch-all enum value
-        // (e.g., AuditEventType.Unknown) to the ProcessingActivityControlEnums.cs enum.
+        // Parse EventType to canonical enum. If no match, exclude event from timeline.
         if (!Enum.TryParse<ProcessingActivityControlEnums.AuditEventType>(
-            log.Action, ignoreCase: true, out var eventType))
+            log.EventType, ignoreCase: true, out var eventType))
         {
-            // Action value doesn't match any enum member—exclude this event
+            // EventType value doesn't match any enum member—exclude this event
             return null;
         }
 
         var eventTypeString = eventType.ToString();
         var eventTypeLabelKey = $"audit.eventType.{eventTypeString}";
 
-        // GAP 2: AuditLog has NO Result field. AuditSeverity (Info/Warning/Critical)
-        // is NOT equivalent to AuditEventResult (Success/Failure/Blocked).
-        // Default all events to Success until auditing captures failure semantics.
-        // TODO: When AuditLog adds a Result/Status field, map that instead of hardcoding Success.
-        const string resultString = nameof(ProcessingActivityControlEnums.AuditEventResult.Success);
-        const string resultLabelKey = "audit.result.Success";
+        // Map Result field (ahora formal en AuditLog)
+        var resultString = log.Result.ToString();
+        var resultLabelKey = $"audit.result.{resultString}";
 
-        // GAP 3: UserId is Guid? nullable. Contract expects non-nullable actorUserId.
-        // System actions (null userId) map to Guid.Empty as placeholder.
-        // TODO: Decide if "system actor" (Guid.Empty) should be nullable in contract,
-        // or if a canonical "SYSTEM" Guid constant should be defined at domain level.
+        // UserId es Guid? nullable. Contract espera no-nullable actorUserId.
+        // Acciones de sistema (null userId) mapean a Guid.Empty como placeholder.
         var actorUserId = log.UserId ?? Guid.Empty;
 
-        // GAP 4: NO correlationId in AuditLog. Leave as null (optional in contract).
-        string? correlationId = null;
+        // CorrelationId está disponible en AuditLog (ahora formal en contrato)
+        string? correlationId = log.CorrelationId;
 
-        // GAP 5: metadata is optional. Try to deserialize Details as JSON; fall back to null.
+        // Metadata es diccionario tipado (JSON serializado). Deserializar.
         object? metadata = null;
-        if (!string.IsNullOrEmpty(log.Details))
+        if (!string.IsNullOrEmpty(log.Metadata))
         {
             try
             {
-                metadata = JsonSerializer.Deserialize<object>(log.Details);
+                metadata = JsonSerializer.Deserialize<object>(log.Metadata);
             }
             catch (JsonException)
             {
-                // Details is not valid JSON—leave metadata null
+                // Metadata is not valid JSON—leave metadata null
             }
         }
 
