@@ -165,6 +165,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseLocalDevGuard();
+app.UseCorrelationId();
 app.UseAuthentication();
 app.UseAuthorization();
 
