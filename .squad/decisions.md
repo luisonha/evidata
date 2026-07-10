@@ -14,12 +14,6 @@
 **Why:** Petición explícita del usuario — evitar mezclar simulación de auth con simulación de roles; los roles deben ser reales y consistentes entre entornos, sólo el proveedor de identidad cambia.
 **Owner:** Legolas (Security & Authorization Engineer).
 
-### 2026-07-10T00-30-38Z: Regla de branching para PRs en evidata
-**By:** Legolas (Security & Authorization Engineer)
-**What:** SIEMPRE usar `gh pr create --base develop --head <rama-de-trabajo>` explícitamente para todas las PRs. Nunca omitir `--base develop` ni asumir que el default del repo es `develop`. Esto previene merges accidentales fuera del flujo dev-first (PR #98 fue mergeada accidentalmente en `main` en lugar de `develop`).
-**Why:** El default del repositorio está configurado como `main` históricamente. Sin `--base develop` explícito, `gh pr create` usa `main` como destino, causando divergencia real entre ramas. Explícito es mejor que implícito. Previene merges accidentales en ramas de producción y reduce fricción en reconciliación posterior.
-**Action:** Documentado en charter del repositorio o guía de contrib. PR #102 reconciliaba esta divergencia cherry-pickando cambios desde `main` a `develop`.
-
 ## Governance
 
 - All meaningful changes require team consensus

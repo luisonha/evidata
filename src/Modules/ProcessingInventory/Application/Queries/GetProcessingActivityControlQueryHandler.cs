@@ -55,7 +55,7 @@ public sealed class GetProcessingActivityControlQueryHandler
             activity.CreatedBy, // Use CreatedBy as owner for now
             null, // Category not in domain yet
             activity.Status,
-            $"status.{char.ToLowerInvariant(activity.Status.ToString()[0])}{activity.Status.ToString()[1..]}",
+            MapStatusToLocalizationKey(activity.Status),
             activity.Version,
             activity.SupersedesId,
             activity.ApprovedBy,
@@ -69,15 +69,8 @@ public sealed class GetProcessingActivityControlQueryHandler
         var version = new ProcessingActivityVersionViewModel(
             versionId,
             activity.Version,
-            activity.Status switch
-            {
-                Domain.ProcessingActivityStatus.Draft => ProcessingActivityVersionStatus.Draft,
-                Domain.ProcessingActivityStatus.UnderReview => ProcessingActivityVersionStatus.InReview,
-                Domain.ProcessingActivityStatus.Approved => ProcessingActivityVersionStatus.Approved,
-                Domain.ProcessingActivityStatus.Archived => ProcessingActivityVersionStatus.Archived,
-                _ => ProcessingActivityVersionStatus.Draft
-            },
-            $"version.status.{char.ToLowerInvariant(activity.Status.ToString()[0])}{activity.Status.ToString()[1..]}",
+            MapStatusToVersionStatus(activity.Status),
+            MapStatusToVersionLocalizationKey(activity.Status),
             activity.SupersedesId,
             activity.ApprovedAt,
             activity.ApprovedBy,
@@ -97,7 +90,7 @@ public sealed class GetProcessingActivityControlQueryHandler
             null, null, [], [], null);
 
         var timeline = new List<TimelineEventViewModel>();
-        var availableActions = new List<AvailableActionViewModel>();
+        var priorityActions = new List<AvailableActionViewModel>();
         var blockedActions = new List<BlockedActionViewModel>();
 
         var operationalMap = new OperationalMapViewModel(new List<ProcessingActivityNodeViewModel>());
@@ -105,16 +98,16 @@ public sealed class GetProcessingActivityControlQueryHandler
 
         var userRoles = new List<RbacRoleItemViewModel>();
         var resourcePermissionsViewModel = new ResourcePermissionsViewModel(
-            userRoles, availableActions, ReadOnly: false, blockedActions);
+            userRoles, priorityActions, ReadOnly: false, blockedActions);
 
         var controlTower = new ControlTowerViewModel(
-            0m, null, null, availableActions, blockedActions);
+            0m, null, null, priorityActions, blockedActions);
 
         var controlViewModel = new ProcessingActivityControlViewModel(
             processingActivityDetail,
             version,
             controlTower,
-            availableActions,
+            priorityActions,
             operationalMap,
             evidenceSummaryViewModel,
             gapSummaryViewModel,
@@ -126,5 +119,38 @@ public sealed class GetProcessingActivityControlQueryHandler
             null!);
 
         return controlViewModel;
+    }
+
+    /// <summary>
+    /// Maps ProcessingActivityStatus to ProcessingActivityVersionStatus enum for the ViewModel.
+    /// </summary>
+    private static ProcessingActivityVersionStatus MapStatusToVersionStatus(Domain.ProcessingActivityStatus status) =>
+        status switch
+        {
+            Domain.ProcessingActivityStatus.Draft => ProcessingActivityVersionStatus.Draft,
+            Domain.ProcessingActivityStatus.UnderReview => ProcessingActivityVersionStatus.InReview,
+            Domain.ProcessingActivityStatus.Approved => ProcessingActivityVersionStatus.Approved,
+            Domain.ProcessingActivityStatus.Archived => ProcessingActivityVersionStatus.Archived,
+            _ => ProcessingActivityVersionStatus.Draft
+        };
+
+    /// <summary>
+    /// Maps ProcessingActivityStatus to localization key for detail view status field.
+    /// Format: "status.{lowercase-status}" (e.g., "status.draft", "status.underReview").
+    /// </summary>
+    private static string MapStatusToLocalizationKey(Domain.ProcessingActivityStatus status)
+    {
+        var statusString = status.ToString();
+        return $"status.{char.ToLowerInvariant(statusString[0])}{statusString[1..]}";
+    }
+
+    /// <summary>
+    /// Maps ProcessingActivityStatus to localization key for version status field.
+    /// Format: "version.status.{lowercase-status}" (e.g., "version.status.draft").
+    /// </summary>
+    private static string MapStatusToVersionLocalizationKey(Domain.ProcessingActivityStatus status)
+    {
+        var statusString = status.ToString();
+        return $"version.status.{char.ToLowerInvariant(statusString[0])}{statusString[1..]}";
     }
 }
