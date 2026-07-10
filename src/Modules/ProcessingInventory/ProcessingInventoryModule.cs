@@ -5,6 +5,7 @@ using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
+using Evidata.Modules.Contracts.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ public static class ProcessingInventoryModule
                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
 
         // P1-017: Review event handler — called when reviews are approved
+        // P1-019: Register against Contracts interface for clean DI composition
         services.AddScoped<IReviewEventHandler, ReviewEventHandler>();
 
         services.AddScoped<ListProcessingActivitiesQueryHandler>();

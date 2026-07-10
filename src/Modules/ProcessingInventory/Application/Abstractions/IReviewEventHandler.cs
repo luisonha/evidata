@@ -1,18 +1,11 @@
-using Evidata.Modules.Workflow.Application.Notifications;
-
 namespace Evidata.Modules.ProcessingInventory.Application.Abstractions;
 
 /// <summary>
-/// Handler para eventos de Review que afectan ProcessingActivity.
-/// Se inyecta en Workflow para ser invocado cuando reviews transicionan.
+/// Deprecated: Use <see cref="Evidata.Modules.Contracts.Notifications.IReviewEventHandler"/> instead.
+/// 
+/// P1-019: IReviewEventHandler is now defined in Evidata.Modules.Contracts
+/// to eliminate circular dependencies between Workflow and ProcessingInventory.
+/// This namespace alias is kept for backward compatibility.
 /// </summary>
-public interface IReviewEventHandler
-{
-    /// <summary>
-    /// Maneja el evento ReviewApproved emitido por Workflow.
-    /// Si el review target es un ProcessingActivity, marca la actividad como revisada.
-    /// </summary>
-    Task HandleReviewApprovedAsync(
-        ReviewApprovedEventPayload payload,
-        CancellationToken ct = default);
-}
+using IReviewEventHandler = Evidata.Modules.Contracts.Notifications.IReviewEventHandler;
+

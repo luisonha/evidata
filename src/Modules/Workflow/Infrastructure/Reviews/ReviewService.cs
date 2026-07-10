@@ -1,9 +1,9 @@
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Notifications;
+using Evidata.Modules.Contracts.Notifications;
 using Evidata.Modules.Workflow.Domain;
 using Evidata.Modules.Workflow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Evidata.Modules.Workflow.Infrastructure.Reviews;
@@ -12,26 +12,28 @@ namespace Evidata.Modules.Workflow.Infrastructure.Reviews;
 /// Implementación de <see cref="IReviewService"/> con EF Core + PostgreSQL.
 /// Emits domain events via IReviewNotificationService cuando las reviews transicionan.
 /// 
-/// P1-017: When review is approved, also tries to invoke registered event handlers
+/// P1-017: When review is approved, invokes registered event handlers
 /// (e.g., ProcessingInventory IReviewEventHandler) to update related entities.
-/// Uses IServiceProvider for late binding to avoid circular dependencies.
+/// 
+/// P1-019: Refactored to use direct DI injection instead of reflection-based
+/// service locator pattern for type safety and cleaner architecture.
 /// </summary>
 public sealed class ReviewService : IReviewService
 {
     private readonly WorkflowDbContext _db;
     private readonly IReviewNotificationService _notificationService;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IReviewEventHandler _handler;
     private readonly ILogger<ReviewService> _logger;
 
     public ReviewService(
         WorkflowDbContext db,
         IReviewNotificationService notificationService,
-        IServiceProvider serviceProvider,
+        IReviewEventHandler handler,
         ILogger<ReviewService> logger)
     {
         _db = db;
         _notificationService = notificationService;
-        _serviceProvider = serviceProvider;
+        _handler = handler;
         _logger = logger;
     }
 
@@ -64,55 +66,16 @@ public sealed class ReviewService : IReviewService
         // Event is written to Outbox for async processing or can be consumed synchronously by registered handlers
         await _notificationService.NotifyApprovedAsync(review, ct);
 
-        // P1-017: Try to invoke ProcessingInventory or other module handlers synchronously
-        // This is safe because ProcessingInventory module is already registered when Workflow is loaded
-        await TryInvokeReviewEventHandlerAsync(review, ct);
+        // P1-019: Invoke handler directly via DI (no reflection)
+        await InvokeReviewEventHandlerAsync(review, ct);
     }
 
-    private async Task TryInvokeReviewEventHandlerAsync(Review review, CancellationToken ct)
+    private async Task InvokeReviewEventHandlerAsync(Review review, CancellationToken ct)
     {
         try
         {
-            // Try to resolve IReviewEventHandler from the container
-            // This is available if ProcessingInventory module is loaded
-            var handlerType = Type.GetType(
-                "Evidata.Modules.ProcessingInventory.Application.Abstractions.IReviewEventHandler, Evidata.Modules.ProcessingInventory");
-            
-            if (handlerType == null)
-            {
-                _logger.LogWarning(
-                    "ProcessingInventory IReviewEventHandler type not found. Module may not be loaded. " +
-                    "Review {ReviewId} approved, but synchronous handler invocation skipped.",
-                    review.Id);
-                return; // Handler type not found — ProcessingInventory module not loaded or type not available
-            }
-
-            var handler = _serviceProvider.GetService(handlerType);
-            if (handler == null)
-            {
-                _logger.LogWarning(
-                    "ProcessingInventory IReviewEventHandler not registered in DI container. " +
-                    "Review {ReviewId} approved, but synchronous handler invocation skipped. " +
-                    "Outbox will handle eventual delivery.",
-                    review.Id);
-                return; // Handler not registered in DI container
-            }
-
-            // Build the payload
-            var payloadType = Type.GetType(
-                "Evidata.Modules.Workflow.Application.Notifications.ReviewApprovedEventPayload, Evidata.Modules.Workflow");
-            
-            if (payloadType == null)
-            {
-                _logger.LogError(
-                    "ReviewApprovedEventPayload type not found for review {ReviewId}. " +
-                    "This should not happen — please check assembly loading.",
-                    review.Id);
-                return;
-            }
-
-            // Create payload instance
-            var payload = Activator.CreateInstance(payloadType,
+            // P1-019: Direct DI injection — no reflection, compile-time safe
+            var payload = new ReviewApprovedEventPayload(
                 review.Id,
                 review.TenantId,
                 review.TargetModule,
@@ -121,42 +84,21 @@ public sealed class ReviewService : IReviewService
                 review.ReviewerId ?? Guid.Empty,
                 review.Comments,
                 DateTimeOffset.UtcNow,
-                review.RequestedBy);
+                null);
 
-            if (payload == null)
-            {
-                _logger.LogError(
-                    "Failed to create ReviewApprovedEventPayload instance for review {ReviewId}.",
-                    review.Id);
-                return;
-            }
-
-            // Invoke HandleReviewApprovedAsync
-            var method = handlerType.GetMethod("HandleReviewApprovedAsync");
-            if (method != null)
-            {
-                var task = (Task?)method.Invoke(handler, new[] { payload, ct });
-                if (task != null)
-                {
-                    await task.ConfigureAwait(false);
-                    _logger.LogInformation(
-                        "Successfully invoked ProcessingInventory review event handler for review {ReviewId}.",
-                        review.Id);
-                }
-            }
-            else
-            {
-                _logger.LogError(
-                    "HandleReviewApprovedAsync method not found on IReviewEventHandler for review {ReviewId}.",
-                    review.Id);
-            }
+            await _handler.HandleReviewApprovedAsync(payload, ct);
+            
+            _logger.LogInformation(
+                "Successfully invoked review event handler for review {ReviewId}.",
+                review.Id);
         }
         catch (Exception ex)
         {
-            // Log but don't fail — missing or broken handler is not fatal, but must be visible in production logs
+            // Log but don't fail — handler errors are visible but don't block approval.
+            // Outbox will ensure eventual consistency for async consumers.
             _logger.LogError(ex,
-                "Error invoking ProcessingInventory review event handler for review {ReviewId}. " +
-                "Handler type resolution or invocation failed. Continuing with Outbox-only delivery. " +
+                "Error invoking review event handler for review {ReviewId}. " +
+                "Continuing with Outbox-only delivery. " +
                 "TargetEntity: {TargetModule}/{TargetEntityType}/{TargetEntityId}",
                 review.Id,
                 review.TargetModule,

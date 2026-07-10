@@ -1,3 +1,5 @@
+using Evidata.Modules.Contracts.Notifications;
+
 namespace Evidata.Modules.Workflow.Application.Notifications;
 
 /// <summary>
@@ -10,21 +12,6 @@ public static class ReviewEventTypes
     public const string ReviewChangesRequested = "review.changes_requested.v1";
     public const string ReviewCancelled = "review.cancelled.v1";
 }
-
-/// <summary>
-/// Payload for ReviewApproved event.
-/// Emitted when a review transitions to Approved status.
-/// </summary>
-public sealed record ReviewApprovedEventPayload(
-    Guid ReviewId,
-    Guid TenantId,
-    string TargetModule,
-    string TargetEntityType,
-    Guid TargetEntityId,
-    Guid ReviewerId,
-    string? Comments,
-    DateTimeOffset OccurredAt,
-    Guid? ActorId = null);
 
 /// <summary>
 /// Payload for ReviewChangesRequested event.

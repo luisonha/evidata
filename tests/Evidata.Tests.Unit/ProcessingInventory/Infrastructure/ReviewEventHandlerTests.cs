@@ -8,6 +8,7 @@ using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.Audit.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Notifications;
+using Evidata.Modules.Contracts.Notifications;
 using Evidata.Modules.Workflow.Domain;
 using Evidata.Modules.Workflow.Infrastructure.Persistence;
 using Evidata.Modules.Workflow.Infrastructure.Reviews;
@@ -213,13 +214,15 @@ public class ReviewEventHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// P1-017: End-to-end integration test verifying the COMPLETE reflection-based flow:
-    /// 1. Create a ProcessingActivity and Review via ReviewService (uses reflection internally)
-    /// 2. ReviewService.ApproveAsync() → invokes handler via reflection → ReviewedAt is set
+    /// P1-017: End-to-end integration test verifying the complete DI-based flow:
+    /// 1. Create a ProcessingActivity and Review via ReviewService
+    /// 2. ReviewService.ApproveAsync() → invokes handler via direct DI → ReviewedAt is set
     /// 3. Verify VersionModifiedAfterReview blocker is triggered when activity is modified after review
+    ///
+    /// P1-019: Refactored from reflection-based to direct DI injection.
     /// </summary>
     [Fact]
-    public async Task ReviewService_ApproveAsync_WithReflection_E2E_SetsReviewedAtAndBlocksVersionModified()
+    public async Task ReviewService_ApproveAsync_E2E_SetsReviewedAtAndBlocksVersionModified()
     {
         // ── Arrange ──────────────────────────────────────────────────────────────────
         var tenantId = Guid.NewGuid();
@@ -272,7 +275,7 @@ public class ReviewEventHandlerTests : IAsyncLifetime
 
         // Set up DI container with ReviewService and handler
         var services = new ServiceCollection();
-        // Use the same contexts as the test fixture (do not create new scoped contexts)
+        // P1-019: Use the same contexts as the test fixture for consistent state
         services.AddScoped<IReviewNotificationService>(sp =>
             new TestReviewNotificationService()); // Mock notification service
         services.AddScoped<IReviewEventHandler, ReviewEventHandler>(sp =>
@@ -282,22 +285,22 @@ public class ReviewEventHandlerTests : IAsyncLifetime
         var serviceProvider = services.BuildServiceProvider();
         var scope = serviceProvider.CreateScope();
 
-        // Create ReviewService with DI
+        // Create ReviewService with DI — handler is injected directly, no reflection
         var reviewService = new ReviewService(
             _workflowDb,
             scope.ServiceProvider.GetRequiredService<IReviewNotificationService>(),
-            scope.ServiceProvider,
+            scope.ServiceProvider.GetRequiredService<IReviewEventHandler>(),
             scope.ServiceProvider.GetRequiredService<ILogger<ReviewService>>());
 
         // ── Act: Approve the review ──────────────────────────────────────────────────
-        // This internally calls TryInvokeReviewEventHandlerAsync() which uses reflection
+        // This internally calls InvokeReviewEventHandlerAsync() which uses direct DI
         // to invoke ReviewEventHandler.HandleReviewApprovedAsync()
         review.Start(reviewerId);
         await _workflowDb.SaveChangesAsync();
 
         await reviewService.ApproveAsync(review.Id, reviewerId, "Approved after review");
 
-        // ── Assert Part 1: ReviewedAt was set via reflection ──────────────────────────
+        // ── Assert Part 1: ReviewedAt was set via handler ──────────────────────────
         var updatedActivity = await _inventoryDb.ProcessingActivities
             .FirstOrDefaultAsync(a => a.Id == activityId);
 
