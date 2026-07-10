@@ -128,69 +128,40 @@
 **Owner:** Aragorn (implementation) + Gandalf (review/approval).
 **Patrón de Excelencia**: Sigue fail-closed de PR #105 (SEC-EV-001) + composición de PR #103/104 + auditoría con correlationId de PR #107/108. Replicable para acciones críticas futuras.
 
-### ⚠️ PENDIENTE - SEGUIMIENTO OBLIGATORIO: P1-011a/b/c (Acciones Críticas de Auditoría de Seguridad)
-**By:** Aragorn (decisión arquitectónica)
-**What:** Tres items POST-MERGE registrados explícitamente como **CRÍTICOS para cierre de seguridad**. Estos son gaps deliberados de P1-010 que MUST ser completados INMEDIATAMENTE en ciclo siguiente (no dejar a limbo organizacional):
+### 2026-07-10T00:54:14Z: PR #110 - Cierre de P1-011a/b (ValidateEvidence + AcceptGapWithRisk con Auditoría) ✅ APROBADO + MERGED
+**By:** Aragorn (Backend Core Engineer) → Gandalf (Architect/Lead, Code Review Approved)
+**What:** PR #110 (P1-011a/b) implementa cierre de dos **gaps críticos de seguridad** post-PR #108, formalizando handlers API e instrumentación de auditoría para ValidateEvidence y AcceptGapWithRisk:
+- **P1-011a (ValidateEvidence/SEC-EV-001)**: Implementación de `ValidateEvidenceCommandHandler` en Evidence module con endpoint `POST /api/v1/evidence/{validationId}/validate`, autorización fail-closed domain-specific (LegalReviewer para Legal, SecurityReviewer para Security), auditoría AUD-EV-001/AUD-EV-002 con metadata segura (reviewDomain, outcome, **NO texto de comentarios**).
+- **P1-011b (AcceptGapWithRisk/SEC-GAP-001)**: Implementación de `AcceptGapWithRiskCommandHandler` en GapManagement module con endpoint `POST /api/v1/gaps/{gapId}/accept-with-risk`, autorización fail-closed admin-only (TenantOwner + ComplianceAdmin con justificación obligatoria), auditoría AUD-GAP-001 con metadata segura (gapSeverity, justificationLength [**NO texto sensible**], newStatus).
+- **Decisiones Técnicas**:
+  - Propagación CorrelationId E2E via `HttpContextAccessor.HttpContext?.GetCorrelationId()` → `IAuditService.LogAsync(correlationId, ...)`
+  - Inyección DI: `{Evidence|Gap}DbContext`, `IAuditService`, `ICurrentUserContext`, `IHttpContextAccessor`
+  - Autorización temporal MVP sobre `HttpContext.User.Claims` (buscado case-insensitive); P2 centralización via `IPermissionService`
+  - Validaciones fail-closed: Autorización → Regla de negocio → Cambio de estado → Auditoría
+  - Tests reales: 4+4 test cases (NSubstitute mocks, NO reflection), cobertura de rol incorrecto/justificación vacía/rol correcto/auditoría exitosa
+- **Ciclo de Rechazo/Corrección**: 
+  - **Rechazo 1ª iteración** (2026-07-10T00:39:26Z): Gandalf rechazó PR #110 por fuga de datos sensibles — `ValidateEvidenceCommandHandler` exponía `{ "comment", cmd.Comment }` en metadata auditable (violaba privacidad). `AcceptGapWithRiskCommandHandler` estaba correcto (solo `justificationLength`).
+  - **Corrección** (Aragorn inmediata): Reemplazó `{ "comment", cmd.Comment }` por `{ "commentLength", (cmd.Comment?.Length ?? 0) }` en ValidateEvidenceCommandHandler, alineando con patrón seguro de AcceptGapWithRisk.
+  - **Aprobación 2ª iteración** (2026-07-10T00:54:14Z): Gandalf re-verificó PR #110, confirmó cero fugas de datos sensibles, aprobó UNCONDICIONAL.
+- **Cambios en Proyecto**: Referencias agregadas a `Evidata.Modules.Audit` en Evidence y GapManagement csproj.
+- **Cobertura Tests**: 761 tests passing (8 nuevos + 753 previos), todos con mocks NSubstitute, zero reflection.
+- **Conformidad Contrato**: ✅ 04-rbac-audit-evidence-gaps-contract.md SEC-EV-001 (reviewer correcto por domain), SEC-GAP-001 (admin-only + justificación), auditoría con metadata no-sensible, fail-closed.
+**Why:** Cierra gaps críticos formalizados en PR #105/106 (dominio RBAC) pero sin handlers/auditoría. Completa trazabilidad E2E para acciones de seguridad crítica. El episodio de rechazo/corrección (fuga de datos sensibles → remediación rápida) valida process quality gate y conciencia de seguridad del equipo.
+**Status:** ✅ APROBADO + MERGED
+**Process:** 2 iteraciones — 1ª rechazada (fuga de comentarios en metadata); 2ª aprobada tras corrección inmediata (Aragorn <5min fix) + Gandalf re-review exhaustivo.
+**Owner:** Aragorn (implementation + correction) + Gandalf (review/gate/approval).
+**Recomendación Futura:** P1-011c (remaining 5 handlers SubmitForReview/Activate/Archive/RejectEvidence/GenerateOfficialExport) debe seguir P2 con prioridad media, replicando patrón fail-closed y auditoría no-sensible de P1-011a/b.
 
-**P1-011a: ValidateEvidence + Instrumentación de Auditoría (CRITICAL - BLOCKING)**
-- **Priority:** P1 · **Constraint Code:** SEC-EV-001 (fail-closed RBAC domain-specific)
-- **Scope**: 
-  - Implementar `ValidateEvidenceCommandHandler` en Evidence module
-  - Inyectar `IAuditService` en handler
-  - Log audit event: `AuditEventType.ValidateEvidence` (AUD-EV-001)
-  - Metadata: `{ "evidenceId", "result" ("Valid"|"Invalid"), "failureReason" (if Invalid) }`
-  - Tests: audit logged correctly, evidence validation failure recorded, malformed evidence handled gracefully
-- **Estimación**: 3-4 horas (tests + integration verification)
-- **Bloquea**: P1-011b puede referenciar ValidateEvidence audit trail
-- **Status**: ⏳ PENDIENTE - Programar inmediatamente post-merge
-
-**P1-011b: AcceptGapWithRisk + Instrumentación de Auditoría (CRITICAL - BLOCKING)**
-- **Priority:** P1 · **Constraint Code:** SEC-GAP-001 (admin-only, high-risk action)
-- **Scope**:
-  - Implementar `AcceptGapWithRiskCommandHandler` en GapManagement module
-  - Inyectar `IAuditService` en handler
-  - Log audit event: `AuditEventType.AcceptGapWithRisk` (AUD-GAP-001)
-  - Metadata: `{ "gapId", "riskLevel" ("High"|"Medium"|"Low"), "acceptanceJustification", "acceptedBy" }`
-  - Tests: gap acceptance audited with justification, risk level correctly recorded, ProcessingActivity Approve can reference gap acceptance
-- **Estimación**: 3-4 horas (tests, risk validation, ProcessingActivity integration)
-- **Bloquea**: GapNotification tests para reference audit records
-- **Status**: ⏳ PENDIENTE - Iniciar después de P1-011a
-
-**P1-011c: Remaining Five Handlers + Instrumentación de Auditoría (MEDIUM PRIORITY - DEFER TO P2)**
-- **Priority:** P2 · **Constraint Code:** SEC-HANDLERS-001
-- **Scope**: Implementar + audit-instrument 5 handlers restantes:
-  1. **SubmitForReview** (AUD-REV-001): SubmitForReviewCommandHandler + metadata { processingActivityId, reviewedBy, submissionReason }
-  2. **Activate** (AUD-ACT-001): ActivateProcessingActivityCommandHandler + metadata { processingActivityId, activatedBy, activationDate }
-  3. **Archive** (AUD-ARC-001): ArchiveProcessingActivityCommandHandler + metadata { processingActivityId, archivedBy, archiveReason }
-  4. **RejectEvidence** (AUD-EV-002): RejectEvidenceCommandHandler + metadata { evidenceId, rejectionReason, rejectedBy }
-  5. **GenerateOfficialExport** (AUD-EXP-001): GenerateOfficialExportCommandHandler + metadata { exportFormat, exportScope, requestedBy, exportSize }
-- **Estimación**: 6-8 horas total (all 5 handlers + integration tests)
-- **Testing**: Unit tests per handler (audit logged + metadata), integration tests (timeline returns all 10 event types), contract compliance (metadata + eventTypes match P1-009)
-- **Status**: ⏳ PENDIENTE - Después de P1-011a/b completadas
-
-**Implementation Notes Checklist**:
-- [ ] P1-011a: Confirm `IAuditService` available in Evidence module DI
-- [ ] P1-011b: Confirm `IAuditService` available in GapManagement module DI
-- [ ] P1-011c: Confirm `IAuditService` available in all handler modules
-- [ ] All new handlers: reflection-free test pattern (factory methods only)
-- [ ] All handlers registered in respective module `AddXxxModule()` methods
-- [ ] CI passes: 700+ unit tests, 0 build errors
-- [ ] Integration smoke test: API startup con todos 10 handlers loaded successfully
-- [ ] Contract compliance: Metadata keys match P1-009, eventTypes match AuditEventType enum, result uses AuditEventResult enum
-
-**Timeline**:
-- **P1-011a**: Start immediately post-merge PR #109, target completion within 1 sprint
-- **P1-011b**: Start after P1-011a (may have dependencies), target completion within 1 sprint
-- **P1-011c**: Start after both CRITICAL items complete, stagger across 1-2 sprints
-
-**Success Criteria**:
-1. All 10 auditable actions have corresponding AuditLog records in production
-2. GetProcessingActivityTimelineQueryHandler returns all 10 event types when resource queried
-3. Zero reflection-based tests (audit logging tests use only factory methods)
-4. 100% test pass rate + 0 build errors
-5. TimelineEvent timeline loads for any ProcessingActivity within 200ms (no N+1 queries)
-
-**Why CRITICAL**: ValidateEvidence (SEC-EV-001, fail-closed) y AcceptGapWithRisk (SEC-GAP-001, admin-only) fueron formalizadas en PR #105/106 con RBAC autorización crítica pero sin handlers API/auditoría. Dejar estos items sin programación explícita es riesgo organizacional (se pierden, quedan en limbo). Registrados aquí como PENDIENTE - SEGUIMIENTO OBLIGATORIO para visibilidad máxima.
+### ⏳ PENDIENTE - P1-011c (Remaining Five Handlers + Auditoría, PRIORIDAD MEDIA/P2)
+**Priority:** P2 · **Constraint Code:** SEC-HANDLERS-001  
+**Scope**: Implementar + audit-instrument 5 handlers restantes (mismo patrón fail-closed que P1-011a/b):
+1. **SubmitForReview** (AUD-REV-001): Metadata { processingActivityId, reviewedBy, submissionReason }
+2. **Activate** (AUD-ACT-001): Metadata { processingActivityId, activatedBy, activationDate }
+3. **Archive** (AUD-ARC-001): Metadata { processingActivityId, archivedBy, archiveReason }
+4. **RejectEvidence** (AUD-EV-002): Metadata { evidenceId, rejectionReason [length only], rejectedBy }
+5. **GenerateOfficialExport** (AUD-EXP-001): Metadata { exportFormat, exportScope, requestedBy, exportSize }
+**Estimación**: 6-8 horas total (all 5 handlers + integration tests)  
+**Status**: ⏳ PENDIENTE - Después de P1-011a/b completadas, stagger P2
 
 ## Governance
 
