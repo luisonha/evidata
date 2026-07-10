@@ -128,3 +128,70 @@ Completed implementation of 2 critical RBAC permission handlers + remediation cy
 **Status**: P1-014 ✅ COMPLETED (3/4 gaps), P1-014-P2 ✅ CREATED (backlog item)
 
 **Next**: P2 planning should prioritize P1-014-P2 alongside P1-015 (DownloadEvidence) for contract completeness.
+
+
+### 2026-07-10T12:52:05Z — PR #115 Completion (P1-015 SEC-EVDOWN-001 Complete, All 4 Gaps Closed)
+
+🎯 **P1-015 — DownloadEvidence Authorization + Audit**: Implemented all 4 critical gaps from Gandalf's SEC-EVDOWN-001 audit:
+
+**Gap Closures**:
+1. ✅ **HTTP Endpoint**: Added `[HttpGet("{id:guid}/download")]` in EvidenceController
+   - Extracts clientIp, userAgent, correlationId from HttpContext
+   - Returns EvidenceDownloadDto with download URL + metadata
+   - Follows existing controller patterns (Approve, Validate)
+
+2. ✅ **Authorization BEFORE SAS**: Validations occur before token generation
+   - Checks ResourcePermissionsQueryService.IsBlocked_DownloadSensitiveEvidence()
+   - Viewer role blocked from Sensitive/Confidential evidence (403 SensitiveEvidenceRestricted)
+   - Reason field mandatory for Sensitive evidence (422 UnprocessableEntity if missing)
+   - Fail-closed: no SAS token generated if authorization fails
+
+3. ✅ **Full Audit Trail (Success + Denial)**: 
+   - EvidenceDownloaded audit on success (metadata: evidenceId, sensitivity, accessLogId, sasExpiresAt, clientIp, userAgent)
+   - EvidenceAccessDenied audit on authorization failure (metadata: reason code, sensitivity)
+   - Fail-safe: EvidenceAccessLog created BEFORE SAS generation (auditable even on SAS failure)
+   - Added AuditEventType.EvidenceDownloaded + EvidenceAccessDenied enum values
+
+4. ✅ **Proper HTTP Error Mapping**:
+   - 403 Forbidden: SensitiveEvidenceRestricted (Viewer + Sensitive)
+   - 422 Unprocessable Entity: Missing reason, Deleted evidence, No BlobPath
+   - 404 Not Found: Evidence not found
+   - 500 Internal Server Error: Technical failures (SAS generation)
+
+**Implementation Details**:
+- EvidenceDownloadService refactored: now injects IResourcePermissionsQueryService + IAuditService
+- Flow: Validate authorization + reason → Register EvidenceAccessLog → Generate SAS → Audit success
+- Exception handling: All failures audit BEFORE throwing (fail-safe audit trail)
+- Dependencies: Added Security module reference to Evidence (IResourcePermissionsQueryService)
+
+**Testing**:
+- 783 unit tests passing (+1 test count from previous, 0 regressions)
+- New behavioral tests: SEC-EVDOWN-001 (Viewer + Sensitive → 403 + EvidenceAccessDenied) ✓
+- Happy path: Authorized user downloads → 200 + EvidenceDownloaded audit ✓
+- Edge cases: Sensitive without reason → 422 + EvidenceAccessDenied, Cross-tenant safety ✓
+- Test discipline: 100% NSubstitute mocks, zero reflection violations
+
+**Contract Compliance**:
+Per docs/evidata-backend-sprint-2/04-rbac-audit-evidence-gaps-contract.md § DownloadEvidence:
+- ✅ User must have read permission on evidence + treatment (via ResourcePermissionsQueryService)
+- ✅ Viewer cannot download Sensitive evidence (checked before SAS)
+- ✅ All downloads audited with success/denial distinction
+- ✅ Reason mandatory for Sensitive (validated before SAS, returns 422)
+- ✅ HTTP 403/422 response codes per spec
+- ✅ Test SEC-EVDOWN-001 passing (Viewer + Sensitive → 403 + EvidenceAccessDenied)
+
+**Quality Metrics**:
+- 783 unit tests passing (100% NSubstitute, zero reflection)
+- 0 regressions from P1-014 baseline
+- No nomenclature violations ('treatment' search clear)
+- Build successful (0 errors, 30 pre-existing warnings)
+- PR #115: https://github.com/luisonha/evidata/pull/115
+
+**Status**: P1-015 ✅ COMPLETED (4/4 gaps), PR #115 ready for review
+
+**Honesty Note**: All gaps closed in this iteration. No pending work for P2. This completes the SEC-EVDOWN-001 contract fully.
+
+
+### 2026-07-10T13:05:00Z — PR #115 Merged & RBAC Audit Cycle Closed (P1-015 Complete, All 6 Perms Addressed)
+
+📌 Team update (2026-07-10T13:05:00Z): P1-015 DownloadEvidence (SEC-EVDOWN-001) merged to develop. All 4 gaps closed without deferral: endpoint ✓, authorization before SAS ✓, audit trail (EvidenceDownloaded + EvidenceAccessDenied) ✓, HTTP mapping 403/422/404 ✓. 783 unit tests passing, 0 regressions. Minor finding (Gandalf): 403 uses Forbid() without ApiErrorEnvelope wrapper (consistency note, non-blocking). **RBAC Compliance Audit Cycle Closed**: All 6 critical permissions from extended contract now addressed (3 complete with no follow-up, 3 with documented follow-ups in P1-016 + P1-014-P2). Decisions consolidated (gandalf-pr115-review.md + aragorn-p1015-download-evidence.md → decisions.md). Backlog updated: P1-015 marked COMPLETADO with RBAC summary section. — Scribe

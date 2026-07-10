@@ -1,7 +1,7 @@
 ---
-updated_at: 2026-07-10T16:44:00Z
-focus_area: P1-001 a P1-014 COMPLETADOS Y MERGEADOS a develop (782 tests passing, 0 regressions, P1-014 3/4 gaps closed + P1-014-P2 backlog created) + P1-015/P1-016 PENDIENTES (RBAC compliance gaps) + P1-014-P2 (non-blocking, P2 priority) + follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
-active_issues: [P1-015 (DownloadEvidence endpoint + 403/422 RBAC), P1-016 (2 blockers restantes de ApproveProcessingActivity: RequiredReviewPending, VersionModifiedAfterReview — domain model dependencies), P1-014-P2 (ExportWarning auto-detection, non-blocking P2), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (pending)]
+updated_at: 2026-07-10T13:05:00Z
+focus_area: P1-001 a P1-015 COMPLETADOS Y MERGEADOS a develop (783 tests passing, 0 regressions, RBAC compliance audit cycle closed — todos 6 permisos críticos abordados: 3 completos, 3 con seguimientos formales) + P1-016 (2 blockers domain model) + P1-014-P2 (ExportWarning auto-detection, non-blocking P2) + follow-up administrativo (develop→main, Dependabot/CodeQL, P1-DEGRADATION)
+active_issues: [P1-016 (2 blockers restantes ApproveProcessingActivity: RequiredReviewPending, VersionModifiedAfterReview — domain model), P1-014-P2 (ExportWarning auto-detection, non-blocking P2), develop→main reconciliation (pending), Dependabot/CodeQL enable (requires GitHub admin, pending), P1-DEGRADATION (pending)]
 ---
 
 # What We're Focused On

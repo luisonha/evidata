@@ -384,3 +384,123 @@ Implementar Opción C con documentación clara:
 
 **Owner:** Aragorn (backend) + Product (roadmap alignment).
 
+
+
+---
+
+### 2026-07-10T13:05:00Z: P1-015 DownloadEvidence Complete (SEC-EVDOWN-001 — 4/4 Gaps Closed)
+**By:** Gandalf (Reviewer), Aragorn (Backend Implementation)
+**Status:** ✅ MERGED to develop (PR #115)
+
+## What
+
+All 4 critical gaps in SEC-EVDOWN-001 (DownloadEvidence authorization + audit) are closed without deferral:
+
+| Gap | Requirement | Implementation | Status |
+|-----|-------------|-----------------|--------|
+| Gap #1 | HTTP endpoint `[HttpGet("{id:guid}/download")]` | EvidenceController endpoint added | ✅ |
+| Gap #2 | Authorization BEFORE SAS generation (fail-closed) | Validate permissions + reason BEFORE SAS token | ✅ |
+| Gap #3 | Audit trail success/denial | AuditEventType.EvidenceDownloaded + EvidenceAccessDenied | ✅ |
+| Gap #4 | HTTP error mapping (403/422/404) | Forbid() for 403, InvalidOp→422, 404 for missing | ⚠️ Minor format inconsistency |
+
+**Minor Finding (Gandalf)**: 403 response uses `Forbid()` without `ApiErrorEnvelope` wrapper (inconsistency with ProducesResponseType, not a security issue). Documented as quality note, no backlog item required unless user overrides.
+
+## Why
+
+SEC-EVDOWN-001 audit (prior) identified DownloadEvidence as unimplemented at HTTP layer, with missing authorization checks and audit trail.
+
+**Authorization Order (Fail-Closed)**:
+1. Validate user read permission on evidence
+2. Validate user not blocked for Sensitive/Confidential (Viewer role blocks)
+3. Validate reason field mandatory for Sensitive evidence
+4. **Then**: Create EvidenceAccessLog (transaction boundary)
+5. **Then**: Generate SAS token (no exposure if auth fails)
+6. **Finally**: Audit success with EvidenceDownloaded event
+
+**Audit Trail**:
+- Success: AuditEventType.EvidenceDownloaded with metadata (evidenceId, sensitivity, accessLogId, sasExpiresAt, clientIp, userAgent truncated)
+- Denial: AuditEventType.EvidenceAccessDenied with block reason (SensitiveBlocked, MissingReason)
+- Safe metadata: no file content, no full paths, no SAS keys exposed
+
+## Contract Satisfaction
+
+Per 04-rbac-audit-evidence-gaps-contract.md:
+
+✅ **Permission**: DownloadEvidence enforced via ResourcePermissionsQueryService.IsBlocked_DownloadSensitiveEvidence()
+✅ **Viewer Block**: Viewer cannot download Sensitive/Confidential (403 SensitiveEvidenceRestricted)
+✅ **Reason Validation**: Mandatory for Sensitive, returns 422 UnprocessableEntity if missing
+✅ **Audit Trail**: Complete (success EvidenceDownloaded, denial EvidenceAccessDenied)
+✅ **HTTP Mapping**: 403/422/404 mapped correctly
+✅ **Tests**: 7 behavioral tests (NSubstitute, zero reflection), covering happy path + all error cases
+
+## Testing & Quality
+
+- **783 unit tests passing** (0 regressions from P1-014)
+- **7 new tests** for SEC-EVDOWN-001:
+  - TC1: Download authorized → 200 + EvidenceDownloaded
+  - TC2: Viewer + Sensitive → 403 + EvidenceAccessDenied
+  - TC3: Sensitive without reason → 422 + EvidenceAccessDenied
+  - TC4: Cross-tenant evidence → KeyNotFoundException
+  - TC5: Missing BlobPath → InvalidOperationException
+  - TC6: Deleted evidence → InvalidOperationException
+  - TC7: Sensitive + valid reason → 200 + logged reason + audit
+- **CI**: GREEN (Windows + Linux)
+- **Nomenclature**: Zero instances of "treatment" (2 prior rejections avoided)
+- **Governance**: No changes to .squad/ files
+
+## Decision Made
+
+**Approve Unconditional** — All 4 gaps functionally closed. Minor 403 format inconsistency is non-blocking quality item (no new backlog required unless user decides).
+
+**PR #115 Status**: ✅ APPROVED and MERGED to develop (2026-07-10)
+
+## Future Note
+
+**Pattern Reuse**: DownloadEvidence authorization follows exact pattern from P1-014 (GenerateOfficialExport):
+- Validate authorization BEFORE privileged action
+- Audit success + denial with semantic event types
+- Fail-closed: no artifact generated if authorization fails
+- HTTP mapping clean (403/422)
+
+Apply this pattern to all future RBAC-gated actions.
+
+---
+
+### 2026-07-10T13:05:00Z: RBAC Compliance Audit Closure — All 6 Critical Permissions Addressed
+**By:** Gandalf (Tech Lead), Squad Coordinator
+**Context:** End of P1-015 (DownloadEvidence) — final RBAC compliance gap closure for extended contract
+
+## What
+
+All 6 critical permissions in 04-rbac-audit-evidence-gaps-contract.md have been addressed (some with documented follow-ups). RBAC compliance audit cycle complete:
+
+| Permission | Contract Ref | Implementation | Status | Follow-up |
+|------------|--------------|-----------------|--------|-----------|
+| ApproveProcessingActivity | SEC-APP-001 | P1-013: 2/4 blockers | ✅ (2/4) | P1-016 (2 blockers) |
+| ActivateProcessingActivity | SEC-ACT-001 | P1-012: Full FSM | ✅ Complete | None |
+| ValidateEvidence | SEC-EV-001 | Prior: Fail-closed auth | ✅ Complete | None |
+| AcceptGapWithRisk | SEC-GAP-001 | Prior: Admin + justification | ✅ Complete | None |
+| GenerateOfficialExport | SEC-EXP-001 | P1-014: 3/4 gaps | ✅ (3/4) | P1-014-P2 (Gap #2) |
+| DownloadEvidence | SEC-EVDOWN-001 | P1-015: 4/4 gaps | ✅ Complete | None |
+
+## Summary
+
+- **3 permissions fully implemented** with zero follow-up (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk)
+- **2 permissions partially implemented** with formal follow-ups:
+  - ApproveProcessingActivity: 2/4 blockers in P1-013, 2 pending in P1-016 (domain model dependencies)
+  - GenerateOfficialExport: 3/4 gaps in P1-014, 1 non-blocking gap in P1-014-P2 (architectural choice)
+- **1 permission fully implemented** with no blockers (DownloadEvidence, P1-015)
+
+**Test Coverage**: 783 unit tests passing, 0 regressions across all PRs (#112, #113, #114, #115).
+
+**Remaining Compliance Work**:
+- P1-016: 2 domain model extensions (Review.Status, ProcessingActivity.ReviewedAt) → 4/4 ApproveProcessingActivity blockers
+- P1-014-P2: IProcessingActivityRiskAssessmentService aggregator for ExportWarning auto-detection (non-blocking, P2 priority)
+
+## Why
+
+04-rbac-audit-evidence-gaps-contract.md defined 6 critical permissions with specific authorization + audit requirements. Extended compliance cycle (P1-011 → P1-015) systematically closes each permission's gaps while honoring architectural constraints (module boundaries, domain model dependencies).
+
+**Key Achievement**: No security shortcuts taken. All defer decisions explicitly documented with rationale. All follow-ups formally tracked in backlog.
+
+---

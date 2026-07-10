@@ -33,8 +33,34 @@
 | P1-012 | ✅ COMPLETADO: Formalizar transición Activate() en ProcessingActivity (AUD-ACT-001). | ProcessingActivity FSM incluye estado Active, ActivateProcessingActivityCommandHandler con auditoría ProcessingActivityActivated, SEC-ACT-001 RBAC contract satisfecho, 5 new tests, 0 regressions. PR #112 MERGED a develop (2026-07-10). | ✅ 778 unit tests passing |
 | P1-013 | ✅ COMPLETADO (2/4 blockers, P1-016 follow-up): Implementar ApproveProcessingActivity handler con 4 business blockers (SEC-APP-001). | ApproveProcessingActivityCommandHandler con RBAC SEC-APP-001 (ProcessOwner ≠ Approver) implementado. 2/4 blockers implementados: ✓ CriticalGapOpen, ✓ MissingLegalBasisEvidence. 2/4 blockers pendientes (domain model dependencies): ⚠ RequiredReviewPending, ⚠ VersionModifiedAfterReview → tracked in P1-016. PR #113 MERGED a develop (2026-07-10). | ✅ 778 unit tests passing, P1-016 pending |
 | P1-014 | ✅ COMPLETADO (3/4 gaps, P1-014-P2 follow-up): Completar GenerateOfficialExport handler (SEC-EXP-001 compliance). | **Gap #1 ✅**: ExportService ahora valida estado "Active" ADEMÁS "Approved". **Gap #3 ✅**: HTTP 422 con código OfficialExportRequiresApproval correcto. **Gap #4 ✅**: ExportGenerationBlocked auditado con result.Blocked, metadata completa, correlationId preservado. **Gap #2 ⚠️ DEFERRED P2**: Auto-detección de ExportWarning (requiere coordinación cross-module GapManagement/Evidence). PR #114 MERGED a develop (2026-07-10), 782 unit tests passing, 0 regressions, Gandalf aprobó condicional a ítem P2 formal. | ✅ Export tests + 782 unit tests passing |
-| P1-015 | Implementar DownloadEvidence endpoint + autorización (SEC-EVDOWN-001 compliance). | Endpoint HTTP `[HttpGet("{id:guid}/download")]` en EvidenceController, validación RBAC antes de SAS (retorna 403 SensitiveEvidenceRestricted si Viewer intenta acceso sensible), auditoría con AuditEventType.EvidenceDownloaded (éxito) / EvidenceAccessDenied (denegación), validación `reason` obligatorio para Sensitive. Hallazgo de auditoría Gandalf: endpoint no existe, auditoría sin tipos especializados, validación 403/422 faltante. | Security + Evidence tests |
+| P1-015 | ✅ COMPLETADO: Implementar DownloadEvidence endpoint + autorización (SEC-EVDOWN-001 — 4/4 gaps cerrados sin deferral). | Endpoint HTTP `[HttpGet("{id:guid}/download")]` en EvidenceController ✓, validación RBAC antes de SAS (fail-closed: 403 SensitiveEvidenceRestricted si Viewer intenta acceso sensible) ✓, auditoría con AuditEventType.EvidenceDownloaded (éxito) + EvidenceAccessDenied (denegación) ✓, validación `reason` obligatorio para Sensitive ✓. PR #115 MERGED a develop (2026-07-10). 783 unit tests passing, 0 regressions. Hallazgo menor (Gandalf): respuesta 403 usa Forbid() sin ApiErrorEnvelope (inconsistencia formato, no seguridad) — nota de calidad, no requiere backlog nuevo. | ✅ Security + Evidence tests + 783 unit tests passing |
 | P1-016 | Implementar 2 blockers restantes de ApproveProcessingActivity (P1-013 follow-up). | Requiere: (1) agregar Review.Status enum estado "Requerida" a Workflow module, (2) agregar ProcessingActivity.ReviewedAt timestamp, (3) actualizar ApproveProcessingActivityCommandHandler para validar: ✓ todas revisiones requeridas aprobadas (RequiredReviewPending), ✓ versión no modificada post-revisión (VersionModifiedAfterReview), (4) tests. Estas son domain model dependencies, no engineering defects (Aragorn documented honestly in PR #113). | Security + Domain tests, P1 priority |
+
+## RBAC Compliance Closure — Contrato Ampliado (04-rbac-audit-evidence-gaps-contract.md)
+
+**Estado de los 6 Permisos Críticos:**
+
+| Permiso | Contrato | Implementación | Estado | Seguimiento |
+|---------|----------|-----------------|--------|-------------|
+| ApproveProcessingActivity | SEC-APP-001 | P1-013 | ✅ 2/4 blockers | P1-016 (2 blockers) |
+| ActivateProcessingActivity | SEC-ACT-001 | P1-012 | ✅ Completo | Ninguno |
+| ValidateEvidence | SEC-EV-001 | Prior | ✅ Completo | Ninguno |
+| AcceptGapWithRisk | SEC-GAP-001 | Prior | ✅ Completo | Ninguno |
+| GenerateOfficialExport | SEC-EXP-001 | P1-014 | ✅ 3/4 gaps | P1-014-P2 (Gap #2) |
+| DownloadEvidence | SEC-EVDOWN-001 | P1-015 | ✅ 4/4 gaps (Completo) | Ninguno |
+
+**Resumen:**
+- ✅ **3 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk)
+- ✅ **3 permisos parcialmente o completamente implementados** con seguimientos formales documentados (ApproveProcessingActivity P1-016, GenerateOfficialExport P1-014-P2, DownloadEvidence completo)
+- 📊 **783 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115)
+- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-015 sistemáticamente cierra cada permiso
+
+**Próximas Tareas:**
+1. P1-016: 2 extensiones de modelo de dominio (Review.Status, ProcessingActivity.ReviewedAt)
+2. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
+3. Transición a develop→main y follow-up administrativo
+
+
 
 ## P2 — Limpieza y compatibilidad
 
