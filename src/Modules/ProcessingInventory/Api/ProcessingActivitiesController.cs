@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
+using Evidata.Modules.ProcessingInventory.Application.ViewModels;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +19,7 @@ public class ProcessingActivitiesController(
     GetProcessingActivityQueryHandler getHandler,
     CreateProcessingActivityCommandHandler createHandler,
     UpdateProcessingActivityCommandHandler updateHandler,
+    GetProcessingActivityControlQueryHandler controlHandler,
     ICurrentUserContext currentUser) : ControllerBase
 {
     [HttpGet]
@@ -38,6 +40,21 @@ public class ProcessingActivitiesController(
     {
         var result = await getHandler.HandleAsync(currentUser.TenantId, id, ct);
         return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpGet("{id:guid}/control")]
+    [ProducesResponseType(typeof(ProcessingActivityControlViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorEnvelope), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ProcessingActivityControlViewModel>> GetControl(
+        Guid id,
+        CancellationToken ct)
+    {
+        var result = await controlHandler.HandleAsync(currentUser.TenantId, id, currentUser.UserId, ct);
+        if (result is null)
+            return NotFound();
+
+        return Ok(result);
     }
 
     [HttpPost]
