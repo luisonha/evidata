@@ -116,7 +116,7 @@ public sealed class ActivateProcessingActivityCommandHandler(
 
             // ── Deprecar versión anterior ───────────────────────────────────────────
             
-            // Find the previous active version in this root treatment group
+            // Find the previous active version in this root processing activity group
             // Search for any version that currently has Status = Active and version < current version
             ProcessingActivity? previousActive = null;
 
