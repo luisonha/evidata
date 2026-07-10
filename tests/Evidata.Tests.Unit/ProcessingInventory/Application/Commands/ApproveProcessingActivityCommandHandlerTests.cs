@@ -7,6 +7,8 @@ using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Security.Domain;
 using Evidata.Modules.Security.Infrastructure.Persistence;
+using Evidata.Modules.Workflow.Application.Abstractions;
+using Evidata.Modules.Workflow.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -115,10 +117,17 @@ public class ApproveProcessingActivityCommandHandlerTests
             });
 
         var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, ownerUserId);
 
@@ -185,10 +194,17 @@ public class ApproveProcessingActivityCommandHandlerTests
                 new List<BlockedActionResult>()));
 
         var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -267,10 +283,17 @@ public class ApproveProcessingActivityCommandHandlerTests
                 new List<BlockedActionResult>()));
 
         var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -332,10 +355,17 @@ public class ApproveProcessingActivityCommandHandlerTests
                 new List<BlockedActionResult>()));
 
         var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, httpAccessor);
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -354,6 +384,271 @@ public class ApproveProcessingActivityCommandHandlerTests
             "ProcessingActivity",
             activity.Id,
             AuditEventResult.Blocked,
+            correlationId,
+            Arg.Any<Dictionary<string, object?>>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// P1-016 Blocker: Required review pending, preventing approval.
+    /// When an activity has open reviews (not Approved), approval is blocked.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_RequiredReviewPending_Returns422Blocked()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var approverUserId = Guid.NewGuid();
+        var reviewerUserId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        // Create activity in UnderReview state
+        var activity = ProcessingActivity.Create(tenantId, "Test Activity", ownerUserId);
+        activity.SetPurpose(PurposeSection.Create("Test purpose", LegalBasis.ContractExecution, "Test legal reference"), ownerUserId);
+        activity.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], ownerUserId);
+        activity.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], ownerUserId);
+        activity.SubmitForReview(ownerUserId);
+
+        await using var db = BuildProcessingInventoryContext();
+        await using var securityDb = BuildSecurityContext();
+
+        db.ProcessingActivities.Add(activity);
+        await db.SaveChangesAsync();
+
+        // Create a review in InProgress state (not Approved) for this activity
+        var review = Review.Create(
+            tenantId,
+            "ProcessingInventory",
+            "ProcessingActivity",
+            activity.Id,
+            ownerUserId);
+        review.Start(reviewerUserId);
+        // Review is now in InProgress state — this is "pending" and blocks approval
+
+        // Setup security: Approver has permission
+        var permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        permissionsService.GetResourcePermissionsAsync(
+                approverUserId,
+                tenantId,
+                Arg.Any<string>(),
+                Arg.Any<Guid>(),
+                Arg.Any<ResourceContextData>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("ApproveProcessingActivity", "permission.approveProcessingActivity") }.ToList(),
+                false,
+                new List<BlockedActionResult>()));
+
+        // Setup review service to return the pending review
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                tenantId,
+                activity.Id,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new[] { review }.ToList()));
+
+        var auditService = Substitute.For<IAuditService>();
+        var httpAccessor = BuildHttpContextAccessor(correlationId);
+
+        var handler = new ApproveProcessingActivityCommandHandler(
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+
+        var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.HandleAsync(cmd, CancellationToken.None));
+
+        Assert.Contains("ApprovalBlocked", ex.Message);
+        Assert.Contains("RequiredReviewPending", ex.Message);
+
+        // Verify audit log was called with Blocked result
+        await auditService.Received(1).LogAsync(
+            tenantId,
+            approverUserId,
+            AuditEventType.ProcessingActivityApproved.ToString(),
+            "ProcessingActivity",
+            activity.Id,
+            AuditEventResult.Blocked,
+            correlationId,
+            Arg.Any<Dictionary<string, object?>>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// P1-016 Blocker: Version modified after review, preventing approval.
+    /// When activity's LastModifiedAt is after ReviewedAt, approval is blocked.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_VersionModifiedAfterReview_Returns422Blocked()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var approverUserId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        // Create activity in UnderReview state
+        var activity = ProcessingActivity.Create(tenantId, "Test Activity", ownerUserId);
+        activity.SetPurpose(PurposeSection.Create("Test purpose", LegalBasis.ContractExecution, "Test legal reference"), ownerUserId);
+        activity.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], ownerUserId);
+        activity.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], ownerUserId);
+        activity.SubmitForReview(ownerUserId);
+
+        // Set ReviewedAt in the past (simulating completed review)
+        var reviewedTime = DateTimeOffset.UtcNow.AddHours(-1);
+        
+        // Use reflection to set both ReviewedAt and LastModifiedAt to simulate the condition:
+        // ReviewedAt was set in the past, but then LastModifiedAt was updated later
+        var reviewedAtProperty = typeof(ProcessingActivity).GetProperty(nameof(ProcessingActivity.ReviewedAt))
+            ?.GetSetMethod(true);
+        reviewedAtProperty?.Invoke(activity, new object?[] { reviewedTime });
+
+        // Set LastModifiedAt to a time after ReviewedAt (simulating modification after review)
+        var modifiedTime = DateTimeOffset.UtcNow;
+        var lastModifiedAtProperty = typeof(ProcessingActivity).GetProperty(nameof(ProcessingActivity.LastModifiedAt))
+            ?.GetSetMethod(true);
+        lastModifiedAtProperty?.Invoke(activity, new object?[] { modifiedTime });
+
+        await using var db = BuildProcessingInventoryContext();
+        await using var securityDb = BuildSecurityContext();
+
+        db.ProcessingActivities.Add(activity);
+        await db.SaveChangesAsync();
+
+        // Setup security: Approver has permission
+        var permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        permissionsService.GetResourcePermissionsAsync(
+                approverUserId,
+                tenantId,
+                Arg.Any<string>(),
+                Arg.Any<Guid>(),
+                Arg.Any<ResourceContextData>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("ApproveProcessingActivity", "permission.approveProcessingActivity") }.ToList(),
+                false,
+                new List<BlockedActionResult>()));
+
+        // Setup review service to return no open reviews (all approved)
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                tenantId,
+                activity.Id,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
+        var auditService = Substitute.For<IAuditService>();
+        var httpAccessor = BuildHttpContextAccessor(correlationId);
+
+        var handler = new ApproveProcessingActivityCommandHandler(
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+
+        var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.HandleAsync(cmd, CancellationToken.None));
+
+        Assert.Contains("ApprovalBlocked", ex.Message);
+        Assert.Contains("VersionModifiedAfterReview", ex.Message);
+
+        // Verify audit log was called with Blocked result
+        await auditService.Received(1).LogAsync(
+            tenantId,
+            approverUserId,
+            AuditEventType.ProcessingActivityApproved.ToString(),
+            "ProcessingActivity",
+            activity.Id,
+            AuditEventResult.Blocked,
+            correlationId,
+            Arg.Any<Dictionary<string, object?>>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// P1-016 Success: Both RequiredReviewPending and VersionModifiedAfterReview conditions are satisfied.
+    /// Activity with no pending reviews and not modified after review is approved successfully.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_NoPendingReviewsAndNotModifiedAfterReview_ReturnsSuccess()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var approverUserId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        // Create activity in UnderReview state
+        var activity = ProcessingActivity.Create(tenantId, "Test Activity", ownerUserId);
+        activity.SetPurpose(PurposeSection.Create("Test purpose", LegalBasis.ContractExecution, "Test legal reference"), ownerUserId);
+        activity.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], ownerUserId);
+        activity.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], ownerUserId);
+        activity.SubmitForReview(ownerUserId);
+
+        await using var db = BuildProcessingInventoryContext();
+        await using var securityDb = BuildSecurityContext();
+
+        db.ProcessingActivities.Add(activity);
+        await db.SaveChangesAsync();
+
+        // Setup security: Approver has permission
+        var permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        permissionsService.GetResourcePermissionsAsync(
+                approverUserId,
+                tenantId,
+                Arg.Any<string>(),
+                Arg.Any<Guid>(),
+                Arg.Any<ResourceContextData>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("ApproveProcessingActivity", "permission.approveProcessingActivity") }.ToList(),
+                false,
+                new List<BlockedActionResult>()));
+
+        // Setup review service to return no open reviews
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(
+                tenantId,
+                activity.Id,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((IReadOnlyList<Review>)new List<Review>()));
+
+        var auditService = Substitute.For<IAuditService>();
+        var httpAccessor = BuildHttpContextAccessor(correlationId);
+
+        var handler = new ApproveProcessingActivityCommandHandler(
+            db, securityDb, permissionsService, auditService, reviewService, httpAccessor);
+
+        var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
+
+        // Act
+        var result = await handler.HandleAsync(cmd, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(ProcessingActivityStatus.Approved.ToString(), result.Status.ToString());
+        Assert.Equal(approverUserId.ToString(), result.ApprovedBy.ToString());
+
+        // Verify activity was updated in database
+        var dbActivity = await db.ProcessingActivities
+            .FirstOrDefaultAsync(a => a.Id == activity.Id);
+        Assert.NotNull(dbActivity);
+        Assert.Equal(ProcessingActivityStatus.Approved, dbActivity.Status);
+        Assert.Equal(approverUserId, dbActivity.ApprovedBy);
+
+        // Verify audit log was called with Success
+        await auditService.Received(1).LogAsync(
+            tenantId,
+            approverUserId,
+            AuditEventType.ProcessingActivityApproved.ToString(),
+            "ProcessingActivity",
+            activity.Id,
+            AuditEventResult.Success,
             correlationId,
             Arg.Any<Dictionary<string, object?>>(),
             ct: Arg.Any<CancellationToken>());
