@@ -56,13 +56,15 @@ public class AuditLog : ITenantScoped
         string? correlationId = null,
         Dictionary<string, object?>? metadata = null,
         string? ipAddress = null,
-        AuditSeverity severity = AuditSeverity.Info)
+        AuditSeverity severity = AuditSeverity.Info,
+        DateTime? occurredAtOverride = null,
+        string? metadataJsonRaw = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
 
-        string? metadataJson = null;
-        if (metadata != null && metadata.Count > 0)
+        string? metadataJson = metadataJsonRaw;
+        if (metadataJson == null && metadata != null && metadata.Count > 0)
         {
             metadataJson = JsonSerializer.Serialize(metadata);
         }
@@ -80,7 +82,7 @@ public class AuditLog : ITenantScoped
             Metadata = metadataJson,
             IpAddress = ipAddress,
             Severity = severity,
-            OccurredAt = DateTime.UtcNow
+            OccurredAt = occurredAtOverride ?? DateTime.UtcNow
         };
     }
 

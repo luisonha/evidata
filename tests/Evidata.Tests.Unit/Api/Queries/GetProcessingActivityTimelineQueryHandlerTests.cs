@@ -217,34 +217,32 @@ public class GetProcessingActivityTimelineQueryHandlerTests
     [Fact]
     public async Task ChronologicalOrder_ShouldBeMostRecentFirst()
     {
-        // Arrange: Create 3 events with slightly staggered creation times
+        // Arrange: Create 3 events with staggered creation times using occurredAtOverride
+        var now = DateTime.UtcNow;
+        
         var createLog = AuditLog.Create(
             tenantId: _tenantId,
             userId: _actorUserId,
             eventType: AuditEventType.CreateProcessingActivity.ToString(),
             resource: "ProcessingActivity",
-            resourceId: _processingActivityId);
-
-        // Use reflection to set specific OccurredAt times to ensure ordering
-        var createProperty = typeof(AuditLog).GetProperty("OccurredAt", 
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-        createProperty?.SetValue(createLog, DateTime.UtcNow.AddSeconds(-20));
+            resourceId: _processingActivityId,
+            occurredAtOverride: now.AddSeconds(-20));
 
         var updateLog = AuditLog.Create(
             tenantId: _tenantId,
             userId: _actorUserId,
             eventType: AuditEventType.UpdateNode.ToString(),
             resource: "ProcessingActivity",
-            resourceId: _processingActivityId);
-        createProperty?.SetValue(updateLog, DateTime.UtcNow.AddSeconds(-10));
+            resourceId: _processingActivityId,
+            occurredAtOverride: now.AddSeconds(-10));
 
         var approveLog = AuditLog.Create(
             tenantId: _tenantId,
             userId: _actorUserId,
             eventType: AuditEventType.Approve.ToString(),
             resource: "ProcessingActivity",
-            resourceId: _processingActivityId);
-        createProperty?.SetValue(approveLog, DateTime.UtcNow);
+            resourceId: _processingActivityId,
+            occurredAtOverride: now);
 
         var logs = new[] { createLog, updateLog, approveLog };
         var handler = CreateHandler(logs);
@@ -304,18 +302,14 @@ public class GetProcessingActivityTimelineQueryHandlerTests
     [Fact]
     public async Task MalformedMetadata_ShouldNotBreakTimeline()
     {
-        // Arrange: Create event with invalid JSON metadata
+        // Arrange: Create event with invalid JSON metadata using metadataJsonRaw parameter
         var evt = AuditLog.Create(
             tenantId: _tenantId,
             userId: _actorUserId,
             eventType: AuditEventType.CreateProcessingActivity.ToString(),
             resource: "ProcessingActivity",
-            resourceId: _processingActivityId);
-
-        // Use reflection to set invalid metadata to test deserialization error handling
-        var metadataProperty = typeof(AuditLog).GetProperty("Metadata", 
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-        metadataProperty?.SetValue(evt, "{invalid json}");
+            resourceId: _processingActivityId,
+            metadataJsonRaw: "{invalid json}");
 
         var handler = CreateHandler(new[] { evt });
 
@@ -324,8 +318,9 @@ public class GetProcessingActivityTimelineQueryHandlerTests
             tenantId: _tenantId,
             resourceId: _processingActivityId);
 
-        // Assert: Event should still be returned, but Metadata should be null
+        // Assert: Event should still be returned, but Metadata should be null/handled gracefully
         var timelineEvent = Assert.Single(events);
+        // Metadata should be null since the JSON was invalid and couldn't be deserialized
         Assert.Null(timelineEvent.Metadata);
     }
 
