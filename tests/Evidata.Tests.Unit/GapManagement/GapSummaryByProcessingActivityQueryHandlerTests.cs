@@ -53,44 +53,36 @@ public class GapSummaryByProcessingActivityQueryHandlerTests : IDisposable
         var versionId = Guid.NewGuid();
 
         _db.ComplianceGaps.AddRange(
-            CreateGap(_processingActivityId, GapSeverity.Critical),
+            CreateGap(_processingActivityId, GapSeverity.Critical),                          // 1: Open
+            CreateGap(_processingActivityId, GapSeverity.Critical),                          // 2: Open
             CreateGap(_processingActivityId, GapSeverity.High, gap =>
             {
-                gap.StartCorrection(_userId);
+                gap.StartCorrection(_userId);                                                 // 3: InCorrection
+            }),
+            CreateGap(_processingActivityId, GapSeverity.High, gap =>
+            {
+                gap.StartCorrection(_userId);                                                 // 4: InCorrection
             }),
             CreateGap(_processingActivityId, GapSeverity.Medium, gap =>
             {
                 gap.StartCorrection(_userId);
-                gap.Resolve(_userId);
-            }),
-            CreateGap(_processingActivityId, GapSeverity.Low, gap =>
-            {
-                gap.StartCorrection(_userId);
-                gap.Resolve(_userId);
-                gap.Close(_userId);
-            }),
-            CreateGap(_processingActivityId, GapSeverity.High, gap =>
-            {
-                gap.StartCorrection(_userId);
-                gap.Resolve(_userId);
+                gap.Resolve(_userId);                                                         // 5: Resolved
             }),
             CreateGap(_processingActivityId, GapSeverity.Medium, gap =>
             {
                 gap.StartCorrection(_userId);
-                gap.Resolve(_userId);
-                gap.Close(_userId);
+                gap.Resolve(_userId);                                                         // 6: Resolved
             }),
             CreateGap(_processingActivityId, GapSeverity.High, gap =>
             {
-                gap.AcceptRisk("Riesgo aceptado por comité.", _userId);
+                gap.AcceptRisk("Riesgo aceptado por comité.", _userId);                      // 7: AcceptedWithRisk
             }),
             CreateGap(_processingActivityId, GapSeverity.Low, gap =>
             {
-                gap.AcceptRisk("Riesgo residual aceptado.", _userId);
-                gap.Close(_userId);
+                gap.AcceptRisk("Riesgo residual aceptado.", _userId);                        // 8: AcceptedWithRisk
             }),
-            CreateGap(_otherProcessingActivityId, GapSeverity.Critical),
-            CreateGapForTenant(_otherTenantId, _processingActivityId, GapSeverity.Critical));
+            CreateGap(_otherProcessingActivityId, GapSeverity.Critical),                    // (ignored: other activity)
+            CreateGapForTenant(_otherTenantId, _processingActivityId, GapSeverity.Critical)); // (ignored: other tenant)
 
         await _db.SaveChangesAsync();
 

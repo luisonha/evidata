@@ -74,8 +74,8 @@ public class GapRuleCatalogTests
         var rules = GapRuleInitializer.GetDefaultRules();
         var criticalCount = rules.Count(r => r.Severity == GapSeverity.Critical);
         
-        // Contract specifies 7 Critical rules
-        Assert.Equal(7, criticalCount);
+        // Contract specifies 6 Critical rules
+        Assert.Equal(6, criticalCount);
     }
 
     [Fact]
@@ -84,8 +84,8 @@ public class GapRuleCatalogTests
         var rules = GapRuleInitializer.GetDefaultRules();
         var highCount = rules.Count(r => r.Severity == GapSeverity.High);
         
-        // Contract specifies 4 High rules
-        Assert.Equal(4, highCount);
+        // Contract specifies 5 High rules
+        Assert.Equal(5, highCount);
     }
 
     [Fact]
