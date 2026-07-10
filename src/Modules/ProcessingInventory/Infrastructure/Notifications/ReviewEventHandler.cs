@@ -44,6 +44,7 @@ public sealed class ReviewEventHandler : IReviewEventHandler
 
         // Mark as reviewed — sets ReviewedAt = UtcNow
         // This enables the VersionModifiedAfterReview blocker to function correctly
+        // Idempotent: if already marked, MarkAsReviewed() will not overwrite the timestamp
         activity.MarkAsReviewed();
 
         _db.ProcessingActivities.Update(activity);
