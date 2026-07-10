@@ -504,3 +504,25 @@ Branch push successful — Same PR #110, NO new PR created
 3. Create ActivateEvidenceCommand/Handler for Evidence
 4. All with audit instrumentation (correlationId, result, metadata)
 5. Tests: success + auth/state blocking cases
+
+## 2026-07-10T01:30 — P1-011c Complete
+
+### Delivered
+- 3 command handlers with audit instrumentation:
+  - SubmitForReviewCommandHandler (ProcessingActivity, AUD-REV-001)
+  - ArchiveCommandHandler (ProcessingActivity, AUD-ARC-001)
+  - ActivateEvidenceCommandHandler (Evidence, AUD-ACT-001)
+- All handlers follow established pattern (ValidateEvidenceCommandHandler reference)
+- Audit includes correlationId, result (Success/Failure), safe metadata
+- ExportService already audits GenerateOfficialExport (verified)
+
+### Verification
+- Build: 0 errors
+- Tests: 761 passing, zero regressions
+- Coverage: 10/10 critical auditable actions now instrumented
+
+### Deliverables
+- PR #111: feat(P1-011c): instrument remaining critical audit actions
+- Decision: .squad/decisions/inbox/aragorn-audit-remaining.md
+
+### Status: P1-011c COMPLETE ✅
