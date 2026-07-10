@@ -5,6 +5,7 @@ using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
+using Evidata.Modules.Audit.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Notifications;
 using Evidata.Modules.Workflow.Domain;
@@ -13,6 +14,7 @@ using Evidata.Modules.Workflow.Infrastructure.Reviews;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
 using Xunit;
 
 namespace Evidata.Tests.Unit.ProcessingInventory.Infrastructure;
@@ -26,6 +28,7 @@ public class ReviewEventHandlerTests : IAsyncLifetime
     private readonly WorkflowDbContext _workflowDb;
     private readonly ProcessingInventoryDbContext _inventoryDb;
     private readonly ReviewEventHandler _handler;
+    private readonly IAuditService _auditService;
 
     public ReviewEventHandlerTests()
     {
@@ -40,7 +43,11 @@ public class ReviewEventHandlerTests : IAsyncLifetime
 
         _workflowDb = new WorkflowDbContext(workflowOptions);
         _inventoryDb = new ProcessingInventoryDbContext(inventoryOptions);
-        _handler = new ReviewEventHandler(_inventoryDb);
+        
+        // Create a mock IAuditService using NSubstitute
+        _auditService = Substitute.For<IAuditService>();
+        
+        _handler = new ReviewEventHandler(_inventoryDb, _auditService);
     }
 
     public async Task InitializeAsync()
@@ -269,7 +276,7 @@ public class ReviewEventHandlerTests : IAsyncLifetime
         services.AddScoped<IReviewNotificationService>(sp =>
             new TestReviewNotificationService()); // Mock notification service
         services.AddScoped<IReviewEventHandler, ReviewEventHandler>(sp =>
-            new ReviewEventHandler(_inventoryDb)); // Use the test's inventoryDb
+            new ReviewEventHandler(_inventoryDb, _auditService)); // Use the test's inventoryDb and auditService
         services.AddLogging(builder => builder.AddConsole());
 
         var serviceProvider = services.BuildServiceProvider();
@@ -325,6 +332,118 @@ public class ReviewEventHandlerTests : IAsyncLifetime
 
         // Clean up
         scope.Dispose();
+    }
+
+    /// <summary>
+    /// P1-017 Defect #1: Verify MarkAsReviewed() is idempotent
+    /// (does not overwrite timestamp on second invocation)
+    /// </summary>
+    [Fact]
+    public void MarkAsReviewed_IsIdempotent()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var activity = ProcessingActivity.Create(
+            tenantId,
+            "Test Activity",
+            Guid.NewGuid(),
+            "Test description",
+            "Controller",
+            "Department");
+
+        // Act: First invocation
+        activity.MarkAsReviewed();
+        var reviewedAt1 = activity.ReviewedAt;
+
+        // Wait to ensure different timestamp if method were not idempotent
+        System.Threading.Thread.Sleep(100);
+
+        // Act: Second invocation
+        activity.MarkAsReviewed();
+        var reviewedAt2 = activity.ReviewedAt;
+
+        // Assert: Both timestamps should be identical (idempotent)
+        Assert.NotNull(reviewedAt1);
+        Assert.NotNull(reviewedAt2);
+        Assert.Equal(reviewedAt1, reviewedAt2);
+    }
+
+    /// <summary>
+    /// P1-017 Defect #2: Verify ReviewEventHandler logs audit event
+    /// when marking ProcessingActivity as reviewed
+    /// </summary>
+    [Fact]
+    public async Task HandleReviewApprovedAsync_LogsAuditEvent()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var activityId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var reviewId = Guid.NewGuid();
+
+        // Create ProcessingActivity
+        var activity = ProcessingActivity.Create(
+            tenantId,
+            "Test Activity",
+            Guid.NewGuid(),
+            "Test description",
+            "Controller",
+            "Department");
+
+        // Override the Id
+        var idField = typeof(ProcessingActivity).GetProperty("Id",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!
+            .GetSetMethod(nonPublic: true);
+        if (idField != null)
+        {
+            idField.Invoke(activity, new object[] { activityId });
+        }
+
+        // Set status to UnderReview
+        var statusField = typeof(ProcessingActivity).GetProperty("Status",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!
+            .GetSetMethod(nonPublic: true);
+        if (statusField != null)
+        {
+            statusField.Invoke(activity, new object[] { ProcessingActivityStatus.UnderReview });
+        }
+
+        _inventoryDb.ProcessingActivities.Add(activity);
+        await _inventoryDb.SaveChangesAsync();
+
+        // Create audit service mock that tracks calls
+        var auditServiceMock = Substitute.For<IAuditService>();
+        var handler = new ReviewEventHandler(_inventoryDb, auditServiceMock);
+
+        // Create the event payload
+        var payload = new ReviewApprovedEventPayload(
+            ReviewId: reviewId,
+            TenantId: tenantId,
+            TargetModule: "ProcessingInventory",
+            TargetEntityType: "ProcessingActivity",
+            TargetEntityId: activityId,
+            ReviewerId: reviewerId,
+            Comments: "Approved after review",
+            OccurredAt: DateTimeOffset.UtcNow,
+            ActorId: reviewerId);
+
+        // Act
+        await handler.HandleReviewApprovedAsync(payload);
+
+        // Assert: Verify audit logging was called
+        await auditServiceMock.Received(1).LogAsync(
+            Arg.Is<Guid>(id => id == tenantId),
+            Arg.Is<Guid?>(id => id == reviewerId),
+            Arg.Any<string>(), // eventType
+            Arg.Is<string>(s => s == "ProcessingActivity"),
+            Arg.Is<Guid?>(id => id == activityId),
+            Arg.Any<Evidata.Modules.Audit.Domain.AuditEventResult>(), // result
+            Arg.Is<string?>(s => s == reviewId.ToString()), // correlationId
+            Arg.Any<Dictionary<string, object?>>(), // metadata
+            Arg.Any<string?>(), // ipAddress
+            Arg.Any<Evidata.Modules.Audit.Domain.AuditSeverity>(), // severity
+            Arg.Any<System.Threading.CancellationToken>()
+        );
     }
 }
 
