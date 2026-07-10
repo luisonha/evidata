@@ -22,7 +22,7 @@ public class ExportsController(
     /// <summary>
     /// POST /api/v1/processing-activities/{processingActivityId}/exports
     /// Creates a new export request for a processing activity.
-    /// Implements SEC-EXP-001: Requires valid authorization.
+    /// Implements SEC-EXP-001: Requires valid authorization and approved activity.
     /// </summary>
     [HttpPost("processing-activities/{processingActivityId:guid}/exports")]
     public async Task<ActionResult<ExportDto>> CreateExport(
@@ -54,8 +54,14 @@ public class ExportsController(
 
             return CreatedAtAction(nameof(GetExport), new { exportId = export.Id }, ExportDto.From(export));
         }
+        catch (UnauthorizedAccessException)
+        {
+            // SEC-EXP-001: User not authorized
+            return Forbid();
+        }
         catch (InvalidOperationException ex)
         {
+            // Activity not found or not in approved state (SEC-EXP-001)
             return BadRequest(new ExportErrorResponse("InvalidOperation", ex.Message));
         }
     }

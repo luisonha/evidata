@@ -3,6 +3,7 @@ using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Domain;
+using Evidata.Modules.Security.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Evidata.Modules.Reporting.Application.Services;
@@ -14,6 +15,8 @@ namespace Evidata.Modules.Reporting.Application.Services;
 public sealed class ExportService(
     IExportRepository exportRepository,
     IAuditService auditService,
+    IProcessingActivityReadOnlyQueryService processingActivityQueryService,
+    IResourcePermissionsQueryService resourcePermissionsService,
     ILogger<ExportService> logger) : IExportService
 {
     public async Task<Export> RequestExportAsync(
@@ -27,6 +30,40 @@ public sealed class ExportService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        // ── SEC-EXP-001: Verify user role is authorized to generate exports ────
+        var permissions = await resourcePermissionsService.GetResourcePermissionsAsync(
+            userId: requestedByUserId,
+            tenantId: tenantId,
+            resourceType: "export",
+            resourceId: processingActivityId,
+            ct: ct);
+
+        // Fail-closed: Block if user lacks permission (or has blocking reasons)
+        if (permissions.BlockedActions.Any(a => a.ActionCode == "GenerateOfficialExport"))
+        {
+            var reason = permissions.BlockedActions.First(a => a.ActionCode == "GenerateOfficialExport").ReasonCode;
+            throw new UnauthorizedAccessException(
+                $"User {requestedByUserId} is not authorized to generate exports. Reason: {reason}");
+        }
+
+        // ── SEC-EXP-001: Verify ProcessingActivity is in Approved state ────
+        var activityStatus = await processingActivityQueryService.GetStatusAsync(
+            tenantId, processingActivityId, ct);
+
+        if (string.IsNullOrEmpty(activityStatus))
+        {
+            throw new InvalidOperationException(
+                $"ProcessingActivity {processingActivityId} not found or not accessible in tenant {tenantId}");
+        }
+
+        // Fail-closed: Only Approved status allows export generation
+        if (activityStatus != "Approved")
+        {
+            throw new InvalidOperationException(
+                $"Cannot generate export for ProcessingActivity in state '{activityStatus}'. " +
+                "Only 'Approved' state allows export generation (SEC-EXP-001).");
+        }
 
         // Calculate next version for this activity + type combination
         var version = await exportRepository.GetNextVersionAsync(

@@ -3,6 +3,7 @@ using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Services;
 using Evidata.Modules.Reporting.Domain;
+using Evidata.Modules.Security.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -18,6 +19,8 @@ public class ExportServiceTests
 
     private IExportRepository _repositoryMock = null!;
     private IAuditService _auditMock = null!;
+    private IProcessingActivityReadOnlyQueryService _activityQueryMock = null!;
+    private IResourcePermissionsQueryService _permissionsMock = null!;
     private ILogger<ExportService> _loggerMock = null!;
     private ExportService _service = null!;
 
@@ -25,8 +28,97 @@ public class ExportServiceTests
     {
         _repositoryMock = Substitute.For<IExportRepository>();
         _auditMock = Substitute.For<IAuditService>();
+        _activityQueryMock = Substitute.For<IProcessingActivityReadOnlyQueryService>();
+        _permissionsMock = Substitute.For<IResourcePermissionsQueryService>();
         _loggerMock = Substitute.For<ILogger<ExportService>>();
-        _service = new ExportService(_repositoryMock, _auditMock, _loggerMock);
+        
+        // Default setup: Activity is Approved, user has permission
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("Approved");
+        
+        _permissionsMock.GetResourcePermissionsAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), 
+            Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("GenerateOfficialExport", "permission.generateOfficialExport") },
+                false,
+                new BlockedActionResult[] { }));
+        
+        _service = new ExportService(_repositoryMock, _auditMock, _activityQueryMock, _permissionsMock, _loggerMock);
+    }
+
+    // ── SEC-EXP-001 Behavioral Tests ──────────────────────────────────────────
+
+    [Fact]
+    public async Task SEC_EXP_001_AuthorizedUserWithApprovedActivity_CreatesExport()
+    {
+        // Arrange: User with ComplianceAdmin role + Activity in Approved state
+        Setup();
+        _repositoryMock.GetNextVersionAsync(Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(1);
+
+        // Act
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Assert: Export was created
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal(ExportStatus.Requested, result.Status);
+        await _repositoryMock.Received(1).AddAsync(Arg.Any<Export>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SEC_EXP_001_UnauthorizedRole_Forbids()
+    {
+        // Arrange: User with Viewer role (not authorized for exports)
+        Setup();
+        _permissionsMock.GetResourcePermissionsAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(),
+            Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "Viewer" },
+                new AvailableActionResult[] { },
+                true,
+                new[] { new BlockedActionResult(
+                    "GenerateOfficialExport",
+                    "permission.generateOfficialExport",
+                    "SEC-EXP-001",
+                    "block.generateExportNotAuthorized",
+                    "High",
+                    "severity.high",
+                    "Export",
+                    "node.export") }));
+
+        // Act & Assert: Throws UnauthorizedAccessException
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.RequestExportAsync(
+                _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+                _contentType, _user, _correlationId, CancellationToken.None));
+
+        // Verify export was NOT created
+        await _repositoryMock.DidNotReceive().AddAsync(Arg.Any<Export>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SEC_EXP_001_ActivityNotApproved_FailsClosed()
+    {
+        // Arrange: User with permission but Activity in Draft state (not approved)
+        Setup();
+        _activityQueryMock.GetStatusAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns("Draft");
+
+        // Act & Assert: Throws InvalidOperationException (fail-closed)
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RequestExportAsync(
+                _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+                _contentType, _user, _correlationId, CancellationToken.None));
+        
+        Assert.Contains("SEC-EXP-001", ex.Message);
+
+        // Verify export was NOT created
+        await _repositoryMock.DidNotReceive().AddAsync(Arg.Any<Export>(), Arg.Any<CancellationToken>());
     }
 
     // ── RequestExportAsync ────────────────────────────────────────────────────
