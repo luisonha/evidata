@@ -13,23 +13,24 @@ public enum GapSeverity
 }
 
 /// <summary>
-/// Estado del ciclo de vida de una brecha (hallazgo operativo).
+/// Estado del ciclo de vida de una brecha.
 ///
 /// FSM:
-///   Open → InCorrection → Resolved
-///   Open → AcceptedWithRisk
-///   Open → Dismissed
-///   Resolved → Open (transición automática interna durante re-evaluación síncrona si regla se dispara nuevamente)
-///
-/// Nota: No existe endpoint público de reapertura. La reapertura es transición interna del motor de reglas.
+///   Open → Assigned → InProgress → Resolved → Closed
+///   Open / Assigned / InProgress → Blocked (impedimento externo)
+///   Blocked → InProgress (impedimento resuelto)
+///   Open / Assigned → AcceptedRisk (riesgo aceptado formalmente)
+///   Resolved / AcceptedRisk → Closed
 /// </summary>
 public enum GapStatus
 {
     Open,
-    InCorrection,
+    Assigned,
+    InProgress,
+    Blocked,
     Resolved,
-    AcceptedWithRisk,
-    Dismissed
+    AcceptedRisk,
+    Closed
 }
 
 /// <summary>
@@ -64,6 +65,12 @@ public class ComplianceGap
     public GapSeverity Severity { get; private set; }
     public GapStatus Status { get; private set; }
 
+    /// <summary>Responsable asignado (null = sin asignar).</summary>
+    public Guid? OwnerId { get; private set; }
+
+    /// <summary>Fecha objetivo de cierre.</summary>
+    public DateTimeOffset? DueAt { get; private set; }
+
     /// <summary>Justificación cuando el riesgo es aceptado formalmente.</summary>
     public string? RiskAcceptanceJustification { get; private set; }
 
@@ -73,9 +80,12 @@ public class ComplianceGap
     public Guid? LastModifiedBy { get; private set; }
     public DateTimeOffset? LastModifiedAt { get; private set; }
 
+    public DateTimeOffset? ClosedAt { get; private set; }
+    public Guid? ClosedBy { get; private set; }
+
     /// <summary>True si esta brecha debe bloquear la aprobación del RAT origen.</summary>
     public bool BlocksApproval => Severity == GapSeverity.Critical
-        && Status is not (GapStatus.Resolved or GapStatus.AcceptedWithRisk or GapStatus.Dismissed);
+        && Status is not (GapStatus.Resolved or GapStatus.AcceptedRisk or GapStatus.Closed);
 
     // ── Factory ────────────────────────────────────────────────────────────────
 
@@ -87,7 +97,8 @@ public class ComplianceGap
         string description,
         GapSeverity severity,
         Guid createdBy,
-        Guid? legalObligationId = null)
+        Guid? legalObligationId = null,
+        DateTimeOffset? dueAt = null)
     {
         if (string.IsNullOrWhiteSpace(sourceModule))
             throw new ArgumentException("El módulo origen no puede ser vacío.", nameof(sourceModule));
@@ -116,76 +127,90 @@ public class ComplianceGap
 
     // ── FSM ────────────────────────────────────────────────────────────────────
 
-    /// <summary>Inicia la corrección de la brecha: Open → InCorrection.</summary>
-    public void StartCorrection(Guid modifiedBy)
+    /// <summary>Asigna un responsable y transiciona a Assigned.</summary>
+    public void Assign(Guid ownerId, Guid modifiedBy, DateTimeOffset? dueAt = null)
     {
-        if (Status != GapStatus.Open)
+        GuardNotClosed();
+        if (Status is GapStatus.Resolved or GapStatus.AcceptedRisk)
             throw new InvalidOperationException(
-                $"Solo se puede iniciar corrección desde Open. Estado actual: {Status}.");
+                $"No se puede asignar una brecha en estado {Status}.");
 
-        Status = GapStatus.InCorrection;
+        OwnerId = ownerId;
+        if (dueAt.HasValue) DueAt = dueAt;
+        Status = GapStatus.Assigned;
         Touch(modifiedBy);
     }
 
-    /// <summary>Marca la brecha como resuelta después de corrección: InCorrection → Resolved.</summary>
+    /// <summary>Inicia el trabajo de remediación.</summary>
+    public void StartProgress(Guid modifiedBy)
+    {
+        if (Status is not (GapStatus.Assigned or GapStatus.Blocked))
+            throw new InvalidOperationException(
+                $"Solo se puede iniciar progreso desde Assigned o Blocked. Estado actual: {Status}.");
+
+        Status = GapStatus.InProgress;
+        Touch(modifiedBy);
+    }
+
+    /// <summary>Registra un impedimento externo.</summary>
+    public void Block(Guid modifiedBy)
+    {
+        if (Status is not (GapStatus.Open or GapStatus.Assigned or GapStatus.InProgress))
+            throw new InvalidOperationException(
+                $"No se puede bloquear desde el estado {Status}.");
+
+        Status = GapStatus.Blocked;
+        Touch(modifiedBy);
+    }
+
+    /// <summary>Marca la brecha como resuelta (pendiente validación).</summary>
     public void Resolve(Guid modifiedBy)
     {
-        if (Status != GapStatus.InCorrection)
+        if (Status != GapStatus.InProgress)
             throw new InvalidOperationException(
-                $"Solo se puede resolver desde InCorrection. Estado actual: {Status}.");
+                $"Solo se puede resolver desde InProgress. Estado actual: {Status}.");
 
         Status = GapStatus.Resolved;
         Touch(modifiedBy);
     }
 
-    /// <summary>Reabre automáticamente la brecha si durante re-evaluación síncrona vuelve a dispararse: Resolved → Open.</summary>
-    internal void ReopenAutomatically(Guid triggeredBySystem)
-    {
-        if (Status != GapStatus.Resolved)
-            throw new InvalidOperationException(
-                $"Solo se puede reabrir desde Resolved. Estado actual: {Status}.");
-
-        Status = GapStatus.Open;
-        // LastModifiedBy y LastModifiedAt se actualizan para auditar la reapertura automática.
-        Touch(triggeredBySystem);
-    }
-
-    /// <summary>Rechaza la brecha o la desestima: Open → Dismissed.</summary>
-    public void Dismiss(Guid modifiedBy)
-    {
-        if (Status != GapStatus.Open)
-            throw new InvalidOperationException(
-                $"Solo se puede desestimar desde Open. Estado actual: {Status}.");
-
-        Status = GapStatus.Dismissed;
-        Touch(modifiedBy);
-    }
-
-    /// <summary>Acepta formalmente el riesgo con justificación: Open → AcceptedWithRisk.</summary>
+    /// <summary>Acepta formalmente el riesgo con justificación.</summary>
     public void AcceptRisk(string justification, Guid modifiedBy)
     {
         if (string.IsNullOrWhiteSpace(justification))
             throw new ArgumentException("La justificación de aceptación de riesgo es obligatoria.", nameof(justification));
-        if (Status != GapStatus.Open)
+        if (Status is not (GapStatus.Open or GapStatus.Assigned or GapStatus.InProgress))
             throw new InvalidOperationException(
-                $"Solo se puede aceptar riesgo desde Open. Estado actual: {Status}.");
+                $"No se puede aceptar riesgo desde el estado {Status}.");
 
         RiskAcceptanceJustification = justification.Trim();
-        Status = GapStatus.AcceptedWithRisk;
+        Status = GapStatus.AcceptedRisk;
         Touch(modifiedBy);
     }
 
-    /// <summary>Actualiza campos editables (solo en estados no resueltos/aceptados/desestimados).</summary>
+    /// <summary>Cierra definitivamente la brecha (post-resolución o post-aceptación).</summary>
+    public void Close(Guid closedBy)
+    {
+        if (Status is not (GapStatus.Resolved or GapStatus.AcceptedRisk))
+            throw new InvalidOperationException(
+                $"Solo se puede cerrar desde Resolved o AcceptedRisk. Estado actual: {Status}.");
+
+        Status = GapStatus.Closed;
+        ClosedAt = DateTimeOffset.UtcNow;
+        ClosedBy = closedBy;
+        Touch(closedBy);
+    }
+
+    /// <summary>Actualiza campos editables (solo en estados no cerrados).</summary>
     public void Update(
         string title,
         string description,
         GapSeverity severity,
         Guid modifiedBy,
+        DateTimeOffset? dueAt = null,
         Guid? legalObligationId = null)
     {
-        if (Status is GapStatus.Resolved or GapStatus.AcceptedWithRisk or GapStatus.Dismissed)
-            throw new InvalidOperationException(
-                $"Una brecha en estado {Status} no puede modificarse.");
+        GuardNotClosed();
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("El título no puede ser vacío.", nameof(title));
         if (title.Length > 300)
@@ -196,6 +221,7 @@ public class ComplianceGap
         Title = title.Trim();
         Description = description.Trim();
         Severity = severity;
+        DueAt = dueAt;
         LegalObligationId = legalObligationId;
         Touch(modifiedBy);
     }
@@ -206,5 +232,11 @@ public class ComplianceGap
     {
         LastModifiedBy = modifiedBy;
         LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    private void GuardNotClosed()
+    {
+        if (Status == GapStatus.Closed)
+            throw new InvalidOperationException("Una brecha cerrada no puede modificarse.");
     }
 }
