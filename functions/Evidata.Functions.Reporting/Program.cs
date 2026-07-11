@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.Reporting.Handlers;
+using Evidata.Modules.Audit;
 using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.Documents.Infrastructure.Configuration;
 using Evidata.Modules.Documents.Infrastructure.Storage;
@@ -21,6 +22,7 @@ builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
 builder.Services.AddEvidenceModule(builder.Configuration);
+builder.Services.AddAudit(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
 // IOutboxWriter requerido por OutboxGapNotificationService (GapManagement).
 // fn-reporting solo lee datos — NullOutboxWriter evita la dependencia del Outbox real.

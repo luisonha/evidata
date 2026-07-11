@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.SearchIndexing.Handlers;
+using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Search;
@@ -16,6 +17,7 @@ builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
 builder.Services.AddDocumentsModule(builder.Configuration);
+builder.Services.AddAudit(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);
 
