@@ -76,7 +76,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId); // Transition to UnderReview
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -136,7 +135,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, ownerUserId);
 
@@ -182,7 +181,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -222,7 +220,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -280,7 +278,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SetCriticalGapFlag(true, ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -320,7 +317,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -361,7 +358,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         // Status is Draft, not UnderReview
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -401,7 +397,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -447,7 +443,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -497,7 +492,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -557,7 +552,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         lastModifiedAtProperty?.Invoke(activity, new object?[] { modifiedTime });
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -598,7 +592,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -643,7 +637,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -684,7 +677,7 @@ public class ApproveProcessingActivityCommandHandlerTests
         var httpAccessor = BuildHttpContextAccessor(correlationId);
 
         var handler = new ApproveProcessingActivityCommandHandler(
-            db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+            db, permissionsService, auditService, reviewService, policyService, httpAccessor);
 
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
@@ -738,7 +731,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -780,7 +772,7 @@ public class ApproveProcessingActivityCommandHandlerTests
             .Returns(Task.FromResult(true)); // Legal IS required
 
         var httpAccessor = BuildHttpContextAccessor(correlationId);
-        var handler = new ApproveProcessingActivityCommandHandler(db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+        var handler = new ApproveProcessingActivityCommandHandler(db, permissionsService, auditService, reviewService, policyService, httpAccessor);
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
         // Act & Assert
@@ -811,7 +803,6 @@ public class ApproveProcessingActivityCommandHandlerTests
         activity.SubmitForReview(ownerUserId);
 
         await using var db = BuildProcessingInventoryContext();
-        await using var securityDb = BuildSecurityContext();
 
         db.ProcessingActivities.Add(activity);
         await db.SaveChangesAsync();
@@ -836,7 +827,7 @@ public class ApproveProcessingActivityCommandHandlerTests
             .Returns(Task.FromResult(true)); // All required by default
 
         var httpAccessor = BuildHttpContextAccessor(correlationId);
-        var handler = new ApproveProcessingActivityCommandHandler(db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+        var handler = new ApproveProcessingActivityCommandHandler(db, permissionsService, auditService, reviewService, policyService, httpAccessor);
         var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
 
         // Act & Assert

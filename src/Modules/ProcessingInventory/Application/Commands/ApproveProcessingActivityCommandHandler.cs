@@ -41,7 +41,6 @@ namespace Evidata.Modules.ProcessingInventory.Application.Commands;
 /// </summary>
 public sealed class ApproveProcessingActivityCommandHandler(
     ProcessingInventoryDbContext db,
-    SecurityDbContext _securityDb,
     IResourcePermissionsQueryService permissionsService,
     IAuditService auditService,
     IReviewService reviewService,

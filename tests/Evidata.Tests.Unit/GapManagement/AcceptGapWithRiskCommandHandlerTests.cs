@@ -68,11 +68,8 @@ public class AcceptGapWithRiskCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "TenantOwner");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, httpAccessor);
         var cmd = new AcceptGapWithRiskCommand(tenantId, gap.Id, justification, userId);
 
         // Act
@@ -122,11 +119,8 @@ public class AcceptGapWithRiskCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "ProcessOwner"); // Wrong role
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, httpAccessor);
         var cmd = new AcceptGapWithRiskCommand(tenantId, gap.Id, justification, userId);
 
         // Act & Assert
@@ -169,11 +163,8 @@ public class AcceptGapWithRiskCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "ComplianceAdmin");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, httpAccessor);
         var cmd = new AcceptGapWithRiskCommand(tenantId, gap.Id, "", userId); // Empty justification
 
         // Act & Assert
@@ -217,11 +208,8 @@ public class AcceptGapWithRiskCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "ComplianceAdmin");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new AcceptGapWithRiskCommandHandler(db, auditService, httpAccessor);
         var cmd = new AcceptGapWithRiskCommand(tenantId, gap.Id, justification, userId);
 
         // Act
