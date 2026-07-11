@@ -41,6 +41,15 @@ Agent Scribe initialized and ready for work.
   - Updated backlog version v1.7.2 → v1.7.3 (critical multi-function DI bug fix)
   - Added P1-FIX-AUDIT-DI-FUNCTIONS entry to backlog with scope (3 of 6 Functions fixed), cause, solution, verification in isolated worktree
   - Confirmed 828/828 tests passing, 0 regressions, Azure Functions Core Tools startup DI error resolved
+📌 2026-07-11: Consolidated documentation for PR #130 merge (fix-fn-reporting-di-security-adapter):
+  - Added comprehensive entry to `.squad/decisions.md` documenting complete review cycle with Gandalf + architectural improvement
+  - Documented PR #130: fn-reporting DI bug (2 simultaneous root causes: missing AddRbac + IProcessingActivityReadOnlyQueryAdapter without accessible implementation)
+  - Documented Aragorn's pragmatic first fix, Gandalf's conditional approval, and coordinador's architecture discovery (better solution: consolidate adapter in Reporting module instead of duplicating)
+  - Documented final solution: moved adapter to `src/Modules/Reporting/Infrastructure/Adapters/`, registered in ReportingModule, eliminated both duplicates → no technical debt
+  - Updated backlog version v1.7.3 → v1.7.4
+  - Added P1-FIX-REPORTING-DI-SECURITY-ADAPTER entry documenting full review cycle, Gandalf conditional approval, and superior architecture without duplication
+  - Documented critical process lesson: Always `git pull` after `git checkout develop` in isolated worktrees to avoid stale local code causing false positives
+  - Confirmed 828/828 tests passing, 0 regressions, fn-reporting startup resolves both DI errors (merge commit 150f76f)
 
 ## Learnings
 

@@ -1213,3 +1213,58 @@ func start
 ✅ **Verificación en worktree aislado confirma scope y completitud del fix**
 
 **Referencias**: PR #129 (merge commit 8130a6b), `src/functions/fn-mcp-batch/Program.cs`, `src/functions/fn-reporting/Program.cs`, `src/functions/fn-search-indexing/Program.cs`, Audit Module registración.
+
+### 2026-07-11T17:51:24Z: PR #130 - Fix fn-reporting DI: Security Module + Reporting Adapter Consolidation ✅ MERGED
+**By:** Aragorn (Backend Core Engineer) → Gandalf (Architect/Lead, Conditional Approval) → Coordinador (Architecture Validation + Solution Enhancement)
+**What:** PR #130 (merge commit 150f76f) cierra bug crítico multifactorial en `fn-reporting` DI que bloqueaba arranque.
+
+**Raíces Identificadas (2 errores simultáneos)**:
+1. **Missing AddRbac()**: `EvidenceDownloadService` (Reporting module) requiere `IResourcePermissionsQueryService`, que vive en `Evidata.Modules.Security`. El módulo Security nunca fue registrado en `fn-reporting/Program.cs` → `AggregateException: Unable to resolve service for type IResourcePermissionsQueryService` al startup.
+2. **IProcessingActivityReadOnlyQueryAdapter sin implementación accesible**: `ReportingModule` (ProcessingInventory consumer) necesita `IProcessingActivityReadOnlyQueryService` para acceder a actividades. Su única implementación (`ProcessingActivityReadOnlyQueryAdapter`) vivía exclusivamente en `Evidata.Api/Infrastructure/Adapters/` → inaccessible desde `fn-reporting`.
+
+**Ciclo de Revisión y Mejora de Arquitectura (IMPORTANTE)**:
+
+**Fase 1 — Primer Fix (Aragorn, pre-revisión)**:
+- Agregó `builder.Services.AddRbac(builder.Configuration);` + `ProjectReference` a Security en `fn-reporting.csproj`
+- Creó COPIA duplicada del adapter: `src/functions/fn-reporting/Infrastructure/Adapters/ProcessingActivityReadOnlyQueryAdapter.cs` (patrón "host-local adapter")
+- Registró el adapter duplicado en `fn-reporting/Program.cs`: `builder.Services.AddScoped<IProcessingActivityReadOnlyQueryService, ProcessingActivityReadOnlyQueryAdapter>();`
+- ⚠️ Inconsistencias menores: referencia `Contracts` sin usar en .csproj, comentario engañoso en Program.cs → Coordinador detectó pre-revisión, Aragorn corrigió
+
+**Fase 2 — Revisión Formal (Gandalf, aprobación condicional)**:
+- ✅ Aceptó la solución pragmática: duplicación de adapter por host
+- 🔍 Evaluó alternativa (mover adapter a `Evidata.Modules.Contracts`): Rechazó por crear ciclo real `Contracts → ProcessingInventory → Contracts`
+- 📋 Recomendó crear ticket P1-017-REFACTOR para eliminar duplicación en futuro
+- ✅ **APROBACIÓN CONDICIONAL** — aceptó la deuda técnica como trade-off pragmático
+
+**Fase 3 — Validación Independiente (Coordinador, descubrimiento de opción superior)**:
+- Ejecutó verificación independiente post-Gandalf + coordinador independientemente tras merge
+- 🔍 Descubrió opción arquitectónica MEJOR no considerada: `Evidata.Modules.Reporting` **YA referencia directamente** `Evidata.Modules.ProcessingInventory` (grep en .csproj: confirmado cero ciclo)
+- ✅ **Conclusión**: El adapter podía consolidarse dentro del **propio módulo Reporting** (`src/Modules/Reporting/Infrastructure/Adapters/`) → una sola implementación reutilizable por TODOS los hosts (Api, fn-reporting, y futuros) sin duplicación y sin deuda técnica
+- ⚠️ Esta opción **fue pasada por alto tanto por Aragorn como por Gandalf**, probablemente por asumir que un adapter debía vivir "junto a" su consumidor en lugar de junto a sus dependencias
+
+**Fase 4 — Implementación de Solución Superior (Aragorn, a solicitud del usuario)**:
+- Usuario aprobó implementar la opción superior **sin aceptar deuda técnica**
+- ✅ Movió `ProcessingActivityReadOnlyQueryAdapter` a `src/Modules/Reporting/Infrastructure/Adapters/`
+- ✅ Registró en `ReportingModule.AddReportingModule()` (lugar centralizado, reutilizable por todos los hosts)
+- ✅ Eliminó ambas copias duplicadas: `Evidata.Api/Infrastructure/Adapters/ProcessingActivityReadOnlyQueryAdapter.cs` + `fn-reporting/Infrastructure/Adapters/ProcessingActivityReadOnlyQueryAdapter.cs`
+- ✅ Eliminó registros manuales redundantes en ambos `Program.cs` (ahora el módulo gestiona el ciclo de vida del adapter)
+
+**Verificación Final Independiente (Coordinador)**:
+- Verificación realizada en worktree aislado (no interfiere con entorno local del usuario)
+- ✅ `dotnet clean && dotnet build` → 0 warnings, 0 errores (confirma ausencia de ciclo de referencias)
+- ✅ `dotnet test` → 828/828 tests passing (0 regressions)
+- ✅ Arranque real: `cd src/functions/fn-reporting && dotnet run` con Azure Functions Core Tools:
+  - ❌ Anterior error: `AggregateException: Unable to resolve service for type IResourcePermissionsQueryService`
+  - ❌ Anterior error: `AggregateException: Unable to resolve service for type IProcessingActivityReadOnlyQueryService`
+  - ✅ **AMBOS ERRORES DESAPARECIERON** → DI completamente satisfecho
+  - 📋 Siguiente error (esperado, no bloqueante): `Connection string 'evidata-db' not found` → por no tener Aspire/Postgres corriendo en ese entorno
+- **Lección de proceso crítica registrada**: Tras el merge real, el coordinador `git pull` local del usuario había quedado desactualizado → falso positivo "bug volvió". Remediado: Always `git pull` inmediatamente después de `git checkout develop` cuando se usan worktrees para verificación.
+
+**Resultado**:
+✅ Bug de DI multifactorial completamente resuelto
+✅ **Sin deuda técnica** — a diferencia del fix de Aragorn que Gandalf aprobó condicionalmente, la solución final consolidó el adapter en el módulo Reporting sin duplicación
+✅ Arquitectura mejorada: adapter centralizado, reutilizable, sem ciclos
+✅ 828/828 tests passing, 0 regressions
+✅ fn-reporting arranca correctamente (sin errores de DI)
+
+**Referencias**: PR #130 (merge commit 150f76f), `src/Modules/Reporting/Infrastructure/Adapters/ProcessingActivityReadOnlyQueryAdapter.cs`, `src/Modules/Reporting/ReportingModule.cs`, `src/functions/fn-reporting/Program.cs`, Gandalf conditional approval pre-merge, coordinador validation + architecture discovery post-review.
