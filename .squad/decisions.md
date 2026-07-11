@@ -999,3 +999,59 @@ internal static Permission CreateForSeed(Guid id, string resource, string action
 **Impact**: Cierra un bug crítico pero sutil en el seeding del modelo RBAC. Garantiza determinismo del modelo EF Core (blocker para CI/CD en muchos entornos). Restaura integridad referencial en tablas de RBAC.
 
 **Referencias**: PR #125 (merge commit cfde0f6), `.squad/agents/gandalf/history.md` (decisión de aprobación registrada commit c2bcec4), `gandalf-pr125-review.md` consolidada acá.
+
+## 2026-07-11 — PR #126 & PR #127: Limpieza de Compiler Warnings (CS9113, CS0168, CS4014, CS8604/CS8601)
+
+**Autores**: Coordinador (PR #126 + PR #127 combined verification).
+
+**Decisión**: ✅ **AMBOS APROBADOS Y MERGED.** Ciclo completo de corrección de warnings de compilación.
+
+### Contexto: Dos PRs, Un Ciclo de Trabajo
+
+**PR #126** (`squad/cleanup-compiler-warnings` → develop, merge commit 6733198): Primer intento de limpiar 8 warnings pre-existentes en 6 archivos:
+- **CS9113** (parámetros DI no leídos): Intentó renombrar parámetros con prefijo `_` (`currentUser`→`_currentUser`, `securityDb`→`_securityDb`), asumiendo que esto suprimiría el warning. **INCORRECTO** — el warning persistió porque el prefijo `_` **no suprime CS9113 en parámetros de primary constructor**. Los parámetros seguían "no leídos" con el nuevo nombre.
+- **CS0168** (variable catch no usada): ✅ Correcto — reemplazar `catch (Exception ex)` por `catch (Exception)` elimina el warning.
+- **CS4014** (Task no awaited): ✅ Correcto — agregar `_ =` discard operator en asserts de NSubstitute.
+- **CS8604/CS8601** (null-forgiving operators en tests): ✅ Correcto — usar `!` en validaciones de test.
+
+**PR #127** (`squad/fix-unused-di-params` → develop, merge commit 7804a3d): Fix correcto y definitivo para los 3 CS9113 restantes:
+- **Acción**: ELIMINAR por completo los parámetros genuinamente no usados:
+  - `ICurrentUserContext _currentUser` de `ValidateEvidenceCommandHandler`
+  - `ICurrentUserContext _currentUser` de `AcceptGapWithRiskCommandHandler`
+  - `SecurityDbContext _securityDb` de `ApproveProcessingActivityCommandHandler`
+- **Verificación de código muerto**: confirmado (coordinador, con análisis exhaustivo) que estos parámetros eran genuinamente no leídos:
+  - El "quién ejecuta la acción" ya llega vía `cmd.ValidatedBy`/`cmd.AcceptedBy`/`cmd.ApprovedBy` seteados desde `currentUser.UserId` en la capa de Controller (no desde el cliente).
+  - La autorización RBAC real la hace `permissionsService.GetResourcePermissionsAsync`, no `securityDb` directamente.
+- **Actualización de call sites**: tests unitarios que instanciaban estos handlers fueron actualizados para remover el parámetro extra.
+
+### Lección Aprendida: El Peligro del Build Incremental en Verificaciones
+
+**Problema**: La verificación de PR #126 reportó falsamente "0 warnings" porque:
+1. Coordinador ejecutó `dotnet build Evidata.sln` (build incremental)
+2. Los archivos con los parámetros renombrados (`_currentUser`, `_securityDb`) NO fueron recompilados porque `dotnet build` detectó que no habían cambiado las "fuentes binarias"
+3. El compilador nunca vio el nuevo nombre `_currentUser`, así que nunca emitió un nuevo warning para el nombre nuevo
+4. El reporte visual en VS Code mostraba "0 warnings" (caché del análisis anterior)
+
+**Consecuencia**: PR #126 fue mergedo creyendo que los 3 CS9113 estaban fijos, cuando en realidad el warning persistía con el nuevo nombre.
+
+**Remedio (aplicado en PR #127)**: `dotnet clean Evidata.sln && dotnet build Evidata.sln` **antes de cualquier verificación de "0 warnings"**.
+
+### Verificación Final (PR #127, Coordinador con Clean Build)
+
+```bash
+dotnet clean Evidata.sln && dotnet build Evidata.sln
+# Resultado: **0 Advertencias, 0 Errores** en TODA la solución
+
+dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj
+# Resultado: **828/828 tests passing**, sin regresiones
+```
+
+### Resultado
+
+✅ **PR #126 merged** (3 CS9113 incorrectamente fixed, 5 warnings correctamente fixed)
+✅ **PR #127 merged** (3 CS9113 correctamente fixed vía eliminación de parámetros)
+✅ **Final state**: 0 Advertencias, 0 Errores, 828/828 tests passing
+
+**Nota de proceso**: Todos los warnings de compilación pre-existentes están now resueltos. Futuras adiciones de código deben pasar verificaciones de clean build antes de merge para evitar acumular nuevos warnings.
+
+**Referencias**: PR #126 (merge commit 6733198), PR #127 (merge commit 7804a3d).

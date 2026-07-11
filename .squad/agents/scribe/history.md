@@ -23,6 +23,14 @@ Agent Scribe initialized and ready for work.
   - Added P1-RBAC-SEED entry recognizing CreateForSeed pattern, 13 GUID synchronization, FK restoration
   - Deleted `/inbox/gandalf-pr125-review.md` after consolidation (fulfilled its purpose)
   - Confirmed 828/828 tests passing, 0 regressions, E2E Docker/Aspire verification complete
+📌 2026-07-11: Consolidated documentation for PR #126 & #127 merge (cleanup-compiler-warnings + fix-unused-di-params):
+  - Added entry to `.squad/decisions.md` covering both PRs as single work cycle
+  - Documented PR #126: First cleanup attempt with CS9113 fix incorrectly attempted via renaming with `_` prefix (ineffective)
+  - Documented PR #127: Correct and final CS9113 fix via complete parameter elimination (3 unused DI params removed)
+  - **Critical lesson learned**: Build incremental deceptively reported "0 warnings" in PR #126 verification because renamed source files were never recompiled — fix applied: `dotnet clean` before all warning verification
+  - Updated backlog version v1.7.0 → v1.7.1 (compiler warnings cleanup)
+  - Added P1-CLEANUP-WARNINGS entry to backlog confirming: 0 compiler warnings, 0 errors, 828/828 tests passing
+  - Confirmed zero regressions, all compiler warnings (CS9113, CS0168, CS4014, CS8604/CS8601) fully resolved
 
 ## Learnings
 
