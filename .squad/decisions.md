@@ -773,3 +773,46 @@ Se evaluó explícitamente si degradar `GapSummary.ApprovalBlocked` a `false` (v
 Con este merge se cierran todos los pendientes técnicos identificados durante el ciclo P1-011→P1-014-P2, incluyendo la nota de degradación parcial dejada abierta desde PR #104.
 
 **Referencias**: PR #121, `.squad/decisions/inbox/{aragorn-p1-degradation,gandalf-p1-degradation-review}.md` (consolidadas y eliminadas del inbox tras este merge).
+
+## 2026-07-11 — PR #122: Reconciliación develop → main (cierre de sprint 2)
+
+**Autor**: Coordinador (merge administrativo, sin agentes de dominio).
+
+**Decisión**: ✅ **MERGEADO.** `main` queda alineado con `develop`, incorporando el ciclo completo de RBAC/Identity/Seguridad del sprint 2 (110 commits).
+
+### Conflicto encontrado y resuelto
+Único conflicto real en `src/Evidata.Api/Program.cs`: `main` no tenía registrada la policy `TenantOwnerOrComplianceAdmin` (adición pura de `develop`, sin lógica contradictoria). Resuelto tomando el contenido de `develop`.
+
+### Verificación
+Build limpio, 823/823 tests confirmados localmente antes del merge. `develop` y `main` quedan en 0 commits de diferencia tras el merge.
+
+**Referencias**: PR #122.
+
+## 2026-07-11 — PR #123: Alineación de scripts de provisión/seed con el modelo RBAC post-sprint
+
+**Autores**: Aragorn (implementación, 2 rondas), Gandalf (revisión final).
+
+**Decisión**: ✅ **APROBADO SIN CONDICIONES Y MERGED.**
+
+### Contexto
+Tras el cierre del ciclo RBAC (PR #122), el usuario pidió auditar si los scripts de arranque/provisión/seed requerían actualización. Un diagnóstico (Aragorn) + verificación línea por línea del coordinador confirmaron 3 problemas reales causados por los cambios del sprint:
+
+1. **Migración duplicada**: `20260710234111_AddReviewDomainField.cs` volvía a crear la tabla `review_requirements` (ya creada por `20260710172650_AddReviewRequirements.cs`) — habría hecho fallar `dotnet ef database update` contra Postgres real con error de "tabla ya existe".
+2. **`seed.sh` desalineado con el modelo RBAC**: sembraba roles legacy `DPO`/`PrivacyAnalyst`, no reconocidos por `TenantOwnerOrComplianceAdminHandler` (que solo acepta `TenantOwner`/`ComplianceAdmin`) — el admin de desarrollo no podía gestionar roles ni ReviewRequirements (403 en todos esos endpoints).
+3. **`GapRuleInitializer` nunca invocado**: el catálogo de 11 reglas de detección de brechas nunca se cargaba en la base de datos.
+
+### Ronda 1 — corrección inicial (rechazada por el coordinador antes de llegar a Gandalf)
+Aragorn corrigió los problemas 1 y 2 correctamente. Para el problema 3, sembró las 11 reglas vía `HasData()` en una migración EF de `GapManagementDbContext`, usando un tenant fake hardcodeado (`00000000-...-0001`, el tenant de desarrollo). El coordinador detectó que esto era arquitectónicamente incorrecto: `GapRule.TenantId` es un campo genuinamente por-tenant (a diferencia de `Role`/`Permission`, que son entidades de sistema sin tenant), y esa migración se ejecutaría en TODOS los ambientes incluyendo producción — dejando las 11 reglas huérfanas atadas a un tenant inexistente en cualquier entorno real, sin beneficiar a ningún tenant productivo.
+
+### Ronda 2 — corrección final (decisión explícita del usuario)
+El usuario decidió: revertir la migración EF (`dotnet ef migrations remove`) y mover el seeding exclusivamente a `scripts/local/seed.sh` (SQL directo, solo entorno de desarrollo local, usando el `$TENANT_ID` fijo del script). El diseño de cómo se provisionan GapRules a tenants reales en producción queda **explícitamente fuera de alcance** de este fix, pendiente de un trabajo futuro separado (no hay mecanismo de producción todavía — es un catálogo aún no consumido por ningún handler en runtime).
+
+Adicionalmente Aragorn agregó el test `GapRuleInitializerTests` (5 tests: conteo de 11 reglas, códigos únicos, campos requeridos, todas las reglas Critical bloquean aprobación) y eliminó 10 filas de permisos legacy "Ley 21.719" (`a0000001-*`) que quedaron huérfanas tras remover los roles legacy que las usaban.
+
+### Verificación (coordinador + Gandalf, ambos independientes)
+Build limpio, **828/828 tests** (823 + 5 nuevos), 0 regresiones. Transcripción de las 11 reglas verificada contra `GapRuleInitializer.cs` (RuleCode/Severity/BlocksApproval exactos). Enum `GapSeverity` mapeado vía `.HasConversion<string>()` — valores `'Critical'`/`'High'` coinciden exactamente con los nombres del enum. Cero referencias rotas a los permisos/roles legacy eliminados (grep exhaustivo).
+
+### Follow-up detectado durante el cierre (no bloqueante para este PR, corregido por separado)
+Gandalf detectó que `scripts/local/smoke-test.sh` seguía referenciando el roleId legacy hardcodeado del rol `DPO` eliminado — una regresión funcional directa causada por este PR (el archivo no fue tocado en #123, pero su suposición quedó invalidada). Se corrige en un PR separado inmediatamente después.
+
+**Referencias**: PR #123, `.squad/decisions/inbox/gandalf-pr123-review.md` (consolidada y eliminada del inbox tras este merge).
