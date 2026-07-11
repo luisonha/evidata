@@ -1122,3 +1122,94 @@ dotnet run --no-build --no-launch-profile
 ✅ **Nota para el futuro**: P1-FIX-DISTRIBUTED-CACHE-REDIS (escalado multi-instancia con Redis vía Aspire)
 
 **Referencias**: PR #128 (merge commit 6298a1d), Workflow module `ReviewRequirementPolicyService`, `src/Evidata.Api/Program.cs`.
+
+## 2026-07-11 — PR #129: Fix Bug Crítico de DI en 3 Azure Functions — Registración Faltante de AuditModule
+
+**Autores**: Coordinador (Scribe, verificación en worktree aislado + consolidación).
+
+**Decisión**: ✅ **MERGED a develop** (merge commit 8130a6b).
+
+### Contexto: Bug Pre-Existente de Composición de Módulos
+
+**Defecto detectado**: Las 3 Azure Functions (`fn-mcp-batch`, `fn-reporting`, `fn-search-indexing`) fallaban al arrancar con Azure Functions Core Tools:
+```
+AggregateException: Some services are not able to be constructed:
+- ServiceDescriptor for type 'IAuditService' is not registered
+```
+
+**Causa raíz**: Los 3 `Program.cs` registraban módulos que dependen **transitivamente** de `IAuditService`:
+- `fn-mcp-batch`: Registra `builder.Services.AddProcessingInventory(builder.Configuration);` → ProcessingInventory depende de `IAuditModule` vía handlers como `CreateProcessingActivityCommandHandler`
+- `fn-reporting`: Registra `builder.Services.AddReporting(builder.Configuration);` → Reporting depende de `IAuditModule`
+- `fn-search-indexing`: Registra `builder.Services.AddGapManagement(builder.Configuration);` → GapManagement depende de `IAuditModule`
+
+Sin embargo, **ninguno de estos 3 `Program.cs` llamaba a `AuditModule.AddAudit(configuration)` antes de registrar sus módulos consumidores**, generando un ciclo de dependencias no satisfecho: "necesito IAuditService para procesar, pero nadie registró el módulo que la provee".
+
+**Verificación de scope**: Se inspeccionaron también `fn-documents`, `fn-maintenance` y `fn-notifications` — **CONFIRMADO que NO requerían cambios** porque no registran módulos dependientes de `IAuditService`.
+
+### Solución: Registrar AuditModule Antes de Módulos Consumidores
+
+**Fix aplicado en cada uno de los 3 `Program.cs`**:
+```csharp
+// Agregar ANTES del registro de módulos consumidores:
+using Evidata.Modules.Audit;
+// ...
+builder.Services.AddAudit(builder.Configuration);
+builder.Services.AddProcessingInventory(builder.Configuration);
+```
+
+**Justificación**:
+- **Patrón consistente con `Evidata.Api`**: El `Program.cs` de la API principal ya seguía este orden (AuditModule primero, luego módulos consumidores).
+- **Dependencias transitivas**: Cada módulo consumidor que use `IAuditService` directa o indirectamente requiere que el proveedor exista en el contenedor DI antes de su propio registro.
+- **Orden obligatorio**: 
+  1. `AddAudit(configuration)`
+  2. `AddProcessingInventory(configuration)`
+  3. `AddReporting(configuration)`
+  4. `AddGapManagement(configuration)`
+
+### Verificación en Worktree Aislado
+
+**Setup**: Coordinador verificó en un worktree separado (`git worktree add`) para no interferir con el entorno local del usuario.
+
+**Build limpio**:
+```bash
+dotnet clean && dotnet build
+# Resultado: 0 Advertencias, 0 Errores en TODA la solución
+```
+
+**Suite de tests**:
+```bash
+dotnet test
+# Resultado: 828/828 tests passing, 0 regressions
+```
+
+**Arranque real de `fn-mcp-batch` con Azure Functions Core Tools**:
+```bash
+cd src/functions/fn-mcp-batch
+func start
+# Anterior error de DI: AggregateException → DESAPARECIDO
+# Error siguiente (esperado): Connection string 'evidata-db' not found
+# → Confirma que el fix de DI fue completo y que el siguiente error
+#   es por falta de infrastructure (Aspire/Postgres no corriendo),
+#   no por DI mal configurado
+```
+
+**Resultado**: IAuditService error desaparecido en los 3 Functions, DI correctamente satisfecho.
+
+### Alcance: Solo 3 de 6 Functions Requerían Fix
+
+| Función | Registra módulo con dep. IAuditService | Requerí cambios |
+|---------|----------------------------------------|-----------------|
+| fn-mcp-batch | ✓ ProcessingInventory | ✅ SÍ |
+| fn-reporting | ✓ Reporting | ✅ SÍ |
+| fn-search-indexing | ✓ GapManagement | ✅ SÍ |
+| fn-documents | ✗ | ❌ NO |
+| fn-maintenance | ✗ | ❌ NO |
+| fn-notifications | ✗ | ❌ NO |
+
+### Resultado
+
+✅ **Bug de DI resuelto en los 3 Functions** — Azure Functions Core Tools ahora arranca sin error de `IAuditService`
+✅ **828/828 tests passing**, 0 regressions
+✅ **Verificación en worktree aislado confirma scope y completitud del fix**
+
+**Referencias**: PR #129 (merge commit 8130a6b), `src/functions/fn-mcp-batch/Program.cs`, `src/functions/fn-reporting/Program.cs`, `src/functions/fn-search-indexing/Program.cs`, Audit Module registración.

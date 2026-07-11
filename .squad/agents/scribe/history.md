@@ -36,6 +36,11 @@ Agent Scribe initialized and ready for work.
   - Updated backlog version v1.7.1 → v1.7.2 (critical DI bug fix)
   - Added P1-FIX-DISTRIBUTED-CACHE-DI entry to backlog with cause, solution, verification, future Redis scaling note
   - Confirmed 828/828 tests passing, 0 regressions, `dotnet run` DI error resolved
+📌 2026-07-11: Consolidated documentation for PR #129 merge (fix-audit-di-functions):
+  - Added entry to `.squad/decisions.md` documenting PR #129: AuditModule DI registration in 3 Azure Functions
+  - Updated backlog version v1.7.2 → v1.7.3 (critical multi-function DI bug fix)
+  - Added P1-FIX-AUDIT-DI-FUNCTIONS entry to backlog with scope (3 of 6 Functions fixed), cause, solution, verification in isolated worktree
+  - Confirmed 828/828 tests passing, 0 regressions, Azure Functions Core Tools startup DI error resolved
 
 ## Learnings
 
