@@ -185,13 +185,12 @@ public sealed class ApproveProcessingActivityCommandHandler(
                 ct);
 
             // P1-018: Filter only reviews whose type is marked as required for this tenant/entity
-            // For now, all reviews default to Legal type — in full impl, Review domain would be part of Review entity
+            // BLOCKER #3 FIX (Legolas): Map ReviewDomain from Review entity instead of hardcoding to Legal.
             var pendingRequiredReviews = new List<Review>();
             foreach (var review in reviews.Where(r => r.Status != ReviewStatus.Approved))
             {
-                // Map based on review context — for now, assume ProcessingInventory reviews map to ReviewDomain.Legal
-                // In a full implementation, Review would have a ReviewType or ReviewDomain field
-                var reviewType = ReviewType.Legal; // Default — adjust based on review metadata if available
+                // Map from Review.ReviewDomain (0=Legal, 1=Security) to ReviewType enum
+                var reviewType = (ReviewType)review.ReviewDomain;
                 
                 var isRequired = await policyService.IsReviewRequiredAsync(
                     cmd.TenantId,

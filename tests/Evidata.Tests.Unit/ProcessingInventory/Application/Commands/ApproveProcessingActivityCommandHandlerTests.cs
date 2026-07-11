@@ -715,4 +715,133 @@ public class ApproveProcessingActivityCommandHandlerTests
             Arg.Any<Dictionary<string, object?>>(),
             ct: Arg.Any<CancellationToken>());
     }
+
+    /// <summary>
+    /// BLOCKER #3 FIX: Review domain mapping.
+    /// Tenant configures Security=false (not required), Legal=true (required).
+    /// - Security review pending should NOT block approval
+    /// - Legal review pending SHOULD block approval
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_SecurityOptionalLegalRequired_OnlyLegalBlocksApproval()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var approverUserId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        var activity = ProcessingActivity.Create(tenantId, "Test Activity", ownerUserId);
+        activity.SetPurpose(PurposeSection.Create("Test purpose", LegalBasis.ContractExecution, "Test legal reference"), ownerUserId);
+        activity.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], ownerUserId);
+        activity.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], ownerUserId);
+        activity.SubmitForReview(ownerUserId);
+
+        await using var db = BuildProcessingInventoryContext();
+        await using var securityDb = BuildSecurityContext();
+
+        db.ProcessingActivities.Add(activity);
+        await db.SaveChangesAsync();
+
+        // Create a Security review, both pending
+        var securityReview = Review.Create(
+            tenantId,
+            "ProcessingInventory",
+            "ProcessingActivity",
+            activity.Id,
+            ownerUserId,
+            reviewDomain: 1); // 1 = Security
+
+        var legalReview = Review.Create(
+            tenantId,
+            "ProcessingInventory",
+            "ProcessingActivity",
+            activity.Id,
+            ownerUserId,
+            reviewDomain: 0); // 0 = Legal
+
+        var permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        permissionsService.GetResourcePermissionsAsync(approverUserId, tenantId, Arg.Any<string>(), Arg.Any<Guid>(),
+                Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("ApproveProcessingActivity", "permission.approveProcessingActivity") }.ToList(),
+                false, new List<BlockedActionResult>()));
+
+        var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(tenantId, activity.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<Review>>(new List<Review> { securityReview, legalReview }));
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(tenantId, "ProcessingActivity", ReviewType.Security, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false)); // Security NOT required
+        policyService.IsReviewRequiredAsync(tenantId, "ProcessingActivity", ReviewType.Legal, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // Legal IS required
+
+        var httpAccessor = BuildHttpContextAccessor(correlationId);
+        var handler = new ApproveProcessingActivityCommandHandler(db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+        var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.HandleAsync(cmd, CancellationToken.None));
+
+        // Should be blocked by Legal review (required), not Security (optional)
+        Assert.Contains("RequiredReviewPending", ex.Message);
+    }
+
+    /// <summary>
+    /// BLOCKER #3 FIX: Retrocompatibility test.
+    /// Tenant has NO configuration → all reviews required (MVP behavior).
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_NoConfiguration_DefaultAllRequired_AllBlocksApproval()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var approverUserId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        var activity = ProcessingActivity.Create(tenantId, "Test Activity", ownerUserId);
+        activity.SetPurpose(PurposeSection.Create("Test purpose", LegalBasis.ContractExecution, "Test legal reference"), ownerUserId);
+        activity.SetDataCategories([DataCategoryEntry.Create(Guid.NewGuid(), DataSensitivityLevel.Ordinary)], ownerUserId);
+        activity.SetDataSubjects([DataSubjectEntry.Create(DataSubjectType.Employees)], ownerUserId);
+        activity.SubmitForReview(ownerUserId);
+
+        await using var db = BuildProcessingInventoryContext();
+        await using var securityDb = BuildSecurityContext();
+
+        db.ProcessingActivities.Add(activity);
+        await db.SaveChangesAsync();
+
+        var securityReview = Review.Create(tenantId, "ProcessingInventory", "ProcessingActivity", activity.Id, ownerUserId, reviewDomain: 1);
+
+        var permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        permissionsService.GetResourcePermissionsAsync(approverUserId, tenantId, Arg.Any<string>(), Arg.Any<Guid>(),
+                Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new[] { "ComplianceAdmin" },
+                new[] { new AvailableActionResult("ApproveProcessingActivity", "permission.approveProcessingActivity") }.ToList(),
+                false, new List<BlockedActionResult>()));
+
+        var auditService = Substitute.For<IAuditService>();
+        var reviewService = Substitute.For<IReviewService>();
+        reviewService.GetOpenReviewsForEntityAsync(tenantId, activity.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<Review>>(new List<Review> { securityReview }));
+
+        var policyService = Substitute.For<IReviewRequirementPolicyService>();
+        policyService.IsReviewRequiredAsync(tenantId, Arg.Any<string>(), Arg.Any<ReviewType>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true)); // All required by default
+
+        var httpAccessor = BuildHttpContextAccessor(correlationId);
+        var handler = new ApproveProcessingActivityCommandHandler(db, securityDb, permissionsService, auditService, reviewService, policyService, httpAccessor);
+        var cmd = new ApproveProcessingActivityCommand(tenantId, activity.Id, approverUserId);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.HandleAsync(cmd, CancellationToken.None));
+        Assert.Contains("RequiredReviewPending", ex.Message);
+    }
 }

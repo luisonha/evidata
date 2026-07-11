@@ -39,10 +39,10 @@ public sealed class ReviewService : IReviewService
 
     public async Task<Review> CreateAsync(
         Guid tenantId, string targetModule, string targetEntityType,
-        Guid targetEntityId, Guid requestedBy, CancellationToken ct = default)
+        Guid targetEntityId, Guid requestedBy, int reviewDomain = 0, CancellationToken ct = default)
     {
         var review = Review.Create(tenantId, targetModule, targetEntityType,
-            targetEntityId, requestedBy);
+            targetEntityId, requestedBy, reviewDomain);
 
         _db.Reviews.Add(review);
         await _db.SaveChangesAsync(ct);

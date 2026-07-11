@@ -25,6 +25,7 @@ public sealed class WorkflowDbContext : DbContext
             e.Property(r => r.TargetModule).HasColumnName("target_module").HasMaxLength(100).IsRequired();
             e.Property(r => r.TargetEntityType).HasColumnName("target_entity_type").HasMaxLength(100).IsRequired();
             e.Property(r => r.TargetEntityId).HasColumnName("target_entity_id").IsRequired();
+            e.Property(r => r.ReviewDomain).HasColumnName("review_domain").HasDefaultValue(0).IsRequired();
             e.Property(r => r.Status).HasColumnName("status")
                 .HasConversion<string>().HasMaxLength(30).IsRequired();
             e.Property(r => r.RequestedBy).HasColumnName("requested_by").IsRequired();

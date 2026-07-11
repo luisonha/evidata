@@ -4,6 +4,9 @@ namespace Evidata.Modules.Workflow.Domain;
 /// Representa una revisión humana formal sobre una entidad de cualquier módulo.
 /// La entidad es inmutable en sus datos históricos — una vez Approved o ChangesRequested
 /// no puede revertirse; se crea una nueva revisión si se necesita otro ciclo.
+/// 
+/// BLOCKER #3 FIX (Legolas): Added ReviewDomain field to track review type (Legal vs Security).
+/// Required for proper filtering of required/optional reviews per tenant configuration.
 /// </summary>
 public sealed class Review
 {
@@ -18,6 +21,13 @@ public sealed class Review
 
     /// <summary>Id de la entidad revisada.</summary>
     public Guid TargetEntityId { get; private set; }
+
+    /// <summary>
+    /// Type of review: 0=Legal, 1=Security.
+    /// Used to apply tenant-configured review requirements (P1-018).
+    /// Default: 0 (Legal) for backward compatibility.
+    /// </summary>
+    public int ReviewDomain { get; private set; } = 0;
 
     public ReviewStatus Status { get; private set; }
 
@@ -38,7 +48,8 @@ public sealed class Review
         string targetModule,
         string targetEntityType,
         Guid targetEntityId,
-        Guid requestedBy)
+        Guid requestedBy,
+        int reviewDomain = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetModule);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetEntityType);
@@ -50,6 +61,7 @@ public sealed class Review
             TargetModule = targetModule.Trim(),
             TargetEntityType = targetEntityType.Trim(),
             TargetEntityId = targetEntityId,
+            ReviewDomain = reviewDomain,
             Status = ReviewStatus.Open,
             RequestedBy = requestedBy,
             CreatedAt = DateTimeOffset.UtcNow
