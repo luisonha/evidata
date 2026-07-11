@@ -192,22 +192,22 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
         await _handler.HandleAsync(expectedTenantId, processingActivityId, userId, ct);
 
         // Assert: Verify tenantId was propagated to each service
-        _evidenceService.Received(1).GetSummaryAsync(
+        _ = _evidenceService.Received(1).GetSummaryAsync(
             Arg.Is<Guid>(g => g == expectedTenantId), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
 
-        _gapService.Received(1).GetByProcessingActivityAsync(
+        _ = _gapService.Received(1).GetByProcessingActivityAsync(
             Arg.Is<Guid>(g => g == expectedTenantId), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
 
-        _reviewService.Received(1).GetReviewSummaryAsync(
+        _ = _reviewService.Received(1).GetReviewSummaryAsync(
             Arg.Is<Guid>(g => g == expectedTenantId), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
 
-        _timelineService.Received(1).GetTimelineAsync(
+        _ = _timelineService.Received(1).GetTimelineAsync(
             Arg.Is<Guid>(g => g == expectedTenantId), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
 
-        _permissionsService.Received(1).GetResourcePermissionsAsync(
+        _ = _permissionsService.Received(1).GetResourcePermissionsAsync(
             Arg.Any<Guid>(), Arg.Is<Guid>(g => g == expectedTenantId), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>());
 
-        _exportService.Received(1).GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        _ = _exportService.Received(1).GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>

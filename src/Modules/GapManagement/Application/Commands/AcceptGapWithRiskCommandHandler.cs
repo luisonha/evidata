@@ -25,7 +25,7 @@ namespace Evidata.Modules.GapManagement.Application.Commands;
 public sealed class AcceptGapWithRiskCommandHandler(
     GapManagementDbContext db,
     IAuditService auditService,
-    ICurrentUserContext currentUser,
+    ICurrentUserContext _currentUser,
     IHttpContextAccessor httpContextAccessor)
 {
     public async Task<AcceptGapWithRiskResultDto> HandleAsync(
