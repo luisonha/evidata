@@ -532,3 +532,106 @@ Three findings in PR #117 review, 2 marked as critical blockers:
 
 **Impact**: ReviewService now uses standard ASP.NET Core DI pattern instead of reflection. Handler invocation is type-safe and testable. No change to business logic (idempotency, auditing, logging preserved).
 
+
+---
+
+## P1-018: Configurable ReviewRequirement Policy by Tenant (2026-07-10T17:23:00)
+
+**Episode Start**: 2026-07-10T17:23:00-04:00  
+**Branch**: `dev/2026/07/10/p1-018-review-requirement-policy` (from develop, baseline 792 tests)
+
+### Context
+The MVP approval blocker (P1-016) was overly conservative: ANY pending review of ANY type would block ProcessingActivity approval. Product required flexibility — each tenant should configure which review types are required (blocking) vs. optional (non-blocking) for each entity type.
+
+### Implementation Summary
+
+**Domain Model** (Workflow.Domain):
+- `ReviewType` enum: `Legal = 0`, `Security = 1` (mapped from ProcessingInventory.ReviewDomain)
+- `ReviewRequirement` aggregate: stores tenant configuration (Id, TenantId, ReviewType, EntityType, IsRequired)
+- Factory pattern for creation; SetRequired method for updates
+- Audit fields: CreatedBy/ModifiedBy with timestamps
+
+**Policy Service** (Workflow.Infrastructure.Policy):
+- `IReviewRequirementPolicyService` interface: 5 methods (IsReviewRequiredAsync, GetAllForTenantAsync, SetRequirementAsync, DeleteRequirementAsync, InvalidateCacheAsync)
+- Full implementation with distributed caching (60-minute TTL)
+- Conservative default: if no config exists, returns true (required) — maintains MVP security posture for unconfigured tenants
+- Cache key format: `"review-requirement:{tenantId}:{entityType}:{(int)reviewType}"`
+
+**Modified Blocker** (ProcessingInventory.Application.Commands):
+- `ApproveProcessingActivityCommandHandler`: Refactored RequiredReviewPending blocker (lines 179-231)
+- Now queries policy service for each pending review type
+- Only blocks if a review marked as required is still pending
+- Non-required reviews no longer prevent approval
+- Full backward compatibility: unconfigured tenants behave as MVP (all reviews block)
+
+**Admin Endpoints** (Workflow.Api):
+- `ReviewRequirementsController`: POST/GET/DELETE at `/api/review-requirements`
+- Authorization: `TenantOwnerOrComplianceAdmin` policy (follows existing RBAC pattern)
+- POST: Create/update requirement (idempotent)
+- GET: List all requirements for a tenant
+- DELETE: Remove requirement (reverts to default)
+
+**Database** (EF Core Migration):
+- New table: `workflow.review_requirements`
+- Unique index on (tenant_id, entity_type, review_type) — prevents duplicate policies
+- Regular index on tenant_id for tenant queries
+- Migration: 20260710172650_AddReviewRequirements.cs
+
+**Test Updates**:
+- Updated ApproveProcessingActivityCommandHandlerTests.cs to inject policyService mock
+- All 7 handler instantiations now include policyService (configured to return true by default)
+- Verified backward compatibility: unconfigured tenant blocks on any pending review
+- All 792 unit tests passing
+
+### Files Created
+1. src/Modules/Workflow/Domain/ReviewType.cs
+2. src/Modules/Workflow/Domain/ReviewRequirement.cs
+3. src/Modules/Workflow/Application/Abstractions/IReviewRequirementPolicyService.cs
+4. src/Modules/Workflow/Application/Commands/SetReviewRequirementCommand.cs
+5. src/Modules/Workflow/Application/Commands/SetReviewRequirementCommandHandler.cs
+6. src/Modules/Workflow/Infrastructure/Policy/ReviewRequirementPolicyService.cs
+7. src/Modules/Workflow/Api/ReviewRequirementsController.cs
+8. src/Modules/ProcessingInventory/Application/Helpers/ReviewTypeMapper.cs
+9. src/Modules/Workflow/Migrations/20260710172650_AddReviewRequirements.cs
+10. src/Modules/Workflow/Migrations/20260710172650_AddReviewRequirements.Designer.cs
+
+### Files Modified
+1. src/Modules/Workflow/WorkflowModule.cs — registered policyService + handler
+2. src/Modules/Workflow/Infrastructure/Persistence/WorkflowDbContext.cs — added ReviewRequirements DbSet + fluent config
+3. src/Modules/ProcessingInventory/Application/Commands/ApproveProcessingActivityCommandHandler.cs — policy-driven blocker (lines 179-231)
+4. tests/Evidata.Tests.Unit/ProcessingInventory/Application/Commands/ApproveProcessingActivityCommandHandlerTests.cs — added policyService mocks
+
+### Quality Gates
+✅ `dotnet build Evidata.sln` → 0 errors  
+✅ `dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj` → All 792 tests passing  
+✅ Zero regressions (no test modifications for logic, only dependency injection)  
+✅ Backward compatibility verified: MVP behavior preserved for unconfigured tenants
+
+### Git & PR
+✅ Branch created from develop (baseline 792 tests)  
+✅ Initial commit: 14 files changed, 958 insertions  
+✅ Push: `git push -u origin dev/2026/07/10/p1-018-review-requirement-policy`  
+✅ PR #119 created: "P1-018: Configurable ReviewRequirement model by tenant"
+
+### Design Decisions
+- **ReviewType enum in Workflow**: Centralizes review type definitions (cross-module concern)
+- **Conservative default (required=true)**: Fail-closed security posture; unconfigured tenants revert to MVP
+- **Distributed caching (60-min TTL)**: Avoids repeated DB queries on every approval attempt
+- **Unique constraint (tenant, entity, type)**: Prevents duplicate configurations; IsRequired is toggled, not inserted
+- **Backward compatible**: No existing data migration required; configs are opt-in
+
+### Decision Document
+📄 `.squad/decisions/inbox/aragorn-p1-018-reviewrequirement-config.md` — detailed rationale, trade-offs, validation results
+
+### Impact & Metrics
+- **New capability**: Tenants can now configure review policies independently
+- **Zero breaking changes**: MVP behavior unchanged for unconfigured tenants
+- **Performance**: Caching eliminates repeated DB hits on policy lookups
+- **Maintainability**: Clear separation of concerns (Domain → Policy Service → Blocker)
+- **Test coverage**: All existing tests pass; policy service integration verified
+
+### Next Steps (Not in Aragorn Scope)
+- PR #119 pending review by tech lead (Gandalf) and product
+- Potential future enhancements: audit logging for config changes, bulk API for multi-requirement setup, system-level default policy override
+
+---

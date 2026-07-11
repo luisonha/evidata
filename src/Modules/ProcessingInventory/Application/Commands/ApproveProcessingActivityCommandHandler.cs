@@ -7,6 +7,7 @@ using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.Security.Infrastructure.Persistence;
 using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Abstractions;
+using Evidata.Modules.Workflow.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,6 +45,7 @@ public sealed class ApproveProcessingActivityCommandHandler(
     IResourcePermissionsQueryService permissionsService,
     IAuditService auditService,
     IReviewService reviewService,
+    IReviewRequirementPolicyService policyService,
     IHttpContextAccessor httpContextAccessor)
 {
     public async Task<ProcessingActivityDto> HandleAsync(
@@ -174,24 +176,45 @@ public sealed class ApproveProcessingActivityCommandHandler(
                     $"ApprovalBlocked ({blockerCode}): {blockerDetail}");
             }
 
-            // ── Validación: RequiredReviewPending (P1-016) ──────────────────────────
+            // ── Validación: RequiredReviewPending (P1-016 → P1-018) ──────────────────────────
+            // P1-018: Filter reviews by configured requirements — only required reviews block approval.
 
             var reviews = await reviewService.GetOpenReviewsForEntityAsync(
                 cmd.TenantId,
                 cmd.ProcessingActivityId,
                 ct);
 
-            // Any open review (not Approved) means the approval is blocked
-            var pendingReview = reviews.FirstOrDefault(r => r.Status != Evidata.Modules.Workflow.Domain.ReviewStatus.Approved);
-            if (pendingReview != null)
+            // P1-018: Filter only reviews whose type is marked as required for this tenant/entity
+            // BLOCKER #3 FIX (Legolas): Map ReviewDomain from Review entity instead of hardcoding to Legal.
+            var pendingRequiredReviews = new List<Review>();
+            foreach (var review in reviews.Where(r => r.Status != ReviewStatus.Approved))
+            {
+                // Map from Review.ReviewDomain (0=Legal, 1=Security) to ReviewType enum
+                var reviewType = (ReviewType)review.ReviewDomain;
+                
+                var isRequired = await policyService.IsReviewRequiredAsync(
+                    cmd.TenantId,
+                    "ProcessingActivity",
+                    reviewType,
+                    ct);
+                
+                if (isRequired)
+                {
+                    pendingRequiredReviews.Add(review);
+                }
+            }
+
+            if (pendingRequiredReviews.Any())
             {
                 var blockerCode = "RequiredReviewPending";
-                var blockerDetail = $"Required review pending (Status: {pendingReview.Status})";
+                var firstPending = pendingRequiredReviews.First();
+                var blockerDetail = $"Required review pending (Status: {firstPending.Status})";
 
                 metadata["blockerCode"] = blockerCode;
                 metadata["blockerDetail"] = blockerDetail;
-                metadata["pendingReviewId"] = pendingReview.Id;
-                metadata["pendingReviewStatus"] = pendingReview.Status.ToString();
+                metadata["pendingReviewId"] = firstPending.Id;
+                metadata["pendingReviewStatus"] = firstPending.Status.ToString();
+                metadata["pendingReviewsCount"] = pendingRequiredReviews.Count;
 
                 await auditService.LogAsync(
                     cmd.TenantId,
