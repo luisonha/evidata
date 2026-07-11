@@ -1,4 +1,4 @@
-# 05 — Backlog de implementación backend v1.7.0
+# 05 — Backlog de implementación backend v1.7.1
 
 ## P0 — Bloqueantes de contrato
 
@@ -57,9 +57,10 @@
 
 **Resumen:**
 - ✅ **6 de 6 permisos críticos completamente implementados** — ciclo RBAC P1-011→P1-DEGRADATION cerrado sin pendientes
-- 📊 **828 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117, #118, #119, #120, #121, #123, #124)
-- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-DEGRADATION sistemáticamente cierra cada permiso, incluye revisión arquitectónica de calidad (eliminación de reflection, P1-019), remediación de seguridad multi-tenant bajo lockout de revisor (P1-018), detección/corrección proactiva de bugs de DI antes de revisión formal (P1-014-P2), cierre de degradación parcial en /control (P1-DEGRADATION), y alineación de scripts de provisión/seed con el modelo RBAC (P1-SCRIPTS-ALIGNMENT)
+- 📊 **828 unit tests pasando**, 0 regressions, **0 compilation warnings** (P2-CLEANUP-WARNINGS eliminó 8 warnings pre-existentes)
+- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-DEGRADATION sistemáticamente cierra cada permiso, incluye revisión arquitectónica de calidad (eliminación de reflection, P1-019), remediación de seguridad multi-tenant bajo lockout de revisor (P1-018), detección/corrección proactiva de bugs de DI antes de revisión formal (P1-014-P2), cierre de degradación parcial en /control (P1-DEGRADATION), alineación de scripts de provisión/seed con el modelo RBAC (P1-SCRIPTS-ALIGNMENT), y limpieza de compilación (P2-CLEANUP-WARNINGS)
 - ✅ **`develop` y `main` sincronizados** (PR #122) — sprint 2 completamente reconciliado en ambas ramas
+- ✅ **Build limpio**: `dotnet clean && dotnet build` produce 0 warnings, 0 errors (verified post-P2-CLEANUP-WARNINGS)
 
 **Próximas Tareas:**
 1. Dependabot/CodeQL (requiere habilitación manual en GitHub Settings por el usuario — fuera de alcance para el coordinador/agentes)
@@ -72,6 +73,7 @@
 |---|---|---|
 | P2-001 | Definir retiro de rutas `/api/...` legacy. | Migración controlada. |
 | P2-001a | ✅ COMPLETADO: P1-014-P2: Implementar auto-detección de ExportWarning en GenerateOfficialExport (SEC-EXP-001 Gap #2). | `IProcessingActivityRiskAssessmentService` implementado en la capa `Evidata.Api` (mismo patrón que `ProcessingActivityControlCompositionQueryHandler`, única capa sin ciclos de referencia entre módulos), agrega riesgos de GapManagement (brechas críticas), Evidence (pendiente/bloqueante) y Workflow (revisiones pendientes vía policy de P1-018). Non-blocking: export se genera siempre, warning es advisorio; graceful degradation si falla una query. Aislamiento multi-tenant vía `ICurrentUserContext`. **Ciclo de calidad**: coordinador detectó y corrigió 2 defectos (interfaces de DI duplicadas sin registrar; test de DI roto) antes de enviar a revisión formal — Gandalf aprobó sin condiciones en 1 sola ronda. PR #120 merged (2026-07-11). 818 tests totales, 0 regresiones. | ✅ Unit + integration tests; 818 unit tests passing |
+| P2-CLEANUP-WARNINGS | ✅ COMPLETADO — Eliminación de 8 warnings de compilación pre-existentes (CS9113 x3, CS0168 x2, CS4014 x6, CS8604/CS8601 x14) detectados post-merge de P1-RBAC-SEED. | PR #126 (fix inicial, con defecto: rename con `_` NO suprime CS9113) + PR #127 (fix correctivo: eliminación real de 3 parámetros DI no usados). Verificado con `dotnet clean && dotnet build`: 0 advertencias, 0 errores, 828/828 tests. Lección de proceso: verificar siempre con clean build, nunca build incremental. | ✅ 828 unit tests passing, 0 warnings |
 | P2-002 | Limpiar referencias históricas `TreatmentEvidenceSummary`. | Naming consistente. |
 | P2-003 | Separar OpenAPI interno legacy si se requiere. | Contrato público limpio. |
 | P2-004 | Agregar step-up opcional para acciones críticas. | Seguridad avanzada P2. |
