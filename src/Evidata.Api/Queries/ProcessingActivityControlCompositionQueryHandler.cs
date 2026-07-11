@@ -9,6 +9,7 @@ using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Security.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Queries;
+using Microsoft.Extensions.Logging;
 
 namespace Evidata.Api.Queries;
 
@@ -30,6 +31,7 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
     private readonly ITimelineQueryService _timelineService;
     private readonly IExportOptionsQueryService _exportService;
     private readonly IResourcePermissionsQueryService _permissionsService;
+    private readonly ILogger<ProcessingActivityControlCompositionQueryHandler> _logger;
 
     public ProcessingActivityControlCompositionQueryHandler(
         GetProcessingActivityControlQueryHandler stubHandler,
@@ -38,7 +40,8 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
         IReviewSummaryQueryService reviewService,
         ITimelineQueryService timelineService,
         IExportOptionsQueryService exportService,
-        IResourcePermissionsQueryService permissionsService)
+        IResourcePermissionsQueryService permissionsService,
+        ILogger<ProcessingActivityControlCompositionQueryHandler> logger)
     {
         _stubHandler = stubHandler ?? throw new ArgumentNullException(nameof(stubHandler));
         _evidenceService = evidenceService ?? throw new ArgumentNullException(nameof(evidenceService));
@@ -47,11 +50,17 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
         _timelineService = timelineService ?? throw new ArgumentNullException(nameof(timelineService));
         _exportService = exportService ?? throw new ArgumentNullException(nameof(exportService));
         _permissionsService = permissionsService ?? throw new ArgumentNullException(nameof(permissionsService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
     /// Handles the complete /control endpoint by orchestrating all module services in parallel.
     /// Tenant isolation is enforced at each service call.
+    /// 
+    /// P1-DEGRADATION Strategy:
+    /// - CRITICAL services (permissions): fail-closed. If they fail, the entire endpoint fails.
+    /// - OPTIONAL services (evidence, gap, review, timeline, exports): fail-open with graceful degradation.
+    ///   If they fail, a warning is logged and a safe default value is used for composition.
     /// </summary>
     public async Task<ProcessingActivityControlViewModel?> HandleAsync(
         Guid tenantId,
@@ -82,28 +91,97 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
         var permissionsTask = _permissionsService.GetResourcePermissionsAsync(
             userId, tenantId, "processingActivity", processingActivityId, permissionContextData, ct);
 
-        // Wait for all tasks to complete
+        // Step 3: Handle each task individually to support graceful degradation
+        // CRITICAL: permissionsTask must succeed; if it fails, propagate the exception (fail-closed)
+        EvidenceSummaryDto? evidenceSummaryDto = null;
+        ProcessingActivityGapSummaryDto? gapSummaryDto = null;
+        ReviewSummaryDto? reviewSummaryDto = null;
+        IReadOnlyList<Modules.Audit.Application.DTOs.TimelineEventViewModel>? timelineEvents = null;
+        IReadOnlyList<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>? exportOptions = null;
+
         try
         {
-            await Task.WhenAll(evidenceTask, gapTask, reviewTask, timelineTask, exportTask, permissionsTask);
+            evidenceSummaryDto = await evidenceTask;
         }
-        catch
+        catch (Exception ex)
         {
-            // TODO P1-COMPOSITION: Decide on partial degradation strategy.
-            // For now, rethrow. In production, consider returning null for optional fields
-            // and allowing UI to render with incomplete data.
-            throw;
+            _logger.LogWarning(
+                "Evidence service failed for processingActivityId={processingActivityId}, tenantId={tenantId}. " +
+                "Degrading to empty evidence summary. Exception: {exceptionMessage}",
+                processingActivityId, tenantId, ex.Message);
+            // Degrade to empty: will be handled by MapEvidenceSummary
+            evidenceSummaryDto = null;
         }
 
-        // Step 3: Map DTOs to ViewModels
-        var evidenceSummary = MapEvidenceSummary(await evidenceTask);
-        var gapSummary = MapGapSummary(await gapTask);
-        var reviewSummary = MapReviewSummary(await reviewTask, baseControl.Version);
-        var timeline = MapTimeline(await timelineTask);
-        var exports = MapExports(await exportTask);
-        var permissions = MapPermissions(await permissionsTask, baseControl.ProcessingActivity.OwnerUserId);
+        try
+        {
+            gapSummaryDto = await gapTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Gap Management service failed for processingActivityId={processingActivityId}, tenantId={tenantId}. " +
+                "Degrading to empty gap summary. Exception: {exceptionMessage}",
+                processingActivityId, tenantId, ex.Message);
+            // Degrade to empty
+            gapSummaryDto = null;
+        }
 
-        // Step 4: Compose the complete view model
+        try
+        {
+            reviewSummaryDto = await reviewTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Review service failed for processingActivityId={processingActivityId}, tenantId={tenantId}. " +
+                "Degrading to empty review summary. Exception: {exceptionMessage}",
+                processingActivityId, tenantId, ex.Message);
+            // Degrade to null: MapReviewSummary already handles null safely
+            reviewSummaryDto = null;
+        }
+
+        try
+        {
+            timelineEvents = await timelineTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Timeline service failed for processingActivityId={processingActivityId}, tenantId={tenantId}. " +
+                "Degrading to empty timeline. Exception: {exceptionMessage}",
+                processingActivityId, tenantId, ex.Message);
+            // Degrade to empty list
+            timelineEvents = new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly();
+        }
+
+        try
+        {
+            exportOptions = await exportTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Export service failed for processingActivityId={processingActivityId}. " +
+                "Degrading to empty export options. Exception: {exceptionMessage}",
+                processingActivityId, ex.Message);
+            // Degrade to empty list
+            exportOptions = new List<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>().AsReadOnly();
+        }
+
+        // CRITICAL (fail-closed): permissionsTask must succeed
+        // If it throws, the exception propagates and the entire endpoint fails
+        var permissionsResult = await permissionsTask;
+
+        // Step 4: Map DTOs to ViewModels
+        var evidenceSummary = MapEvidenceSummary(evidenceSummaryDto);
+        var gapSummary = MapGapSummary(gapSummaryDto);
+        var reviewSummary = MapReviewSummary(reviewSummaryDto, baseControl.Version);
+        var timeline = MapTimeline(timelineEvents ?? new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly());
+        var exports = MapExports(exportOptions ?? new List<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>().AsReadOnly());
+        var permissions = MapPermissions(permissionsResult, baseControl.ProcessingActivity.OwnerUserId);
+
+        // Step 5: Compose the complete view model
         var controlViewModel = new ProcessingActivityControlViewModel(
             ProcessingActivity: baseControl.ProcessingActivity,
             Version: baseControl.Version,
@@ -129,9 +207,27 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
 
     /// <summary>
     /// Maps Evidence module DTO to ProcessingInventory ViewModel.
+    /// Handles null gracefully by returning an empty summary (0 requirements, 0% completion).
     /// </summary>
-    private static EvidenceSummaryViewModel MapEvidenceSummary(EvidenceSummaryDto dto) =>
-        new(
+    private static EvidenceSummaryViewModel MapEvidenceSummary(EvidenceSummaryDto? dto)
+    {
+        if (dto is null)
+        {
+            // Return empty evidence summary if service failed or returned null
+            return new EvidenceSummaryViewModel(
+                ProcessingActivityId: Guid.Empty,
+                VersionId: Guid.Empty,
+                TotalRequirements: 0,
+                PendingCount: 0,
+                AttachedCount: 0,
+                ValidatedCount: 0,
+                InsufficientCount: 0,
+                RejectedCount: 0,
+                BlockingRequirementsCount: 0,
+                CompletionPercentage: 0m);
+        }
+
+        return new EvidenceSummaryViewModel(
             ProcessingActivityId: dto.ProcessingActivityId,
             VersionId: dto.VersionId,
             TotalRequirements: dto.TotalRequirements,
@@ -142,12 +238,32 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
             RejectedCount: dto.RejectedCount,
             BlockingRequirementsCount: dto.BlockingRequirementsCount,
             CompletionPercentage: dto.CompletionPercentage);
+    }
 
     /// <summary>
     /// Maps GapManagement module DTO to ProcessingInventory ViewModel.
+    /// Handles null gracefully by returning an empty summary (0 gaps).
     /// </summary>
-    private static Modules.ProcessingInventory.Application.ViewModels.GapSummaryViewModel MapGapSummary(ProcessingActivityGapSummaryDto dto) =>
-        new(
+    private static Modules.ProcessingInventory.Application.ViewModels.GapSummaryViewModel MapGapSummary(ProcessingActivityGapSummaryDto? dto)
+    {
+        if (dto is null)
+        {
+            // Return empty gap summary if service failed or returned null
+            return new Modules.ProcessingInventory.Application.ViewModels.GapSummaryViewModel(
+                ProcessingActivityId: Guid.Empty,
+                VersionId: Guid.Empty,
+                TotalCount: 0,
+                OpenCount: 0,
+                InCorrectionCount: 0,
+                ResolvedCount: 0,
+                AcceptedWithRiskCount: 0,
+                DismissedCount: 0,
+                HighestSeverity: null,
+                HighestSeverityLabelKey: "",
+                ApprovalBlocked: false);
+        }
+
+        return new Modules.ProcessingInventory.Application.ViewModels.GapSummaryViewModel(
             ProcessingActivityId: dto.ProcessingActivityId,
             VersionId: dto.VersionId,
             TotalCount: dto.TotalCount,
@@ -159,6 +275,7 @@ public sealed class ProcessingActivityControlCompositionQueryHandler : IProcessi
             HighestSeverity: ConvertGapSeverity(dto.HighestSeverity),
             HighestSeverityLabelKey: dto.HighestSeverityLabelKey,
             ApprovalBlocked: dto.ApprovalBlocked);
+    }
 
     /// <summary>
     /// Converts GapManagement domain enum to ProcessingInventory view model enum.

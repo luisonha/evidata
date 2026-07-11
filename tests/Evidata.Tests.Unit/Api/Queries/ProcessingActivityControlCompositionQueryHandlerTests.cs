@@ -1,6 +1,7 @@
 using NSubstitute;
 using Xunit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Evidata.Api.Queries;
 using Evidata.Modules.ProcessingInventory.Application.ViewModels;
 using Evidata.Modules.ProcessingInventory.Domain;
@@ -33,6 +34,7 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
     private readonly ITimelineQueryService _timelineService;
     private readonly IExportOptionsQueryService _exportService;
     private readonly IResourcePermissionsQueryService _permissionsService;
+    private readonly ILogger<ProcessingActivityControlCompositionQueryHandler> _logger;
     private readonly GetProcessingActivityControlQueryHandler _stubHandler;
     private readonly ProcessingActivityControlCompositionQueryHandler _handler;
 
@@ -51,6 +53,7 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
         _timelineService = Substitute.For<ITimelineQueryService>();
         _exportService = Substitute.For<IExportOptionsQueryService>();
         _permissionsService = Substitute.For<IResourcePermissionsQueryService>();
+        _logger = Substitute.For<ILogger<ProcessingActivityControlCompositionQueryHandler>>();
         
         // Create a real base handler with in-memory database
         _stubHandler = new GetProcessingActivityControlQueryHandler(_dbContext);
@@ -62,7 +65,8 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
             _reviewService,
             _timelineService,
             _exportService,
-            _permissionsService);
+            _permissionsService,
+            _logger);
     }
 
     /// <summary>
@@ -277,10 +281,12 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
     }
 
     /// <summary>
-    /// Scenario 4: Error Handling - Exception from critical service propagates.
+    /// Scenario 4: Graceful Degradation - Optional Evidence Service fails
+    /// Verifies that if Evidence service fails, the endpoint responds with empty evidence summary
+    /// and logs a warning. The rest of the data is still composed correctly.
     /// </summary>
     [Fact]
-    public async Task HandleAsync_CriticalServiceThrowsException_PropagatesException()
+    public async Task HandleAsync_OptionalEvidenceServiceFails_DegradesAndLogsWarning()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
@@ -293,14 +299,15 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
         // Setup evidence service to throw
         _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<EvidenceSummaryDto>(
-                new InvalidOperationException("Evidence service failure")));
+                new InvalidOperationException("Evidence service timeout")));
 
         // Setup other mocks to return data
         _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, processingActivityId, 0, 0, 0, 0, 0, 0, null, "", false));
+            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, processingActivityId, 5, 2, 1, 2, 0, 0, 
+                Modules.GapManagement.Domain.GapSeverity.Medium, "severity.medium", false));
 
         _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(new ReviewSummaryDto(processingActivityId, processingActivityId, "Draft", "", null, null, new List<object>(), new List<object>(), null));
+            .Returns(new ReviewSummaryDto(processingActivityId, processingActivityId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
 
         _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly());
@@ -311,10 +318,307 @@ public class ProcessingActivityControlCompositionQueryHandlerTests
         _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
             .Returns(new ResourcePermissionsResult(new[] { "Viewer" }, new AvailableActionResult[0], true, new BlockedActionResult[0]));
 
-        // Act & Assert: Exception is propagated
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        // Act
+        var result = await _handler.HandleAsync(tenantId, processingActivityId, userId, ct);
+
+        // Assert: Endpoint responds with data, evidence is empty/default
+        Assert.NotNull(result);
+        Assert.Equal(processingActivityId, result.ProcessingActivity.Id);
+        
+        // Evidence is degraded: empty summary with 0 requirements and 0% completion
+        Assert.NotNull(result.EvidenceSummary);
+        Assert.Equal(0, result.EvidenceSummary.TotalRequirements);
+        Assert.Equal(0m, result.EvidenceSummary.CompletionPercentage);
+        
+        // Gap summary is still present (other service succeeded)
+        Assert.NotNull(result.GapSummary);
+        Assert.Equal(5, result.GapSummary.TotalCount);
+        
+        // Verify warning was logged
+        _logger.Received(1).Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Evidence service failed")),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    /// <summary>
+    /// Scenario 5: Graceful Degradation - Optional Gap Management Service fails
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_OptionalGapServiceFails_DegradesAndLogsWarning()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var processingActivityId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var versionId = processingActivityId;
+        var ct = CancellationToken.None;
+
+        CreateAndSaveTestActivity(tenantId, processingActivityId, userId);
+
+        // Setup gap service to throw
+        _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProcessingActivityGapSummaryDto>(
+                new TimeoutException("Gap Management service timeout")));
+
+        // Setup other mocks
+        _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new EvidenceSummaryDto(processingActivityId, versionId, 10, 2, 5, 3, 0, 0, 0, 80m));
+
+        _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ReviewSummaryDto(processingActivityId, versionId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
+
+        _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly());
+
+        _exportService.GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>().AsReadOnly());
+
+        _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(new[] { "ProcessOwner" }, new AvailableActionResult[0], false, new BlockedActionResult[0]));
+
+        // Act
+        var result = await _handler.HandleAsync(tenantId, processingActivityId, userId, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.EvidenceSummary);
+        Assert.Equal(10, result.EvidenceSummary.TotalRequirements);
+        
+        // Gap summary is degraded: empty with 0 gaps
+        Assert.NotNull(result.GapSummary);
+        Assert.Equal(0, result.GapSummary.TotalCount);
+        
+        // Verify warning was logged
+        _logger.Received(1).Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Gap Management service failed")),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    /// <summary>
+    /// Scenario 6: Graceful Degradation - Optional Timeline Service fails
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_OptionalTimelineServiceFails_DegradesAndLogsWarning()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var processingActivityId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var versionId = processingActivityId;
+        var ct = CancellationToken.None;
+
+        CreateAndSaveTestActivity(tenantId, processingActivityId, userId);
+
+        // Setup timeline service to throw
+        _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<Modules.Audit.Application.DTOs.TimelineEventViewModel>>(
+                new InvalidOperationException("Timeline service error")));
+
+        // Setup other services
+        _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new EvidenceSummaryDto(processingActivityId, versionId, 10, 2, 5, 3, 0, 0, 0, 80m));
+
+        _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, versionId, 5, 2, 1, 2, 0, 0, 
+                Modules.GapManagement.Domain.GapSeverity.Medium, "severity.medium", false));
+
+        _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ReviewSummaryDto(processingActivityId, versionId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
+
+        _exportService.GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>().AsReadOnly());
+
+        _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(new[] { "Viewer" }, new AvailableActionResult[0], true, new BlockedActionResult[0]));
+
+        // Act
+        var result = await _handler.HandleAsync(tenantId, processingActivityId, userId, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.EvidenceSummary);
+        Assert.NotNull(result.GapSummary);
+        
+        // Timeline is degraded: empty list
+        Assert.NotNull(result.Timeline);
+        Assert.Empty(result.Timeline);
+        
+        // Verify warning was logged
+        _logger.Received(1).Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Timeline service failed")),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    /// <summary>
+    /// Scenario 7: Graceful Degradation - Optional Export Service fails
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_OptionalExportServiceFails_DegradesAndLogsWarning()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var processingActivityId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var versionId = processingActivityId;
+        var ct = CancellationToken.None;
+
+        CreateAndSaveTestActivity(tenantId, processingActivityId, userId);
+
+        // Setup export service to throw
+        _exportService.GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>>(
+                new InvalidOperationException("Export service error")));
+
+        // Setup other services
+        _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new EvidenceSummaryDto(processingActivityId, versionId, 10, 2, 5, 3, 0, 0, 0, 80m));
+
+        _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, versionId, 5, 2, 1, 2, 0, 0, 
+                Modules.GapManagement.Domain.GapSeverity.Medium, "severity.medium", false));
+
+        _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ReviewSummaryDto(processingActivityId, versionId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
+
+        _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly());
+
+        _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(new[] { "Viewer" }, new AvailableActionResult[0], true, new BlockedActionResult[0]));
+
+        // Act
+        var result = await _handler.HandleAsync(tenantId, processingActivityId, userId, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.EvidenceSummary);
+        Assert.NotNull(result.GapSummary);
+        Assert.Empty(result.Timeline);
+        
+        // Exports are degraded: empty list
+        Assert.NotNull(result.Exports);
+        Assert.Empty(result.Exports);
+        
+        // Verify warning was logged
+        _logger.Received(1).Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Export service failed")),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    /// <summary>
+    /// Scenario 8: Multiple Optional Services Fail Simultaneously
+    /// Verifies that multiple optional service failures are handled gracefully,
+    /// with each degraded appropriately.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_MultipleOptionalServicesFail_AllDegradedCorrectly()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var processingActivityId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var versionId = processingActivityId;
+        var ct = CancellationToken.None;
+
+        CreateAndSaveTestActivity(tenantId, processingActivityId, userId);
+
+        // Setup Timeline and Export services to fail
+        _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<Modules.Audit.Application.DTOs.TimelineEventViewModel>>(
+                new InvalidOperationException("Timeline error")));
+
+        _exportService.GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>>(
+                new InvalidOperationException("Export error")));
+
+        // Setup other services to succeed
+        _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new EvidenceSummaryDto(processingActivityId, versionId, 10, 2, 5, 3, 0, 0, 0, 80m));
+
+        _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, versionId, 5, 2, 1, 2, 0, 0, 
+                Modules.GapManagement.Domain.GapSeverity.Medium, "severity.medium", false));
+
+        _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ReviewSummaryDto(processingActivityId, versionId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
+
+        _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(new[] { "ProcessOwner" }, 
+                new[] { new AvailableActionResult("EditProcessingActivity", "permission.edit") }, false, new BlockedActionResult[0]));
+
+        // Act
+        var result = await _handler.HandleAsync(tenantId, processingActivityId, userId, ct);
+
+        // Assert: All services that succeeded are present, failed services are degraded
+        Assert.NotNull(result);
+        Assert.Equal(10, result.EvidenceSummary.TotalRequirements);
+        Assert.Equal(5, result.GapSummary.TotalCount);
+        Assert.Empty(result.Timeline);
+        Assert.Empty(result.Exports);
+        
+        // Verify 2 warnings were logged
+        _logger.Received(2).Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    /// <summary>
+    /// Scenario 9: CRITICAL Service (Permissions) Fails - Fail-Closed Behavior
+    /// Verifies that if the critical permissions service fails, the entire endpoint fails (no graceful degradation).
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_CriticalPermissionsServiceFails_PropagatesException()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var processingActivityId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var versionId = processingActivityId;
+        var ct = CancellationToken.None;
+
+        CreateAndSaveTestActivity(tenantId, processingActivityId, userId);
+
+        // Setup permissions service to throw (CRITICAL - must fail the endpoint)
+        _permissionsService.GetResourcePermissionsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<ResourceContextData>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ResourcePermissionsResult>(
+                new UnauthorizedAccessException("Permissions service failed")));
+
+        // Setup other services to return data
+        _evidenceService.GetSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new EvidenceSummaryDto(processingActivityId, versionId, 10, 2, 5, 3, 0, 0, 0, 80m));
+
+        _gapService.GetByProcessingActivityAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessingActivityGapSummaryDto(processingActivityId, versionId, 5, 2, 1, 2, 0, 0, 
+                Modules.GapManagement.Domain.GapSeverity.Medium, "severity.medium", false));
+
+        _reviewService.GetReviewSummaryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ReviewSummaryDto(processingActivityId, versionId, "Draft", "review.status.draft", null, null, new List<object>(), new List<object>(), null));
+
+        _timelineService.GetTimelineAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Audit.Application.DTOs.TimelineEventViewModel>().AsReadOnly());
+
+        _exportService.GetExportOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Modules.Reporting.Application.Abstractions.ExportOptionViewModel>().AsReadOnly());
+
+        // Act & Assert: Exception is propagated (fail-closed)
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => _handler.HandleAsync(tenantId, processingActivityId, userId, ct));
 
-        Assert.Contains("Evidence service failure", ex.Message);
+        Assert.Contains("Permissions service failed", ex.Message);
     }
 }
