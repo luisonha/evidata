@@ -3,6 +3,8 @@ using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
+using Evidata.Modules.Identity.Application.Abstractions;
+using Evidata.Modules.Identity.Infrastructure;
 using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
@@ -63,6 +65,11 @@ public sealed class ProcessingActivityRiskAssessmentServiceDependencyInjectionTe
         services.AddReportingModule(config);
         services.AddSearchModule(config);
         
+        // Register ICurrentUserContext for test DI (same as in production via AddIdentityBridge)
+        // Using NullCurrentUserContext as test-double to verify that all dependencies resolve correctly
+        // In production, this is registered by AddIdentityBridge as JwtCurrentUserContext or LocalDevCurrentUserContext
+        services.AddScoped<ICurrentUserContext, NullCurrentUserContext>();
+        
         // Add DbContext for Outbox
         services.AddDbContext<OutboxDbContext>(options =>
             options.UseInMemoryDatabase("evidata_test"));
@@ -114,6 +121,9 @@ public sealed class ProcessingActivityRiskAssessmentServiceDependencyInjectionTe
         services.AddReportingModule(config);
         services.AddSearchModule(config);
         
+        // Register ICurrentUserContext for test DI (same as in production via AddIdentityBridge)
+        services.AddScoped<ICurrentUserContext, NullCurrentUserContext>();
+        
         services.AddDbContext<OutboxDbContext>(options =>
             options.UseInMemoryDatabase("evidata_test"));
         services.AddScoped<OutboxRepository>();
@@ -130,10 +140,14 @@ public sealed class ProcessingActivityRiskAssessmentServiceDependencyInjectionTe
         var gapService = serviceProvider.GetRequiredService<Evidata.Modules.GapManagement.Application.Abstractions.IGapSummaryQueryService>();
         var evidenceService = serviceProvider.GetRequiredService<Evidata.Modules.Evidence.Application.Abstractions.IEvidenceSummaryQueryService>();
         var reviewService = serviceProvider.GetRequiredService<Evidata.Modules.Workflow.Application.Abstractions.IReviewSummaryQueryService>();
+        var currentUserContext = serviceProvider.GetRequiredService<ICurrentUserContext>();
+        var logger = serviceProvider.GetRequiredService<ILogger<ProcessingActivityRiskAssessmentService>>();
         
         // Assert: All services should be resolved
         Assert.NotNull(gapService);
         Assert.NotNull(evidenceService);
         Assert.NotNull(reviewService);
+        Assert.NotNull(currentUserContext);
+        Assert.NotNull(logger);
     }
 }

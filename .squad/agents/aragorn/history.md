@@ -711,3 +711,42 @@ dotnet test → 818 tests (816 + 2 new DI tests)
 
 **Commit**: `5e3713b` — "Fix DI bug in P1-014-P2: Move ProcessingActivityRiskAssessmentService to API layer and use real interfaces"
 
+
+## 2026-07-11: Fixed ProcessingActivityRiskAssessmentService DI Test Failure
+
+**Issue**: Test `ServiceResolution_WithAllModulesConfigured_ShouldSucceed` was failing with:
+```
+System.InvalidOperationException: Unable to resolve service for type 
+'Evidata.Modules.Identity.Application.Abstractions.ICurrentUserContext' 
+while attempting to activate 'Evidata.Api.Services.ProcessingActivityRiskAssessmentService'.
+```
+
+**Root Cause Analysis**:
+- ProcessingActivityRiskAssessmentService (line 29) depends on `ICurrentUserContext` in its constructor
+- Uses `currentUserContext.TenantId` for tenant isolation (line 39)
+- Test was registering all modules via `.AddXxxModule()` but NOT registering `ICurrentUserContext`
+- Production `Program.cs` line 38 calls `AddIdentityBridge()` which registers `ICurrentUserContext` as either:
+  - `LocalDevCurrentUserContext` (in Development)
+  - `JwtCurrentUserContext` (in other environments)
+
+**Solution**:
+1. Added imports: `ICurrentUserContext` and `NullCurrentUserContext`
+2. Registered `ICurrentUserContext` as `NullCurrentUserContext` (test-double implementation) in both DI tests
+   - `NullCurrentUserContext` is a minimal implementation with default `Guid.Empty` tenant/user IDs
+   - Sufficient for verifying that DI resolution succeeds (test doesn't execute async logic)
+3. Enhanced `DependenciesResolution_AllRequiredServicesPresent_ShouldResolveSuccessfully` to explicitly verify resolution of:
+   - IGapSummaryQueryService
+   - IEvidenceSummaryQueryService
+   - IReviewSummaryQueryService
+   - ICurrentUserContext
+   - ILogger<ProcessingActivityRiskAssessmentService>
+
+**Verification**:
+```
+dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj --filter "ProcessingActivityRiskAssessmentServiceDependencyInjectionTests"
+Result: Correctas! - Con error: 0, Superado: 2, Omitido: 0, Total: 2
+```
+
+All 818 tests in Evidata.Tests.Unit pass with 0 failures.
+
+**Commit**: `dc23851` - "Fix: Register ICurrentUserContext in ProcessingActivityRiskAssessmentService DI tests"
