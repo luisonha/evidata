@@ -22,11 +22,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Evidata.ServiceDefaults\Evidata.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Contracts\Evidata.Modules.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Modules\Documents\Evidata.Modules.Documents.csproj" />
     <ProjectReference Include="..\..\src\Modules\Evidence\Evidata.Modules.Evidence.csproj" />
     <ProjectReference Include="..\..\src\Modules\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
     <ProjectReference Include="..\..\src\Modules\GapManagement\Evidata.Modules.GapManagement.csproj" />
     <ProjectReference Include="..\..\src\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Security\Evidata.Modules.Security.csproj" />
   </ItemGroup>
 
 </Project>

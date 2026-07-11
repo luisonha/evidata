@@ -59,6 +59,7 @@ builder.Services.AddSearchModule(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
 
 // SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
+// Each host maintains its own adapter in Infrastructure/Adapters (see P1-017-ADAPTER).
 builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
 builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
     new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));

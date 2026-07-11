@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.Reporting.Handlers;
+using Evidata.Functions.Reporting.Infrastructure.Adapters;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.Documents.Infrastructure.Configuration;
@@ -7,7 +8,9 @@ using Evidata.Modules.Documents.Infrastructure.Storage;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
 using Evidata.Modules.ProcessingInventory;
+using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.Reporting;
+using Evidata.Modules.Security;
 using Evidata.Worker.Outbox.Persistence;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -21,6 +24,8 @@ var builder = FunctionsApplication.CreateBuilder(args);
 builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
+// DI Registration order: Security (RBAC) must be registered before Evidence (which requires IResourcePermissionsQueryService)
+builder.Services.AddRbac(builder.Configuration);
 builder.Services.AddEvidenceModule(builder.Configuration);
 builder.Services.AddAudit(builder.Configuration);
 builder.Services.AddProcessingInventoryModule(builder.Configuration);
@@ -29,6 +34,12 @@ builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddScoped<IOutboxWriter, NullOutboxWriter>();
 builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
+
+// SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
+// Adapter moved to Evidata.Modules.Contracts (neutral layer) for reuse across hosts
+builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
+builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
+    new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));
 
 // Blob Storage — usa Azurite en local (AzureWebJobsStorage=UseDevelopmentStorage=true)
 builder.Services.Configure<BlobStorageOptions>(
