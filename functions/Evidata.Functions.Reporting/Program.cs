@@ -6,9 +6,11 @@ using Evidata.Modules.Documents.Infrastructure.Configuration;
 using Evidata.Modules.Documents.Infrastructure.Storage;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
+using Evidata.Modules.Identity;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.Reporting;
 using Evidata.Modules.Security;
+using Evidata.Modules.TenantManagement;
 using Evidata.Worker.Outbox.Persistence;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -22,7 +24,13 @@ var builder = FunctionsApplication.CreateBuilder(args);
 builder.ConfigureFunctionsWebApplication();
 builder.AddServiceDefaults();
 
-// DI Registration order: Security (RBAC) must be registered before Evidence (which requires IResourcePermissionsQueryService)
+// DI Registration order (must match Evidata.Api/Program.cs):
+// 1. TenantManagement (foundation)
+// 2. Identity (provides ICurrentUserContext for security & other modules)
+// 3. RBAC/Security (requires ICurrentUserContext from Identity)
+// 4. Other modules (Evidence requires IResourcePermissionsQueryService from Security)
+builder.Services.AddTenantManagement(builder.Configuration);
+builder.Services.AddIdentityBridge(builder.Configuration, builder.Environment);
 builder.Services.AddRbac(builder.Configuration);
 builder.Services.AddEvidenceModule(builder.Configuration);
 builder.Services.AddAudit(builder.Configuration);

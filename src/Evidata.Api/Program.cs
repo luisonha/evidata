@@ -1,7 +1,6 @@
 using Evidata.Api.Infrastructure.HealthChecks;
 using Evidata.Api.OpenApi;
 using Evidata.Api.Queries;
-using Evidata.Api.Services;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
@@ -63,13 +62,6 @@ builder.Services.AddMcpModule(builder.Configuration);
 builder.Services.AddScoped<ProcessingActivityControlCompositionQueryHandler>();
 builder.Services.AddScoped<IProcessingActivityControlQueryService>(sp =>
     sp.GetRequiredService<ProcessingActivityControlCompositionQueryHandler>());
-
-// P1-014-P2: Register risk assessment service for export warning auto-detection
-// This service aggregates cross-module risk data from GapManagement, Evidence, and Workflow.
-// Lives in API layer to avoid circular dependencies (GapManagement → ProcessingInventory already exists).
-builder.Services.AddScoped<ProcessingActivityRiskAssessmentService>();
-builder.Services.AddScoped<IProcessingActivityRiskAssessmentService>(sp =>
-    sp.GetRequiredService<ProcessingActivityRiskAssessmentService>());
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
 {

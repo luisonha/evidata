@@ -1,4 +1,4 @@
-using Evidata.Api.Services;
+using Evidata.Modules.Reporting.Infrastructure.Services;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
@@ -77,10 +77,8 @@ public sealed class ProcessingActivityRiskAssessmentServiceDependencyInjectionTe
         services.AddScoped<IOutboxWriter>(sp => 
             sp.GetRequiredService<OutboxRepository>());
         
-        // Register the services that the test targets
-        services.AddScoped<ProcessingActivityRiskAssessmentService>();
-        services.AddScoped<IProcessingActivityRiskAssessmentService>(sp =>
-            sp.GetRequiredService<ProcessingActivityRiskAssessmentService>());
+        // Note: ProcessingActivityRiskAssessmentService is now registered automatically by AddReportingModule(),
+        // so we don't need to manually register it here (it was already done above when we called AddReportingModule).
         
         var serviceProvider = services.BuildServiceProvider();
         
@@ -130,9 +128,7 @@ public sealed class ProcessingActivityRiskAssessmentServiceDependencyInjectionTe
         services.AddScoped<IOutboxWriter>(sp => 
             sp.GetRequiredService<OutboxRepository>());
         
-        services.AddScoped<ProcessingActivityRiskAssessmentService>();
-        services.AddScoped<IProcessingActivityRiskAssessmentService>(sp =>
-            sp.GetRequiredService<ProcessingActivityRiskAssessmentService>());
+        // Note: ProcessingActivityRiskAssessmentService is now registered automatically by AddReportingModule()
         
         var serviceProvider = services.BuildServiceProvider();
         
