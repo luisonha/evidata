@@ -15,19 +15,19 @@ public class AuthorizationAttributeTests
     private static readonly Type[] CriticalControllers =
     {
         // Controladores de identidad y seguridad — DEBEN tener [Authorize]
-        Type.GetType("Evidata.Modules.Identity.Api.UserProfileController, Evidata.Modules.Identity"),
-        Type.GetType("Evidata.Modules.Security.Api.RolesController, Evidata.Modules.Security"),
-        Type.GetType("Evidata.Modules.TenantManagement.Api.TenantsController, Evidata.Modules.TenantManagement"),
-        Type.GetType("Evidata.Modules.Documents.Api.DocumentsController, Evidata.Modules.Documents"),
-        Type.GetType("Evidata.Modules.Search.Api.SearchController, Evidata.Modules.Search"),
-        Type.GetType("Evidata.Modules.Mcp.Api.McpController, Evidata.Modules.Mcp"),
+        Type.GetType("Evidata.Modules.Identity.Api.UserProfileController, Evidata.Modules.Identity")!,
+        Type.GetType("Evidata.Modules.Security.Api.RolesController, Evidata.Modules.Security")!,
+        Type.GetType("Evidata.Modules.TenantManagement.Api.TenantsController, Evidata.Modules.TenantManagement")!,
+        Type.GetType("Evidata.Modules.Documents.Api.DocumentsController, Evidata.Modules.Documents")!,
+        Type.GetType("Evidata.Modules.Search.Api.SearchController, Evidata.Modules.Search")!,
+        Type.GetType("Evidata.Modules.Mcp.Api.McpController, Evidata.Modules.Mcp")!,
         // Controllers que ya tenían [Authorize] (validación de consistencia)
-        Type.GetType("Evidata.Modules.ProcessingInventory.Api.ProcessingActivitiesController, Evidata.Modules.ProcessingInventory"),
-        Type.GetType("Evidata.Modules.Reporting.Api.ReportsController, Evidata.Modules.Reporting"),
-        Type.GetType("Evidata.Modules.Evidence.Api.EvidenceController, Evidata.Modules.Evidence"),
-        Type.GetType("Evidata.Modules.Audit.Api.AuditController, Evidata.Modules.Audit"),
-        Type.GetType("Evidata.Modules.Workflow.Api.WorkflowController, Evidata.Modules.Workflow"),
-        Type.GetType("Evidata.Modules.GapManagement.Api.GapsController, Evidata.Modules.GapManagement"),
+        Type.GetType("Evidata.Modules.ProcessingInventory.Api.ProcessingActivitiesController, Evidata.Modules.ProcessingInventory")!,
+        Type.GetType("Evidata.Modules.Reporting.Api.ReportsController, Evidata.Modules.Reporting")!,
+        Type.GetType("Evidata.Modules.Evidence.Api.EvidenceController, Evidata.Modules.Evidence")!,
+        Type.GetType("Evidata.Modules.Audit.Api.AuditController, Evidata.Modules.Audit")!,
+        Type.GetType("Evidata.Modules.Workflow.Api.WorkflowController, Evidata.Modules.Workflow")!,
+        Type.GetType("Evidata.Modules.GapManagement.Api.GapsController, Evidata.Modules.GapManagement")!,
     };
 
     /// <summary>
@@ -41,11 +41,11 @@ public class AuthorizationAttributeTests
 
         foreach (var controllerType in CriticalControllers.Where(t => t != null))
         {
-            var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
+            var authorizeAttr = controllerType!.GetCustomAttribute<AuthorizeAttribute>();
             
             if (authorizeAttr is null)
             {
-                controllersWithoutAuthorize.Add(controllerType.FullName);
+                controllersWithoutAuthorize.Add(controllerType!.FullName!);
             }
         }
 
@@ -59,7 +59,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void UserProfileController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.Identity.Api.UserProfileController, Evidata.Modules.Identity");
+        var controllerType = Type.GetType("Evidata.Modules.Identity.Api.UserProfileController, Evidata.Modules.Identity")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);
@@ -72,7 +72,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void RolesController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.Security.Api.RolesController, Evidata.Modules.Security");
+        var controllerType = Type.GetType("Evidata.Modules.Security.Api.RolesController, Evidata.Modules.Security")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);
@@ -85,7 +85,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void TenantsController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.TenantManagement.Api.TenantsController, Evidata.Modules.TenantManagement");
+        var controllerType = Type.GetType("Evidata.Modules.TenantManagement.Api.TenantsController, Evidata.Modules.TenantManagement")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);
@@ -98,7 +98,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void DocumentsController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.Documents.Api.DocumentsController, Evidata.Modules.Documents");
+        var controllerType = Type.GetType("Evidata.Modules.Documents.Api.DocumentsController, Evidata.Modules.Documents")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);
@@ -111,7 +111,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void SearchController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.Search.Api.SearchController, Evidata.Modules.Search");
+        var controllerType = Type.GetType("Evidata.Modules.Search.Api.SearchController, Evidata.Modules.Search")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);
@@ -124,7 +124,7 @@ public class AuthorizationAttributeTests
     [Fact]
     public void McpController_MustHaveAuthorizeAttribute()
     {
-        var controllerType = Type.GetType("Evidata.Modules.Mcp.Api.McpController, Evidata.Modules.Mcp");
+        var controllerType = Type.GetType("Evidata.Modules.Mcp.Api.McpController, Evidata.Modules.Mcp")!;
         var authorizeAttr = controllerType.GetCustomAttribute<AuthorizeAttribute>();
         
         Assert.NotNull(authorizeAttr);

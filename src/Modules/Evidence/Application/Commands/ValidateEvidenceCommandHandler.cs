@@ -24,7 +24,7 @@ namespace Evidata.Modules.Evidence.Application.Commands;
 public sealed class ValidateEvidenceCommandHandler(
     EvidenceDbContext db,
     IAuditService auditService,
-    ICurrentUserContext currentUser,
+    ICurrentUserContext _currentUser,
     IHttpContextAccessor httpContextAccessor)
 {
     public async Task<EvidenceValidationResultDto> HandleAsync(
