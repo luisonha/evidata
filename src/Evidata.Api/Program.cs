@@ -33,6 +33,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddDistributedMemoryCache();
 builder.Services.AddEvidataHealthChecks(builder.Configuration);
 builder.Services.AddTenantManagement(builder.Configuration);
 builder.Services.AddIdentityBridge(builder.Configuration, builder.Environment);
