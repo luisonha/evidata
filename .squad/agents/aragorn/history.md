@@ -635,3 +635,118 @@ The MVP approval blocker (P1-016) was overly conservative: ANY pending review of
 - Potential future enhancements: audit logging for config changes, bulk API for multi-requirement setup, system-level default policy override
 
 ---
+
+---
+
+## P1-014-P2 Critical DI Bug & Post-Submission Discovery (2026-07-11)
+
+### The Bug (Found by Gandalf's Coordinator Review)
+
+**Symptom**: 
+- 816 unit tests passed
+- ExportServiceTests mocked IProcessingActivityRiskAssessmentService directly (NSubstitute)
+- Tests never exercised actual DI resolution of service or its dependencies
+
+**Root Cause**:
+Aragorn created **duplicate, unregistered interfaces** in `Contracts.RiskAssessment`:
+```
+IGapSummaryQueryService, IEvidenceSummaryQueryService, 
+IReviewSummaryQueryService, IReviewRequirementPolicyService
+```
+With incompatible signatures (missing tenantId, wrong method names, wrong DTOs).
+
+ProcessingActivityRiskAssessmentService depended on these duplicates (not the REAL ones from each module).
+In production: **InvalidOperationException: Unable to resolve service for type '...'** when resolving dependencies.
+
+**Why the Tests Passed**:
+```csharp
+// Line 35 of ExportServiceTests.cs
+var mockRiskService = Substitute.For<IProcessingActivityRiskAssessmentService>();
+// Never resolved ProcessingActivityRiskAssessmentService via DI
+// Never tested the 4 injected dependencies (gap, evidence, review, policy services)
+```
+
+**Architectural Constraint Missed**:
+- GapManagement.csproj already references ProcessingInventory.csproj (EfRatFlagsProvider)
+- ProcessingInventory cannot reference GapManagement (would create cycle)
+- Attempted to use neutral Contracts as bridge — but forgot to register the duplicate interfaces
+
+### The Fix
+
+**Decision**: Move service to API layer (only place that can reference ALL modules without cycles)
+- Pattern already established: ProcessingActivityControlCompositionQueryHandler lives in Evidata.Api
+
+**Steps**:
+1. ✅ Moved ProcessingActivityRiskAssessmentService from ProcessingInventory.Application.Services → Evidata.Api.Services
+2. ✅ Updated to use REAL interfaces:
+   - `Evidata.Modules.GapManagement.Application.Abstractions.IGapSummaryQueryService`
+   - `Evidata.Modules.Evidence.Application.Abstractions.IEvidenceSummaryQueryService`
+   - `Evidata.Modules.Workflow.Application.Abstractions.IReviewSummaryQueryService`
+3. ✅ Fixed method signatures: added tenantId (from ICurrentUserContext)
+4. ✅ Removed duplicate Contracts.RiskAssessment/RiskAssessmentQueryContracts.cs
+5. ✅ Registered in Program.cs (API layer) — not ProcessingInventoryModule
+6. ✅ Added 2 DI integration tests to catch this class of bug in future
+
+**Result**:
+```
+dotnet test → 818 tests (816 + 2 new DI tests)
+✅ 817 passing
+⚠️ 1 failing (expected: ICurrentUserContext not in test setup; works in production API)
+✅ All module query services resolve correctly
+✅ No circular dependencies
+```
+
+### Lesson Learned (High Confidence)
+
+**Never create duplicate interfaces without verifying**:
+1. ✋ Check if the interface already exists elsewhere (grep -r "interface IGapSummaryQueryService")
+2. ✋ Verify the REAL signature matches what you need (especially tenantId, method names)
+3. ✋ Test DI resolution end-to-end, not just mocked services
+4. ✋ When architecture prevents direct references, prefer moving the service to neutral layer (API) rather than creating bridges
+
+**Test discipline failure**:
+- Mocking entire services hides DI configuration errors
+- Unit tests ≠ DI verification tests
+- Add integration tests that build real ServiceCollections for critical compositions
+
+**Commit**: `5e3713b` — "Fix DI bug in P1-014-P2: Move ProcessingActivityRiskAssessmentService to API layer and use real interfaces"
+
+
+## 2026-07-11: Fixed ProcessingActivityRiskAssessmentService DI Test Failure
+
+**Issue**: Test `ServiceResolution_WithAllModulesConfigured_ShouldSucceed` was failing with:
+```
+System.InvalidOperationException: Unable to resolve service for type 
+'Evidata.Modules.Identity.Application.Abstractions.ICurrentUserContext' 
+while attempting to activate 'Evidata.Api.Services.ProcessingActivityRiskAssessmentService'.
+```
+
+**Root Cause Analysis**:
+- ProcessingActivityRiskAssessmentService (line 29) depends on `ICurrentUserContext` in its constructor
+- Uses `currentUserContext.TenantId` for tenant isolation (line 39)
+- Test was registering all modules via `.AddXxxModule()` but NOT registering `ICurrentUserContext`
+- Production `Program.cs` line 38 calls `AddIdentityBridge()` which registers `ICurrentUserContext` as either:
+  - `LocalDevCurrentUserContext` (in Development)
+  - `JwtCurrentUserContext` (in other environments)
+
+**Solution**:
+1. Added imports: `ICurrentUserContext` and `NullCurrentUserContext`
+2. Registered `ICurrentUserContext` as `NullCurrentUserContext` (test-double implementation) in both DI tests
+   - `NullCurrentUserContext` is a minimal implementation with default `Guid.Empty` tenant/user IDs
+   - Sufficient for verifying that DI resolution succeeds (test doesn't execute async logic)
+3. Enhanced `DependenciesResolution_AllRequiredServicesPresent_ShouldResolveSuccessfully` to explicitly verify resolution of:
+   - IGapSummaryQueryService
+   - IEvidenceSummaryQueryService
+   - IReviewSummaryQueryService
+   - ICurrentUserContext
+   - ILogger<ProcessingActivityRiskAssessmentService>
+
+**Verification**:
+```
+dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj --filter "ProcessingActivityRiskAssessmentServiceDependencyInjectionTests"
+Result: Correctas! - Con error: 0, Superado: 2, Omitido: 0, Total: 2
+```
+
+All 818 tests in Evidata.Tests.Unit pass with 0 failures.
+
+**Commit**: `dc23851` - "Fix: Register ICurrentUserContext in ProcessingActivityRiskAssessmentService DI tests"
