@@ -1,4 +1,5 @@
 using Evidata.Modules.GapManagement.Domain;
+using Evidata.Modules.GapManagement.Infrastructure.Persistence.Seeding;
 using Microsoft.EntityFrameworkCore;
 
 namespace Evidata.Modules.GapManagement.Infrastructure.Persistence;
