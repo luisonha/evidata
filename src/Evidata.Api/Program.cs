@@ -1,4 +1,3 @@
-using Evidata.Api.Infrastructure.Adapters;
 using Evidata.Api.Infrastructure.HealthChecks;
 using Evidata.Api.OpenApi;
 using Evidata.Api.Queries;
@@ -12,7 +11,6 @@ using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.ProcessingInventory;
-using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Security;
 using Evidata.Modules.Security.Infrastructure.Authorization;
@@ -57,11 +55,6 @@ builder.Services.AddWorkflowModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
-
-// SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
-builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
-builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
-    new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));
 
 // P1-FULL-COMPOSITION: Register composition query handler for /control endpoint
 // This replaces the stub implementation with full cross-module composition.
