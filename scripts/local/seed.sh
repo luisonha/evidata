@@ -168,31 +168,10 @@ VALUES
   ('a0000001-0000-0000-0000-000000000010', 'admin:tenant',     'admin',     'tenant',   'Administrar configuración del tenant')
 ON CONFLICT ("Id") DO NOTHING;
 
-INSERT INTO security.roles ("Id", "Name", "Description", "IsSystemRole")
-VALUES
-  ('b0000001-0000-0000-0000-000000000001', 'DPO',            'Delegado de Protección de Datos — acceso total', true),
-  ('b0000001-0000-0000-0000-000000000002', 'PrivacyAnalyst', 'Analista de Privacidad — lectura y escritura',   true),
-  ('b0000001-0000-0000-0000-000000000003', 'Auditor',        'Auditor — solo lectura',                         true)
-ON CONFLICT ("Id") DO NOTHING;
-
-INSERT INTO security.role_permissions ("RoleId", "PermissionId")
-SELECT 'b0000001-0000-0000-0000-000000000001', "Id" FROM security.permissions
-ON CONFLICT DO NOTHING;
-
-INSERT INTO security.role_permissions ("RoleId", "PermissionId") VALUES
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000001'),
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000002'),
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000004'),
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000005'),
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000007'),
-  ('b0000001-0000-0000-0000-000000000002', 'a0000001-0000-0000-0000-000000000008')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO security.role_permissions ("RoleId", "PermissionId") VALUES
-  ('b0000001-0000-0000-0000-000000000003', 'a0000001-0000-0000-0000-000000000001'),
-  ('b0000001-0000-0000-0000-000000000003', 'a0000001-0000-0000-0000-000000000004'),
-  ('b0000001-0000-0000-0000-000000000003', 'a0000001-0000-0000-0000-000000000007')
-ON CONFLICT DO NOTHING;
+-- NOTE: Legacy roles (DPO, PrivacyAnalyst) removed. 
+-- The 7 official RBAC roles (TenantOwner, ComplianceAdmin, ProcessOwner, LegalReviewer, SecurityReviewer, Auditor, Viewer)
+-- are now seeded via EF Core HasData() in SecurityDbContext.
+-- Role assignments below use dynamic SQL to fetch the correct role IDs after migration.
 EOSQL
   info "Roles y permisos insertados ✅"
 else
@@ -214,20 +193,40 @@ else
   warn "PostgreSQL no disponible. Usuarios omitidos."
 fi
 
-# Asignar roles via API
-info "Asignando rol DPO al admin..."
-call_api POST "/api/roles/assign" "{
-  \"userId\": \"$ADMIN_ID\",
-  \"roleId\": \"b0000001-0000-0000-0000-000000000001\",
-  \"tenantId\": \"$TENANT_ID\"
-}" | grep -o '"roleName":"[^"]*"' || true
+# Asignar roles via SQL dinámico (obtiene IDs reales de la migración HasData)
+info "Asignando rol TenantOwner al admin..."
+if [[ -n "$PSQL_CMD" ]]; then
+  TENANT_OWNER_ID=$($PSQL_CMD -t -c "SELECT \"Id\" FROM security.roles WHERE \"Name\" = 'TenantOwner' LIMIT 1")
+  if [[ -n "$TENANT_OWNER_ID" ]]; then
+    $PSQL_CMD <<EOSQL 2>&1 | grep -v "^$" || warn "No se pudo asignar rol TenantOwner"
+INSERT INTO security.user_role_assignments ("UserId", "RoleId", "TenantId")
+VALUES ('$ADMIN_ID', '$TENANT_OWNER_ID', '$TENANT_ID')
+ON CONFLICT DO NOTHING;
+EOSQL
+    info "Rol TenantOwner asignado al admin ✅"
+  else
+    warn "TenantOwner role no encontrado en la BD"
+  fi
+else
+  warn "PostgreSQL no disponible. Asignación de rol omitida."
+fi
 
-info "Asignando rol PrivacyAnalyst al usuario regular..."
-call_api POST "/api/roles/assign" "{
-  \"userId\": \"$USER_ID\",
-  \"roleId\": \"b0000001-0000-0000-0000-000000000002\",
-  \"tenantId\": \"$TENANT_ID\"
-}" | grep -o '"roleName":"[^"]*"' || true
+info "Asignando rol ComplianceAdmin al usuario regular..."
+if [[ -n "$PSQL_CMD" ]]; then
+  COMPLIANCE_ADMIN_ID=$($PSQL_CMD -t -c "SELECT \"Id\" FROM security.roles WHERE \"Name\" = 'ComplianceAdmin' LIMIT 1")
+  if [[ -n "$COMPLIANCE_ADMIN_ID" ]]; then
+    $PSQL_CMD <<EOSQL 2>&1 | grep -v "^$" || warn "No se pudo asignar rol ComplianceAdmin"
+INSERT INTO security.user_role_assignments ("UserId", "RoleId", "TenantId")
+VALUES ('$USER_ID', '$COMPLIANCE_ADMIN_ID', '$TENANT_ID')
+ON CONFLICT DO NOTHING;
+EOSQL
+    info "Rol ComplianceAdmin asignado al usuario regular ✅"
+  else
+    warn "ComplianceAdmin role no encontrado en la BD"
+  fi
+else
+  warn "PostgreSQL no disponible. Asignación de rol omitida."
+fi
 
 # ═══════════════════════════════════════════════════════
 # BLOQUE 3: Actividades de Tratamiento (RAT)
@@ -305,8 +304,8 @@ echo "║  Usuario: user@localdev.evidata  ($USER_ID)  ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║  Datos creados:                                          ║"
 echo "║    • 1 Tenant                                            ║"
-echo "║    • 3 Roles del sistema (DPO, PrivacyAnalyst, Auditor)  ║"
-echo "║    • 10 Permisos (Ley 21.719)                            ║"
+echo "║    • 7 Roles RBAC (TenantOwner, ComplianceAdmin, etc.)    ║"
+echo "║    • 2 Usuarios de prueba con roles asignados            ║"
 echo "║    • 5 RATs (1 Approved, 1 UnderReview, 3 Draft)         ║"
 echo "║    • 1 Consulta MCP de prueba                            ║"
 echo "╠══════════════════════════════════════════════════════════╣"
