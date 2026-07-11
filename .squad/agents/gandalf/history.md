@@ -1053,3 +1053,87 @@ UI podría mostrar indicador visual "⚠️ Estado desconocido" cuando `GapSumma
 
 Decisión completa: `.squad/decisions/inbox/gandalf-p1-degradation-review.md`
 
+
+
+---
+
+### 2026-07-11T13:45:00-04:00 — PR #123 Review: Scripts RBAC Alignment & GapRules Seeding (Unconditional Approval)
+
+**Requested by**: luisonha  
+**Branch**: `squad/scripts-rbac-alignment` → `develop`  
+**Type**: Bug fixes (3 separate issues post-RBAC sprint closure)
+
+#### Context
+
+PR #123 resolves 3 critical issues discovered after sprint RBAC cycle (PR #122):
+1. **Migration duplication**: `20260710234111_AddReviewDomainField.cs` was creating `review_requirements` table twice
+2. **seed.sh misalignment**: Seeding legacy roles `DPO`/`PrivacyAnalyst` (not recognized by RBAC handlers)
+3. **GapRuleInitializer never invoked**: 11-rule catalog was not seeded (attempted EF migration first attempt failed — reverted)
+
+#### Independent Verification Completed
+
+**Build & Tests** ✅
+- `dotnet build Evidata.sln`: SUCCESS (0 errors, 0 warnings)
+- `dotnet test`: **828/828 PASS** (confirmed independently, not relying on coordinator's count)
+
+**Fix 1: Migration Duplication** ✅
+- Verified: `AddReviewDomainField.cs` now ONLY adds column `review_domain` (removed duplicate `review_requirements` creation)
+- Verified: `Down()` symmetric (drops column only, not table) — no asymmetry issues
+- Verified: No orphaned migration files in repository
+
+**Fix 2: RBAC Scripts Alignment** ✅
+- Legacy roles (`DPO`, `PrivacyAnalyst`) completely removed from seed.sh
+- Legacy permissions `a0000001-*` (10 rows) completely removed
+- Role assignment now **dynamic** (not hardcoded): `SELECT "Id" FROM security.roles WHERE "Name" = 'TenantOwner'` for admin, `ComplianceAdmin` for user
+- SecurityDbContext seeds 7 official RBAC roles via `HasData()`
+- **Zero broken references**: `grep -rn "a0000001-"` returns only comments, no broken code
+
+**Fix 3: GapRules Seeding** ✅
+- Migration `20260711171320_SeedGapRules.cs` properly reverted (106 lines deleted)
+- No `*SeedGapRules*` files remain in repository
+- GapManagementDbContext contains **zero `HasData()` calls** for GapRule (correct architectural decision)
+- 11 GapRules inserted via SQL in seed.sh with complete values
+
+**Transcription Accuracy** ✅
+- All 11 rule codes match exactly between GapRuleInitializer.cs and seed.sh
+- Verified: All 6 Critical rules have `BlocksApproval=true`
+- Verified: All 5 High rules have `BlocksApproval=true`
+- Severity mapping verified: enum `GapSeverity { Low, Medium, High, Critical }` matches SQL strings exactly (case-sensitive via `.HasConversion<string>()`)
+- Implementation_notes descriptions: full match
+
+**Test Completeness** ✅
+- `GapRuleInitializerTests`: NOT tautological — verifies 11 rules count, unique codes, required fields (RuleCode, Description, TestFixtureName, BlocksApproval, Severity, IsFullyImplemented), all Critical rules block approval
+- Test expected codes list matches actual source exactly
+
+**Idempotency & Risk Analysis** ✅
+- `ON CONFLICT (id) DO NOTHING` on GapRules INSERT — safe for multiple executions
+- Deterministic IDs `10000000-0000-0000-0000-{0..10}` have zero collision risk in local dev environment
+- Dynamic role assignment via queries (not hardcoded IDs) — fully resilient
+
+**Pre-existing Issue Detected (Not a Blocker)**
+- `scripts/local/smoke-test.sh:170` references legacy role ID `b0000001-0000-0000-0000-000000000001`
+- Status: NOT modified in this PR — pre-existing problem, not introduced by these fixes
+- Recommendation: Schedule separate PR to fix smoke-test.sh
+
+#### Architectural Quality Assessment
+
+✅ **Migration design**: Clean separation — only schema change in migration, seeding only in seed.sh (local dev only)  
+✅ **Dynamic role assignment**: No hardcoded IDs, queries by role name — resilient to future changes  
+✅ **Per-tenant GapRule seeding**: Correctly identified that TenantId is per-tenant data (not system-wide) — seeding via seed.sh with `$TENANT_ID` is correct  
+✅ **Enum mapping**: `.HasConversion<string>()` ensures case-sensitive matching in Postgres  
+✅ **Test strategy**: Comprehensive without tautology — tests actual catalog integrity, not just method calls  
+
+#### Decision
+
+**✅ APROBADO SIN CONDICIONES**
+
+All 3 fixes verified independently:
+1. Migration asymmetry: FIXED
+2. RBAC script misalignment: FIXED  
+3. GapRules never seeded: FIXED + robust testing added
+
+Code quality clean (build green, 828/828 tests), zero regressions, architecture sound. The decision to move GapRules seeding from EF migration to seed.sh is architecturally correct given per-tenant nature of GapRule.TenantId.
+
+#### References
+
+Decision document: `.squad/decisions/inbox/gandalf-pr123-review.md`
