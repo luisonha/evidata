@@ -36,7 +36,7 @@ builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
 
 // SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
-// Adapter moved to Evidata.Modules.Contracts (neutral layer) for reuse across hosts
+// Adapter implemented as host-local (P1-017-ADAPTER pattern) in Evidata.Functions.Reporting.Infrastructure.Adapters
 builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
 builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
     new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));
