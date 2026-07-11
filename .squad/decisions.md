@@ -1055,3 +1055,70 @@ dotnet test tests/Evidata.Tests.Unit/Evidata.Tests.Unit.csproj
 **Nota de proceso**: Todos los warnings de compilación pre-existentes están now resueltos. Futuras adiciones de código deben pasar verificaciones de clean build antes de merge para evitar acumular nuevos warnings.
 
 **Referencias**: PR #126 (merge commit 6733198), PR #127 (merge commit 7804a3d).
+
+## 2026-07-11 — PR #128: Fix Bug Crítico de DI — Registración Faltante de IDistributedCache
+
+**Autores**: Coordinador (Scribe, verificación + commit consolidador).
+
+**Decisión**: ✅ **MERGED a develop** (merge commit 6298a1d).
+
+### Contexto: Bug Pre-Existente no Relacionado a PRs de Sprint 2
+
+**Defecto detectado**: El proyecto `Evidata.Api` fallaba al ejecutar `dotnet run` con excepción:
+```
+AggregateException: Some services are not able to be constructed (seeing the same errors in every case):
+- ServiceDescriptor for type 'Microsoft.Extensions.Caching.Distributed.IDistributedCache' is not registered
+```
+
+**Causa raíz**: Introduced en P1-018 (PR #119), la clase `ReviewRequirementPolicyService` (Workflow module) inyecta `IDistributedCache` en su constructor para cachear políticas de revisión durante 60 minutos:
+
+```csharp
+public ReviewRequirementPolicyService(IDistributedCache cache)
+{
+    _cache = cache;
+}
+```
+
+Sin embargo, **nunca fue registrado ningún proveedor de esa interfaz en la cadena de DI**, ni en `Program.cs` de `Evidata.Api` ni en ningún proyecto dependiente. Es un bug pre-existente no relacionado con las PRs de esta sesión — solamente fue detectado después del merge de P1-018 cuando alguien intentó arrancar la API de forma aislada.
+
+### Solución: Registrar Distributed Memory Cache para Desarrollo Local
+
+**Fix aplicado en `src/Evidata.Api/Program.cs`**:
+```csharp
+builder.Services.AddDistributedMemoryCache();
+```
+
+**Justificación**:
+- **Ambiente de destino**: Desarrollo local con una sola instancia (`dotnet run`).
+- **Comportamiento**: Cache in-memory compartida, suficiente para desarrollo.
+- **Nota arquitectónica para futuro**: Si en el futuro el sistema escala a múltiples instancias en producción, se requerirá un backend de cache distribuido real (Redis vía Microsoft.Extensions.Caching.StackExchangeRedis) orquestado a través de Aspire. **Deferred, no implementado en esta sesión** — anotado como ítem de escalado futuro.
+
+### Verificación
+
+**Build limpio**:
+```bash
+dotnet clean && dotnet build
+# Resultado: 0 Advertencias, 0 Errores
+```
+
+**Suite de tests**:
+```bash
+dotnet test
+# Resultado: 828/828 tests passing, 0 regresiones
+```
+
+**Arranque directo de la API** (sin Aspire/Docker):
+```bash
+dotnet run --no-build --no-launch-profile
+# Anterior error de DI: AggregateException → DESAPARECIDO
+# Error siguiente (esperado): connection string de Postgres indefinida
+# → Confirma que el fix de DI fue completo
+```
+
+### Resultado
+
+✅ **Bug de DI resuelto** — `dotnet run` ya no falla por IDistributedCache no registrada
+✅ **828/828 tests passing**, 0 regressions
+✅ **Nota para el futuro**: P1-FIX-DISTRIBUTED-CACHE-REDIS (escalado multi-instancia con Redis vía Aspire)
+
+**Referencias**: PR #128 (merge commit 6298a1d), Workflow module `ReviewRequirementPolicyService`, `src/Evidata.Api/Program.cs`.

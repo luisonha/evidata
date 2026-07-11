@@ -31,6 +31,11 @@ Agent Scribe initialized and ready for work.
   - Updated backlog version v1.7.0 → v1.7.1 (compiler warnings cleanup)
   - Added P1-CLEANUP-WARNINGS entry to backlog confirming: 0 compiler warnings, 0 errors, 828/828 tests passing
   - Confirmed zero regressions, all compiler warnings (CS9113, CS0168, CS4014, CS8604/CS8601) fully resolved
+📌 2026-07-11: Consolidated documentation for PR #128 merge (fix-distributed-cache-di):
+  - Added entry to `.squad/decisions.md` documenting PR #128: IDistributedCache DI registration bug fix
+  - Updated backlog version v1.7.1 → v1.7.2 (critical DI bug fix)
+  - Added P1-FIX-DISTRIBUTED-CACHE-DI entry to backlog with cause, solution, verification, future Redis scaling note
+  - Confirmed 828/828 tests passing, 0 regressions, `dotnet run` DI error resolved
 
 ## Learnings
 
