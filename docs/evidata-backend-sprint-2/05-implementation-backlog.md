@@ -1,4 +1,4 @@
-# 05 — Backlog de implementación backend v1.6.5
+# 05 — Backlog de implementación backend v1.6.6
 
 ## P0 — Bloqueantes de contrato
 
@@ -49,18 +49,16 @@
 | ActivateProcessingActivity | SEC-ACT-001 | P1-012 | ✅ Completo | Ninguno |
 | ValidateEvidence | SEC-EV-001 | Prior | ✅ Completo | Ninguno |
 | AcceptGapWithRisk | SEC-GAP-001 | Prior | ✅ Completo | Ninguno |
-| GenerateOfficialExport | SEC-EXP-001 | P1-014 | ✅ 3/4 gaps | P1-014-P2 (Gap #2) |
+| GenerateOfficialExport | SEC-EXP-001 | P1-014 / P1-014-P2 | ✅ Completo (4/4 gaps, incluyendo auto-detección de warnings) | Ninguno |
 | DownloadEvidence | SEC-EVDOWN-001 | P1-015 | ✅ 4/4 gaps (Completo) | Ninguno |
 
 **Resumen:**
-- ✅ **5 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk, DownloadEvidence, ApproveProcessingActivity)
-- ✅ **1 permiso 3/4 gaps** con follow-up no bloqueante (GenerateOfficialExport, P1-014-P2)
-- 📊 **812 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117, #118, #119)
-- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-019 sistemáticamente cierra cada permiso, incluye revisión arquitectónica de calidad (eliminación de reflection, P1-019) y remediación de seguridad multi-tenant bajo lockout de revisor (P1-018)
+- ✅ **6 de 6 permisos críticos completamente implementados** — ciclo RBAC P1-011→P1-014-P2 cerrado sin pendientes
+- 📊 **818 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117, #118, #119, #120)
+- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-014-P2 sistemáticamente cierra cada permiso, incluye revisión arquitectónica de calidad (eliminación de reflection, P1-019), remediación de seguridad multi-tenant bajo lockout de revisor (P1-018), y detección/corrección proactiva de bugs de DI antes de revisión formal (P1-014-P2)
 
 **Próximas Tareas:**
-1. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
-2. Transición a develop→main y follow-up administrativo
+1. Transición a develop→main y follow-up administrativo (Dependabot/CodeQL, P1-DEGRADATION)
 
 
 
@@ -69,7 +67,7 @@
 | ID | Acción | Resultado esperado |
 |---|---|---|
 | P2-001 | Definir retiro de rutas `/api/...` legacy. | Migración controlada. |
-| P2-001a | **[NEW]** P1-014-P2: Implementar auto-detección de ExportWarning en GenerateOfficialExport (SEC-EXP-001 Gap #2). | Crear `IProcessingActivityRiskAssessmentService` en ProcessingInventory que agregue datos de riesgo de todos módulos (brechas críticas abiertas, evidencia pendiente, revisiones pendientes) desde GapManagement/Evidence, inyectado en ExportService para generar ExportWarning automáticamente. Opción recomendada (Gandalf): agregador centralizado en ProcessingInventory para encapsulación limpia. Opciones alternativas documentadas (Aragorn decision point). Prioridad: P2 (no bloqueante, aceptado por usuario). |
+| P2-001a | ✅ COMPLETADO: P1-014-P2: Implementar auto-detección de ExportWarning en GenerateOfficialExport (SEC-EXP-001 Gap #2). | `IProcessingActivityRiskAssessmentService` implementado en la capa `Evidata.Api` (mismo patrón que `ProcessingActivityControlCompositionQueryHandler`, única capa sin ciclos de referencia entre módulos), agrega riesgos de GapManagement (brechas críticas), Evidence (pendiente/bloqueante) y Workflow (revisiones pendientes vía policy de P1-018). Non-blocking: export se genera siempre, warning es advisorio; graceful degradation si falla una query. Aislamiento multi-tenant vía `ICurrentUserContext`. **Ciclo de calidad**: coordinador detectó y corrigió 2 defectos (interfaces de DI duplicadas sin registrar; test de DI roto) antes de enviar a revisión formal — Gandalf aprobó sin condiciones en 1 sola ronda. PR #120 merged (2026-07-11). 818 tests totales, 0 regresiones. | ✅ Unit + integration tests; 818 unit tests passing |
 | P2-002 | Limpiar referencias históricas `TreatmentEvidenceSummary`. | Naming consistente. |
 | P2-003 | Separar OpenAPI interno legacy si se requiere. | Contrato público limpio. |
 | P2-004 | Agregar step-up opcional para acciones críticas. | Seguridad avanzada P2. |

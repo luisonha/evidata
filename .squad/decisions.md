@@ -709,3 +709,40 @@ Este es el primer caso real de esta sesión donde el lockout estricto de revisor
 **Ciclo P1-011→P1-019 cerrado por completo.** 5 de 6 permisos 100% completos; GenerateOfficialExport con 3/4 gaps (P1-014-P2, no bloqueante, aceptado por el usuario). Sin pendientes críticos de seguridad en el contrato RBAC.
 
 **Referencias**: PR #119, decisiones originales en `.squad/decisions/inbox/{aragorn-p1-018-*,gandalf-p1-018-*,legolas-p1-018-*}.md` (consolidadas y eliminadas del inbox tras este merge).
+
+## 2026-07-11 — PR #120 (P1-014-P2): Auto-detección de ExportWarning — CIERRE DEL CICLO RBAC P1-011→P1-019
+
+**Autores**: Aragorn (implementación + 2 rondas de auto-corrección), Gandalf (revisión final).
+
+**Decisión**: ✅ **APROBADO SIN CONDICIONES Y MERGED.**
+
+### Contexto
+Último ítem P2 (no bloqueante) del backlog RBAC: auto-detectar `ExportWarning` en `GenerateOfficialExport` agregando señales de riesgo cross-module (brechas críticas de GapManagement, evidencia pendiente de Evidence, revisiones pendientes de Workflow vía la policy configurable de P1-018), en vez de requerir marcado manual.
+
+### Caso de estudio: verificación independiente del coordinador evita 2 ciclos de revisión desperdiciados
+1. **Implementación inicial de Aragorn**: creó `IProcessingActivityRiskAssessmentService` en `ProcessingInventory`, pero **duplicó nombres de interfaz** (`IGapSummaryQueryService`, `IEvidenceSummaryQueryService`, `IReviewSummaryQueryService`, `IReviewRequirementPolicyService`) en un namespace nuevo `Contracts.RiskAssessment`, sin registrarlas en ningún módulo. Las interfaces YA EXISTÍAN (registradas y en uso por `ProcessingActivityControlCompositionQueryHandler` para el endpoint `/control`) en los namespaces reales de GapManagement/Evidence/Workflow. Reportó 816/816 tests pasando — **el bug era 100% invisible a los tests** porque `ExportServiceTests` mockeaba el servicio de risk assessment completo con NSubstitute, sin ejercitar nunca la resolución real de DI. En producción, cualquier llamada a `GenerateOfficialExport` habría lanzado `InvalidOperationException` al no poder resolver las dependencias del servicio.
+2. **El coordinador detectó el bug** inspeccionando manualmente el diff completo del PR (`git diff --stat` + lectura de archivos clave) antes de despachar a Gandalf — no confiando en el auto-reporte del agente. Redespachó a Aragorn directamente (sin gastar ciclo de revisión de Gandalf) con el diagnóstico exacto.
+3. **Corrección #1 de Aragorn**: movió el servicio a la capa `Evidata.Api` (mismo patrón que `ProcessingActivityControlCompositionQueryHandler`, la única capa que puede referenciar todos los módulos sin ciclos), eliminó las interfaces duplicadas, usó las interfaces reales. Agregó un test de resolución de DI real — pero el propio test reportado como "esperado que falle" **fallaba** (`ICurrentUserContext` no registrado en el harness de test).
+4. **El coordinador rechazó ese reporte**: un test llamado `..._ShouldSucceed` que falla nunca es aceptable, "esperado" o no. Redespachó a Aragorn con instrucción explícita de no debilitar ni documentar la falla, sino corregirla de raíz.
+5. **Corrección #2 de Aragorn**: registró `NullCurrentUserContext` en el harness de test. El coordinador verificó independientemente (`dotnet build` + `dotnet test` ejecutados localmente, no solo reportados): **818/818 tests, 0 errores.**
+6. **Revisión de Gandalf** (ahora sí, con el PR ya limpio): **APROBADO SIN CONDICIONES** tras verificación propia desde cero de los 8 puntos críticos (arquitectura, interfaces reales, aislamiento multi-tenant, degradación gradual, reutilización correcta de la policy de P1-018, cobertura de tests, build/test ejecutados por el propio Gandalf).
+
+### Resultado
+792 (baseline post-P1-018) → **818 tests**, 0 regresiones. PR #120 merged a develop.
+
+### Lección de proceso — verificación independiente del coordinador como control de calidad de primera línea
+Este ciclo demuestra el valor de que el coordinador nunca confíe ciegamente en el auto-reporte de un agente antes de despachar a revisión formal: se detectaron y corrigieron 2 defectos reales (uno de arquitectura/DI, otro de un test roto reportado como "aceptable") **sin gastar ciclos de Gandalf**, dejando solo 1 ronda de revisión formal en vez de 2-3 rondas de rechazo/remediación como en P1-018. Regla reforzada: "tests pasando" en el reporte de un agente no es suficiente — el coordinador debe inspeccionar el diff y, cuando hay dudas de diseño (nombres de interfaz, registros de DI), ejecutar build/test localmente antes de avanzar.
+
+### Estado RBAC — CICLO P1-011→P1-019 CERRADO POR COMPLETO
+**6 de 6 permisos críticos del contrato 100% implementados.** Sin pendientes críticos de seguridad ni gaps P2 abiertos en el contrato RBAC.
+
+| Permiso | Estado |
+|---------|--------|
+| ApproveProcessingActivity | ✅ Completo (P1-013/016/017/018) |
+| ActivateProcessingActivity | ✅ Completo (P1-012) |
+| ValidateEvidence | ✅ Completo |
+| AcceptGapWithRisk | ✅ Completo |
+| DownloadEvidence | ✅ Completo (P1-015) |
+| GenerateOfficialExport | ✅ Completo (P1-014 + P1-014-P2) |
+
+**Referencias**: PR #120, `.squad/decisions/inbox/{aragorn-p1-014-p2-*,gandalf-p1-014-p2-review}.md` (consolidadas y eliminadas del inbox tras este merge).
