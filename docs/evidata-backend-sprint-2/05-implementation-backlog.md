@@ -1,4 +1,4 @@
-# 05 — Backlog de implementación backend v1.6.4
+# 05 — Backlog de implementación backend v1.6.5
 
 ## P0 — Bloqueantes de contrato
 
@@ -36,7 +36,7 @@
 | P1-015 | ✅ COMPLETADO: Implementar DownloadEvidence endpoint + autorización (SEC-EVDOWN-001 — 4/4 gaps cerrados sin deferral). | Endpoint HTTP `[HttpGet("{id:guid}/download")]` en EvidenceController ✓, validación RBAC antes de SAS (fail-closed: 403 SensitiveEvidenceRestricted si Viewer intenta acceso sensible) ✓, auditoría con AuditEventType.EvidenceDownloaded (éxito) + EvidenceAccessDenied (denegación) ✓, validación `reason` obligatorio para Sensitive ✓. PR #115 MERGED a develop (2026-07-10). 783 unit tests passing, 0 regressions. Hallazgo menor (Gandalf): respuesta 403 usa Forbid() sin ApiErrorEnvelope (inconsistencia formato, no seguridad) — nota de calidad, no requiere backlog nuevo. | ✅ Security + Evidence tests + 783 unit tests passing |
 | P1-016 | ✅ COMPLETADO: Implementar 2 blockers restantes de ApproveProcessingActivity (P1-013 follow-up). | ProcessingActivity.ReviewedAt (nullable timestamp) + MarkAsReviewed() método ✓, ApproveProcessingActivityCommandHandler validación RequiredReviewPending (bloquea si ANY review != Approved) ✓, VersionModifiedAfterReview (bloquea si LastModifiedAt > ReviewedAt) ✓, 7 handler tests pass, 786 total tests passing, 0 regressions. PR #116 aprobado condicional por Gandalf, merged a develop (2026-07-10). **CRÍTICA LIMITACIÓN FUNCIONAL**: VersionModifiedAfterReview blocker es código muerto en producción porque ReviewedAt nunca se setea automáticamente (MarkAsReviewed() existe pero nadie la invoca). P1-017 requerido para activar funcionalidad real. | ✅ Security + Domain tests; P1-017/P1-018 follow-ups requeridos |
 | P1-017 | ✅ COMPLETADO: Auto-set ReviewedAt en ProcessingActivity cuando Review es aprobada (integración Workflow→ProcessingInventory). | **Implementación (revisada por P1-019)**: `ReviewApprovedEventPayload` + `IReviewEventHandler` viven en proyecto neutral `Evidata.Modules.Contracts`; `ReviewService.ApproveAsync()` emite evento a Outbox y además invoca directamente (DI estándar, ver P1-019) al handler `ReviewEventHandler` en ProcessingInventory, que llama `ProcessingActivity.MarkAsReviewed()`. `MarkAsReviewed()` es idempotente (`if (ReviewedAt.HasValue) return;`). `ReviewEventHandler` registra auditoría vía `IAuditService` (mismo patrón que `ApproveProcessingActivityCommandHandler`). Logging estructurado con `ILogger`. Test E2E confirma: Review aprobada → ReviewedAt seteado → actividad modificada → blocker VersionModifiedAfterReview se dispara (HTTP 422). PR #117, 3 rondas de revisión de Gandalf, merged 2026-07-10. **VersionModifiedAfterReview blocker de P1-016 es funcional end-to-end en producción.** | ✅ Unit + integration tests; P1-018 pendiente (configurabilidad) |
-| P1-018 | **[NEW — MEDIA PRIORIDAD]** Modelo de ReviewRequirement configurable por tenant. | **Acción**: Crear tabla ReviewRequirement (ReviewType enum, TenantId, IsRequiredForEntityType). En RequiredReviewPending blocker (P1-016), filtrar reviews por active requirements solamente. **Por qué**: MVP "cualquier review bloquea aprobación" es conservador pero rígido; necesita configurabilidad por tenant para tipos de review opcionales. **Alcance**: Domain model + policy service + tenant configuration endpoints. **Estimado**: 5 story points. **Criticidad**: MEDIA — MVP funciona fine; enhancement para flexibilidad futura. | Policy engine; tenant admin UI |
+| P1-018 | ✅ COMPLETADO: Modelo de ReviewRequirement configurable por tenant. | **Implementación**: Entidad `ReviewRequirement` (TenantId, EntityType, ReviewType, IsRequired) + `ReviewType` enum (Legal, Security) + `IReviewRequirementPolicyService` con cache distribuida de 60 min. Blocker `RequiredReviewPending` (P1-016) refactorizado para filtrar sólo por tipos de review requeridos según policy del tenant. `ReviewRequirementsController` con endpoints admin (GET/POST/DELETE). Nuevo campo `ReviewDomain` en `Review` (migración `AddReviewDomainField`) para mapear correctamente el tipo sin hardcodear. **Ciclo de revisión**: 1ª ronda de Gandalf → ⛔ RECHAZADO (0 tests nuevos, vulnerabilidad de aislamiento multi-tenant CVSS ~7.3 vía `tenantId` en query param, `ReviewType.Legal` hardcodeado). Bajo lockout de revisor, Legolas (Security & Authorization Engineer) remediation independiente: aislamiento multi-tenant vía `ICurrentUserContext` (tenant resuelto del usuario autenticado, no del cliente), corrección del mapeo de tipo, +20 tests (`ReviewRequirementPolicyServiceTests` 11, `ReviewRequirementsControllerTests` 7, handler 2). 2ª ronda: aprobado condicional pendiente de cobertura de tests. 3ª ronda (final): **APROBADO CONDICIONAL** — los 3 blockers críticos verificados fijos en código y tests; único gap menor no bloqueante (falta test explícito de aislamiento en GET, mismo mecanismo que DELETE que sí está cubierto). PR #119 merged. 812 tests totales, 0 regresiones. | ✅ Security + Policy tests; 812 unit tests passing |
 | P1-019 | ✅ COMPLETADO: Refactor P1-017 — eliminar service locator vía reflection, usar proyecto Contracts neutral + DI estándar. | **Origen**: usuario cuestionó el diseño de reflection de P1-017; Gandalf reconoció que su aprobación original fue permisiva y recomendó Opción B (proyecto de contratos neutral). **Implementación**: nuevo proyecto `Evidata.Modules.Contracts` alberga `IReviewEventHandler` + `ReviewApprovedEventPayload`; `Workflow` y `ProcessingInventory` referencian solo `Contracts` (cero circularidad); `ReviewService` recibe `IReviewEventHandler` por inyección estándar en el constructor — eliminados `Type.GetType()`, `IServiceProvider.GetService()`, `MethodInfo.Invoke()`, `Activator.CreateInstance()`. Lógica de negocio (idempotencia, auditoría, logging, Outbox) intacta — refactor puramente mecánico. Test E2E renombrado (ya no menciona "reflection"). 792 tests, 0 regressions. PR #118, aprobado sin condiciones por Gandalf (7 puntos de verificación), merged 2026-07-10. | ✅ Unit + integration tests; Ninguno |
 
 ## RBAC Compliance Closure — Contrato Ampliado (04-rbac-audit-evidence-gaps-contract.md)
@@ -45,7 +45,7 @@
 
 | Permiso | Contrato | Implementación | Estado | Seguimiento |
 |---------|----------|-----------------|--------|-------------|
-| ApproveProcessingActivity | SEC-APP-001 | P1-013 / P1-016 / P1-017 | ✅ Completo (blocker funcional end-to-end) | P1-018 (configurabilidad) |
+| ApproveProcessingActivity | SEC-APP-001 | P1-013 / P1-016 / P1-017 / P1-018 | ✅ Completo (blocker funcional end-to-end + configurable por tenant) | Ninguno |
 | ActivateProcessingActivity | SEC-ACT-001 | P1-012 | ✅ Completo | Ninguno |
 | ValidateEvidence | SEC-EV-001 | Prior | ✅ Completo | Ninguno |
 | AcceptGapWithRisk | SEC-GAP-001 | Prior | ✅ Completo | Ninguno |
@@ -53,16 +53,14 @@
 | DownloadEvidence | SEC-EVDOWN-001 | P1-015 | ✅ 4/4 gaps (Completo) | Ninguno |
 
 **Resumen:**
-- ✅ **4 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk, DownloadEvidence)
-- ✅ **1 permiso completamente implementado y funcional end-to-end** con follow-up de mejora documentado (ApproveProcessingActivity P1-016+P1-017 completo, P1-018 pendiente para configurabilidad)
+- ✅ **5 permisos completamente implementados** (ActivateProcessingActivity, ValidateEvidence, AcceptGapWithRisk, DownloadEvidence, ApproveProcessingActivity)
 - ✅ **1 permiso 3/4 gaps** con follow-up no bloqueante (GenerateOfficialExport, P1-014-P2)
-- 📊 **792 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117, #118)
-- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-019 sistemáticamente cierra cada permiso e incluye una revisión arquitectónica de calidad (eliminación de reflection, P1-019)
+- 📊 **812 unit tests pasando**, 0 regressions (PR #112, #113, #114, #115, #116, #117, #118, #119)
+- 🔐 **Cierre de auditoría RBAC completa** — Ciclo P1-011 → P1-019 sistemáticamente cierra cada permiso, incluye revisión arquitectónica de calidad (eliminación de reflection, P1-019) y remediación de seguridad multi-tenant bajo lockout de revisor (P1-018)
 
 **Próximas Tareas:**
-1. P1-018: ConfigureReviewRequirement (configurabilidad por tenant, mejora MVP P1-016)
-2. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
-3. Transición a develop→main y follow-up administrativo
+1. P1-014-P2: Agregador IProcessingActivityRiskAssessmentService para auto-detección de ExportWarning (P2, no bloqueante)
+2. Transición a develop→main y follow-up administrativo
 
 
 

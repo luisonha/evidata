@@ -676,3 +676,36 @@ El usuario cuestionó el "service locator vía reflection" introducido en P1-017
 Cuando el usuario cuestiona una decisión ya aprobada, el equipo debe re-evaluar con la misma honestidad que aplicaría a cualquier otro PR — Gandalf documentó explícitamente que su aprobación original fue "demasiado permisiva", lo cual reforzó la confianza en el proceso de revisión en vez de debilitarla.
 
 **Referencias**: PR #118, links a P1-017/PR #117. Decisiones originales en `.squad/decisions/inbox/{aragorn-p1-019-*,gandalf-p1-019-*,gandalf-p1017-reflection-*}.md` (consolidadas y eliminadas del inbox).
+
+## 2026-07-11 — PR #119 (P1-018): ReviewRequirement configurable por tenant
+
+**Autores**: Aragorn (implementación inicial), Legolas (Security & Authorization Engineer — remediación bajo lockout de revisor), Gandalf (3 rondas de revisión).
+
+**Decisión**: ✅ **APROBADO CONDICIONAL Y MERGED** (gap menor no bloqueante, riesgo aceptado a nivel arquitectónico).
+
+### Contexto
+Último ítem pendiente del ciclo P1-011→P1-019: hacer configurable por tenant qué tipos de review (`Legal`, `Security`) bloquean la aprobación de una actividad de procesamiento, en vez del comportamiento MVP rígido de P1-016 ("cualquier review bloquea").
+
+### Ciclo de revisión (caso de estudio del protocolo de rechazo de revisor)
+1. **Implementación inicial de Aragorn**: `ReviewRequirement` entity, `IReviewRequirementPolicyService` con cache de 60 min, filtrado del blocker `RequiredReviewPending`, `ReviewRequirementsController`, migración EF. Reportó 792/792 tests — **sin tests nuevos**, señal de alerta.
+2. **1ª revisión de Gandalf**: ⛔ **RECHAZADO formalmente**, 3 blockers críticos:
+   - Cero tests nuevos pese a requisito explícito.
+   - **Vulnerabilidad de aislamiento multi-tenant** (CVSS ~7.3+): `tenantId` aceptado como query parameter sin validar, permitiendo lectura/escritura cross-tenant.
+   - `ReviewType.Legal` hardcodeado en el handler, rompiendo por completo la feature de "Security opcional".
+3. **Lockout de revisor aplicado**: al ser rechazo formal (no condicional), Aragorn (autor original) quedó bloqueado para revisar su propio trabajo. Se despachó a **Legolas** (Security & Authorization Engineer) para remediación independiente — elegido por ser la vulnerabilidad de seguridad el blocker más severo.
+4. **Remediación de Legolas (ronda 1)**: aislamiento multi-tenant vía `ICurrentUserContext` (tenant resuelto del usuario autenticado, nunca de query/body del cliente); nuevo campo `ReviewDomain` en `Review` (+ migración `AddReviewDomainField`) para mapear el tipo correctamente sin hardcodeo; +2 tests de integración (792→794).
+5. **2ª revisión de Gandalf**: **APROBADO CONDICIONAL** — blockers #2 y #3 verificados corregidos en código; blocker #1 (cobertura de tests) sólo parcialmente resuelto. Exigió explícitamente: `ReviewRequirementPolicyServiceTests.cs` (≥10 tests) y `ReviewRequirementsControllerTests.cs` (≥6 tests, incluyendo test crítico de regresión multi-tenant a nivel HTTP).
+6. **Legolas (ronda 2, sin lockout por ser condicional no rechazo)**: agregó `ReviewRequirementPolicyServiceTests.cs` (11 tests, 794→805), pero omitió inicialmente los tests de controller — gap detectado por el coordinador al inspectar el árbol de archivos remoto (`git ls-tree`) antes de reenviar a revisión. Re-despacho específico a Legolas para cerrar el gap.
+7. **Legolas (ronda 3)**: agregó `ReviewRequirementsControllerTests.cs` (7 tests, 805→812), incluyendo `DeleteRequirement_TenantADoesNotAffectTenantB` (test crítico de regresión multi-tenant a nivel HTTP/integración).
+8. **3ª revisión de Gandalf (final)**: **APROBADO CONDICIONAL** — verificación línea por línea confirma los 3 blockers fijos en código y cubiertos por tests (11 + 7 + 2 = 20 tests nuevos). Gap menor identificado (no bloqueante): falta test explícito de aislamiento en GET; aceptado porque DELETE (escritura, más crítico) está cubierto y ambos endpoints comparten el mismo mecanismo (`ICurrentUserContext`) — una regresión no podría romper GET sin romper también DELETE.
+
+### Resultado
+792 → **812 tests**, 0 regresiones, CI verde. PR #119 merged a develop.
+
+### Lección de proceso — Protocolo de Rechazo de Revisor validado en producción
+Este es el primer caso real de esta sesión donde el lockout estricto de revisor se aplicó ante un rechazo formal: el autor original (Aragorn) no pudo auto-corregir su propio trabajo rechazado; un agente distinto e independiente (Legolas) asumió la remediación completa. La aprobación condicional (a diferencia del rechazo formal) **no** activa lockout — permitió que Legolas continuara iterando sobre su propia remediación en las rondas 2 y 3. La verificación independiente del coordinador (vía `git ls-tree`, no solo el reporte del agente) detectó 2 gaps reales antes de que llegaran a revisión de Gandalf, evitando ciclos de revisión adicionales innecesarios.
+
+### Estado RBAC (6 permisos críticos del contrato)
+**Ciclo P1-011→P1-019 cerrado por completo.** 5 de 6 permisos 100% completos; GenerateOfficialExport con 3/4 gaps (P1-014-P2, no bloqueante, aceptado por el usuario). Sin pendientes críticos de seguridad en el contrato RBAC.
+
+**Referencias**: PR #119, decisiones originales en `.squad/decisions/inbox/{aragorn-p1-018-*,gandalf-p1-018-*,legolas-p1-018-*}.md` (consolidadas y eliminadas del inbox tras este merge).
