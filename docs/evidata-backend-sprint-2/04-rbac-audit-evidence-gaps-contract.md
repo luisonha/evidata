@@ -16,16 +16,519 @@ Auditor
 Viewer
 ```
 
-### Permisos críticos
+# Permisos críticos backend — Evidata
 
-| PermissionCode | Regla mínima | Test obligatorio |
-|---|---|---|
-| `ApproveProcessingActivity` | ProcessOwner no puede aprobar su propio tratamiento. | SEC-APP-001 |
-| `ActivateProcessingActivity` | Sólo TenantOwner/ComplianceAdmin según política. | SEC-ACT-001 |
-| `ValidateEvidence` | Reviewer correcto según tipo de evidencia. | SEC-EV-001 |
-| `AcceptGapWithRisk` | Sólo TenantOwner/ComplianceAdmin, con justificación. | SEC-GAP-001 |
-| `GenerateOfficialExport` | Sólo roles autorizados y actividad aprobada/activa. | SEC-EXP-001 |
-| `DownloadEvidence` | Viewer no descarga evidencia sensible. | SEC-EVDOWN-001 |
+## Propósito de esta sección
+
+Esta sección define los permisos críticos que protegen acciones de alto impacto sobre un `ProcessingActivity`, evidencias, brechas, revisiones y exportaciones oficiales.
+
+No se trata solamente de definir “qué rol puede hacer qué”, sino de establecer un **contrato de autorización verificable** para acciones críticas, considerando:
+
+- usuario autenticado;
+- tenant;
+- roles y permisos;
+- recurso específico;
+- estado del tratamiento;
+- versión activa o borrador;
+- tipo y sensibilidad de evidencia;
+- severidad de la brecha;
+- políticas configuradas del tenant;
+- auditoría obligatoria;
+- pruebas de seguridad obligatorias.
+
+La autorización de estas acciones **siempre debe ejecutarse en backend**. El frontend puede mostrar u ocultar acciones, pero nunca debe ser considerado como mecanismo de seguridad.
+
+---
+
+## Principios obligatorios
+
+Toda acción crítica debe cumplir estas condiciones mínimas:
+
+```text
+1. Validarse siempre en backend.
+2. Requerir un PermissionCode explícito.
+3. Evaluar contexto del recurso, no sólo rol global.
+4. Generar AuditEvent con resultado Succeeded, Denied o Blocked.
+5. Retornar errores consistentes: 403 para falta de permiso, 422 para bloqueo de negocio.
+6. Tener test de seguridad obligatorio.
+7. No confiar en botones ocultos/deshabilitados en frontend como medida de seguridad.
+```
+
+---
+
+## Tabla principal de permisos críticos
+
+| PermissionCode | Qué protege | Regla mínima de autorización | Regla de negocio adicional | Error esperado | Auditoría obligatoria | Test obligatorio |
+|---|---|---|---|---|---|---|
+| `ApproveProcessingActivity` | Aprobación formal de una versión del tratamiento. | `ProcessOwner` no puede aprobar su propio tratamiento. Sólo roles con capacidad revisora o administrativa pueden aprobar según política. | No se puede aprobar si existen evidencias bloqueantes pendientes, brechas críticas abiertas, revisiones requeridas pendientes o versión modificada después de revisión. | `403 InsufficientPermissions` o `422 BlockingEvidenceMissing / CriticalGapOpen / RequiredReviewPending / VersionModifiedAfterReview` | `ProcessingActivityApproved` o `ApprovalBlocked` | `SEC-APP-001` |
+| `ActivateProcessingActivity` | Activación de una versión aprobada como versión vigente. | Sólo `TenantOwner` o `ComplianceAdmin`, según política del tenant. | Sólo una versión `Approved` puede activarse. Al activar, la versión anterior debe quedar `Deprecated`. | `403 InsufficientPermissions` o `422 InvalidStatusTransition` | `ProcessingActivityActivated` | `SEC-ACT-001` |
+| `ValidateEvidence` | Validación de evidencia como suficiente para un requerimiento. | Debe validar el reviewer correcto según tipo de evidencia: legal, seguridad, cumplimiento u otro tipo definido. | El dueño del tratamiento no debe validar su propia evidencia cuando la política requiera independencia. Evidencia rechazada no puede validarse sin reemplazo o reapertura. | `403 InsufficientPermissions` o `422 InvalidEvidenceStatus` | `EvidenceValidated` o `EvidenceValidationDenied` | `SEC-EV-001` |
+| `AcceptGapWithRisk` | Aceptación formal de una brecha sin corrección completa. | Sólo `TenantOwner` o `ComplianceAdmin`. | Requiere justificación obligatoria. Si la brecha es crítica, puede requerir doble aprobación o política explícita del tenant. | `403 InsufficientPermissions` o `422 ReasonRequired` | `GapAcceptedWithRisk` | `SEC-GAP-001` |
+| `GenerateOfficialExport` | Generación de una salida oficial auditable. | Sólo roles autorizados, típicamente `TenantOwner` o `ComplianceAdmin`. | El tratamiento debe estar `Approved` o `Active`, salvo exportaciones preliminares marcadas como no oficiales. Debe registrar advertencias si hay riesgos, brechas o evidencias pendientes. | `403 InsufficientPermissions` o `422 OfficialExportRequiresApproval` | `OfficialExportGenerated` o `ExportGenerationBlocked` | `SEC-EXP-001` |
+| `DownloadEvidence` | Descarga de archivos o evidencias asociadas al tratamiento. | El usuario debe tener permiso de lectura sobre la evidencia y el tratamiento. | `Viewer` no puede descargar evidencia sensible o confidencial. Toda descarga debe auditarse. | `403 SensitiveEvidenceRestricted / InsufficientPermissions` | `EvidenceDownloaded` o `EvidenceAccessDenied` | `SEC-EVDOWN-001` |
+
+---
+
+## Detalle por permiso
+
+## `ApproveProcessingActivity`
+
+Este permiso controla la aprobación formal de una versión del tratamiento. No debe confundirse con guardar cambios, enviar a revisión o comentar una revisión.
+
+La aprobación significa:
+
+```text
+La organización considera que la versión revisada del tratamiento está lista para quedar aprobada, sujeta a posterior activación si corresponde.
+```
+
+### Reglas mínimas
+
+```text
+- El usuario debe pertenecer al mismo tenant.
+- El usuario debe tener `ApproveProcessingActivity`.
+- El usuario no puede aprobar su propio tratamiento si es `ProcessOwner`.
+- La versión debe estar en estado aprobable.
+- No deben existir blockers activos.
+- Deben existir las revisiones requeridas aprobadas.
+- La versión no debe haber cambiado después de la revisión.
+```
+
+### Ejemplos de bloqueo
+
+```text
+- Falta evidencia bloqueante.
+- Existe brecha crítica abierta.
+- Falta revisión legal.
+- Falta revisión de seguridad.
+- La versión fue modificada después de la revisión.
+```
+
+### Resultado esperado
+
+```text
+Success:
+ProcessingActivityVersion.status = Approved
+ProcessingActivity.status = Approved
+AuditEvent = ProcessingActivityApproved
+
+Blocked:
+HTTP 422
+code = BlockingEvidenceMissing | CriticalGapOpen | RequiredReviewPending | VersionModifiedAfterReview
+AuditEvent = ApprovalBlocked
+
+Denied:
+HTTP 403
+code = InsufficientPermissions
+AuditEvent = AccessDenied o ApprovalDenied
+```
+
+### Test mínimo
+
+```text
+SEC-APP-001:
+Dado un tratamiento cuyo owner es ProcessOwner,
+cuando ese mismo ProcessOwner intenta aprobarlo,
+entonces el backend responde 403 InsufficientPermissions
+y registra AuditEvent con result = Denied.
+```
+
+---
+
+## `ActivateProcessingActivity`
+
+Este permiso controla la activación de una versión aprobada. Activar no es lo mismo que aprobar.
+
+La activación significa:
+
+```text
+La versión aprobada pasa a ser la versión vigente del tratamiento.
+```
+
+### Reglas mínimas
+
+```text
+- Sólo `TenantOwner` o `ComplianceAdmin`, según política.
+- La versión debe estar `Approved`.
+- No se debe activar una versión `Draft`, `InReview`, `ChangesRequested`, `Archived` o `Deprecated`.
+- Al activar una nueva versión, la versión activa anterior debe quedar `Deprecated`.
+- Debe actualizarse `activeVersionId`.
+```
+
+### Resultado esperado
+
+```text
+Success:
+ProcessingActivity.status = Active
+selectedVersion.status = Active
+previousActiveVersion.status = Deprecated
+AuditEvent = ProcessingActivityActivated
+
+Blocked:
+HTTP 422
+code = InvalidStatusTransition
+
+Denied:
+HTTP 403
+code = InsufficientPermissions
+```
+
+### Test mínimo
+
+```text
+SEC-ACT-001:
+Dado un usuario ProcessOwner con tratamiento aprobado,
+cuando intenta activar la versión,
+entonces el backend responde 403
+y no modifica activeVersionId.
+```
+
+---
+
+## `ValidateEvidence`
+
+Este permiso controla la validación de evidencia. No basta con que el usuario pueda ver o adjuntar evidencia.
+
+Validar evidencia significa:
+
+```text
+Un rol autorizado declara que la evidencia adjunta es suficiente para el requerimiento correspondiente.
+```
+
+### Reglas mínimas
+
+```text
+- El usuario debe tener `ValidateEvidence`.
+- El tipo de evidencia debe corresponder al scope del reviewer.
+- LegalReviewer valida evidencias legales.
+- SecurityReviewer valida evidencias de seguridad.
+- ComplianceAdmin puede validar evidencias de cumplimiento según política.
+- ProcessOwner puede adjuntar evidencia, pero no necesariamente validarla.
+- Viewer nunca valida evidencia.
+```
+
+### Ejemplos de scope
+
+```text
+Contrato de encargado        → LegalReviewer
+Política de seguridad        → SecurityReviewer
+Registro RAT                 → ComplianceAdmin / LegalReviewer según política
+Evidencia técnica de cifrado  → SecurityReviewer
+```
+
+### Resultado esperado
+
+```text
+Success:
+Evidence.status = Validated
+EvidenceValidation.created
+AuditEvent = EvidenceValidated
+
+Blocked:
+HTTP 422
+code = InvalidEvidenceStatus
+
+Denied:
+HTTP 403
+code = InsufficientPermissions
+```
+
+### Test mínimo
+
+```text
+SEC-EV-001:
+Dada una evidencia de tipo Security,
+cuando un LegalReviewer intenta validarla,
+entonces el backend responde 403
+y la evidencia conserva su estado anterior.
+```
+
+---
+
+## `AcceptGapWithRisk`
+
+Este permiso es especialmente sensible porque permite cerrar o mantener una brecha aceptando el riesgo asociado.
+
+Aceptar una brecha con riesgo significa:
+
+```text
+La organización decide no corregir completamente la brecha en este momento y deja constancia formal de la aceptación del riesgo.
+```
+
+### Reglas mínimas
+
+```text
+- Sólo `TenantOwner` o `ComplianceAdmin`.
+- Debe existir justificación obligatoria.
+- Debe registrar quién aceptó el riesgo.
+- Debe registrar fecha, motivo, severidad y estado previo.
+- No debe eliminar la brecha ni borrar su historial.
+- Si la brecha es crítica, puede requerir política especial.
+```
+
+### Resultado esperado
+
+```text
+Success:
+Gap.status = AcceptedWithRisk
+GapResolution.created
+AuditEvent = GapAcceptedWithRisk
+
+Blocked:
+HTTP 422
+code = ReasonRequired
+
+Denied:
+HTTP 403
+code = InsufficientPermissions
+```
+
+### Test mínimo
+
+```text
+SEC-GAP-001:
+Dado un gap crítico abierto,
+cuando un ComplianceAdmin intenta aceptarlo sin justificación,
+entonces el backend responde 422 ReasonRequired
+y el gap permanece Open.
+```
+
+---
+
+## `GenerateOfficialExport`
+
+Este permiso controla exportaciones oficiales, no simples vistas preliminares.
+
+Una exportación oficial significa:
+
+```text
+Un documento o salida generada por Evidata que puede usarse como evidencia formal ante auditoría, fiscalización o revisión interna.
+```
+
+### Reglas mínimas
+
+```text
+- Sólo roles autorizados.
+- El tratamiento debe estar `Approved` o `Active`.
+- Si existen advertencias, deben incluirse como ExportWarning.
+- Debe quedar AuditEvent.
+- Debe quedar trazabilidad del usuario, versión, fecha, tipo de exportación y parámetros.
+```
+
+### Tipos de exportación oficial
+
+```text
+TreatmentPdfSummary
+ApprovalHistory
+GlobalRatExcel
+```
+
+### Exportaciones técnicas no visibles
+
+```text
+InternalJson
+```
+
+### Resultado esperado
+
+```text
+Success:
+ExportRequest.created
+ExportFile.generated
+AuditEvent = OfficialExportGenerated
+
+Blocked:
+HTTP 422
+code = OfficialExportRequiresApproval
+
+Denied:
+HTTP 403
+code = InsufficientPermissions
+```
+
+### Test mínimo
+
+```text
+SEC-EXP-001:
+Dado un tratamiento en Draft,
+cuando un ComplianceAdmin intenta generar una exportación oficial,
+entonces el backend responde 422 OfficialExportRequiresApproval.
+```
+
+---
+
+## `DownloadEvidence`
+
+Este permiso protege la descarga de evidencias, especialmente evidencias sensibles.
+
+Descargar evidencia significa:
+
+```text
+Acceder al archivo o contenido probatorio fuera de la vista resumida del sistema.
+```
+
+### Reglas mínimas
+
+```text
+- El usuario debe tener `DownloadEvidence`.
+- El usuario debe tener acceso al tratamiento.
+- La sensibilidad de la evidencia debe evaluarse.
+- Viewer no puede descargar evidencia sensible.
+- Toda descarga debe auditarse.
+- Un acceso denegado también debe auditarse.
+```
+
+### Clasificación mínima sugerida
+
+```text
+Public
+Internal
+Confidential
+Sensitive
+```
+
+### Resultado esperado
+
+```text
+Success:
+Archivo entregado mediante URL segura o stream controlado.
+AuditEvent = EvidenceDownloaded
+
+Denied:
+HTTP 403
+code = SensitiveEvidenceRestricted
+AuditEvent = EvidenceAccessDenied
+```
+
+### Test mínimo
+
+```text
+SEC-EVDOWN-001:
+Dada una evidencia Sensitive,
+cuando un Viewer intenta descargarla,
+entonces el backend responde 403 SensitiveEvidenceRestricted
+y registra EvidenceAccessDenied.
+```
+
+---
+
+# Contrato esperado para autorización
+
+Cada acción crítica debería pasar por un servicio de autorización, no por validaciones dispersas en controllers/functions.
+
+## Contexto de autorización
+
+```csharp
+public sealed record AuthorizationContext(
+    Guid TenantId,
+    Guid UserId,
+    IReadOnlyCollection<string> RoleCodes,
+    string PermissionCode,
+    string ResourceType,
+    Guid ResourceId,
+    Guid? ProcessingActivityId,
+    Guid? VersionId,
+    string? ResourceStatus,
+    string? EvidenceType,
+    string? EvidenceSensitivity,
+    string? GapSeverity,
+    string? ReviewType,
+    string? ActionReason
+);
+```
+
+## Decisión de autorización
+
+```csharp
+public sealed record AuthorizationDecision(
+    bool IsAllowed,
+    string? DenyReasonCode,
+    string? BlockedReasonCode,
+    IReadOnlyCollection<BlockedAction> BlockedActions,
+    bool RequiresReason,
+    bool RequiresComment,
+    bool RequiresAudit
+);
+```
+
+## Regla de resultado HTTP
+
+```text
+IsAllowed = false por permiso insuficiente → HTTP 403
+IsAllowed = true pero bloqueado por regla de negocio → HTTP 422
+```
+
+---
+
+# Relación con frontend
+
+El frontend puede mostrar botones habilitados, deshabilitados o razones de bloqueo, pero eso no reemplaza la autorización backend.
+
+El backend debe devolver permisos y bloqueos en los ViewModels relevantes.
+
+Ejemplo:
+
+```json
+{
+  "permissions": {
+    "availableActions": [
+      "ViewProcessingActivity",
+      "AttachEvidence"
+    ],
+    "blockedActions": [
+      {
+        "action": "ApproveProcessingActivity",
+        "reasonCode": "BlockingEvidenceMissing",
+        "labelKey": "blockedReason.blockingEvidenceMissing",
+        "severity": "Critical",
+        "relatedNode": "Evidence"
+      }
+    ]
+  }
+}
+```
+
+La UI sólo interpreta:
+
+```text
+- qué acciones mostrar;
+- cuáles deshabilitar;
+- qué explicación presentar;
+- qué CTA ofrecer.
+```
+
+Pero la seguridad real vive en backend.
+
+---
+
+# Tabla resumida para documentación ejecutiva
+
+| PermissionCode | Objetivo | Regla crítica | Backend debe validar | Test obligatorio |
+|---|---|---|---|---|
+| `ApproveProcessingActivity` | Aprobar versión revisada del tratamiento. | El owner no aprueba su propio tratamiento. | Rol, owner, estado, blockers, revisiones, versión no modificada. | `SEC-APP-001` |
+| `ActivateProcessingActivity` | Activar versión aprobada. | Sólo roles autorizados. | Estado `Approved`, política del tenant, deprecación de versión anterior. | `SEC-ACT-001` |
+| `ValidateEvidence` | Validar evidencia como suficiente. | Reviewer correcto según tipo. | Tipo, sensibilidad, estado, independencia del validador. | `SEC-EV-001` |
+| `AcceptGapWithRisk` | Aceptar brecha con riesgo. | Sólo TenantOwner/ComplianceAdmin y con justificación. | Severidad, estado, razón obligatoria, política para críticos. | `SEC-GAP-001` |
+| `GenerateOfficialExport` | Emitir salida oficial. | Sólo roles autorizados y tratamiento aprobado/activo. | Tipo de exportación, estado, warnings, trazabilidad. | `SEC-EXP-001` |
+| `DownloadEvidence` | Descargar evidencia. | Viewer no descarga evidencia sensible. | Sensibilidad, permiso, acceso al tratamiento, auditoría. | `SEC-EVDOWN-001` |
+
+---
+
+# Resultado esperado de esta sección
+
+Esta sección busca asegurar que Evidata proteja acciones críticas mediante reglas backend verificables, trazables y testeables.
+
+Los objetivos son:
+
+```text
+- impedir conflictos de interés;
+- evitar aprobaciones indebidas;
+- asegurar separación de funciones;
+- proteger evidencia sensible;
+- evitar aceptación informal de riesgos;
+- controlar exportaciones oficiales;
+- garantizar auditoría de acciones exitosas, denegadas o bloqueadas;
+- convertir cada permiso crítico en pruebas obligatorias de seguridad.
+```
 
 ### Mapeo obligatorio para `ValidateEvidence`
 

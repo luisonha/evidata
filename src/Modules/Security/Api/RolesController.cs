@@ -31,14 +31,24 @@ public class RolesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Assigns a role to a user in the current tenant.
+    /// Only TenantOwner or ComplianceAdmin can perform this operation.
+    /// </summary>
     [HttpPost("assign")]
+    [Authorize(Policy = "TenantOwnerOrComplianceAdmin")]
     public async Task<IActionResult> AssignRole([FromBody] AssignRoleToUserCommand command, CancellationToken ct)
     {
         var result = await _assign.HandleAsync(command, ct);
         return Ok(result);
     }
 
+    /// <summary>
+    /// Removes a role from a user in the current tenant.
+    /// Only TenantOwner or ComplianceAdmin can perform this operation.
+    /// </summary>
     [HttpDelete("remove")]
+    [Authorize(Policy = "TenantOwnerOrComplianceAdmin")]
     public async Task<IActionResult> RemoveRole([FromBody] RemoveRoleFromUserCommand command, CancellationToken ct)
     {
         await _remove.HandleAsync(command, ct);

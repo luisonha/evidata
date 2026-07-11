@@ -28,18 +28,22 @@ namespace Evidata.Modules.Audit.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Action")
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<string>("Details")
-                        .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
-
                     b.Property<string>("IpAddress")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -52,6 +56,9 @@ namespace Evidata.Modules.Audit.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ResourceId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Result")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Severity")
                         .HasColumnType("integer");
 
@@ -62,6 +69,8 @@ namespace Evidata.Modules.Audit.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
 
                     b.HasIndex("TenantId", "OccurredAt");
 

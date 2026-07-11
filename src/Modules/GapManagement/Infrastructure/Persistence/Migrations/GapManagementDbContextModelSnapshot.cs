@@ -55,6 +55,10 @@ namespace Evidata.Modules.GapManagement.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
 
+                    b.Property<Guid?>("GapRuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gap_rule_id");
+
                     b.Property<DateTimeOffset?>("LastModifiedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_modified_at");
@@ -109,6 +113,9 @@ namespace Evidata.Modules.GapManagement.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("GapRuleId")
+                        .HasDatabaseName("ix_compliance_gaps_rule");
+
                     b.HasIndex("OwnerId")
                         .HasDatabaseName("ix_compliance_gaps_owner");
 
@@ -122,6 +129,80 @@ namespace Evidata.Modules.GapManagement.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_compliance_gaps_source");
 
                     b.ToTable("compliance_gaps", "gap");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.GapManagement.Domain.GapRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("BlocksApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("blocks_approval");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ImplementationNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("implementation_notes");
+
+                    b.Property<bool>("IsFullyImplemented")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_fully_implemented");
+
+                    b.Property<DateTimeOffset?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_modified_at");
+
+                    b.Property<Guid?>("LastModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_modified_by");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("rule_code");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("severity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TestFixtureName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("test_fixture_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleCode")
+                        .HasDatabaseName("ix_gap_rules_code");
+
+                    b.HasIndex("TenantId", "RuleCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gap_rules_tenant_code");
+
+                    b.ToTable("gap_rules", "gap");
                 });
 #pragma warning restore 612, 618
         }

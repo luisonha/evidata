@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Identity\Evidata.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Contracts\Evidata.Modules.Contracts.csproj" />
+    <ProjectReference Include="..\..\Evidata.Worker.Outbox\Evidata.Worker.Outbox.csproj" />
   </ItemGroup>
 
 </Project>

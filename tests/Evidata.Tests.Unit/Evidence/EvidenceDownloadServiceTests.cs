@@ -1,8 +1,11 @@
+using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.Evidence.Application.Abstractions;
 using Evidata.Modules.Evidence.Domain;
 using Evidata.Modules.Evidence.Infrastructure.Download;
 using Evidata.Modules.Evidence.Infrastructure.Persistence;
+using Evidata.Modules.Security.Application.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -56,9 +59,55 @@ public class EvidenceDownloadServiceTests
         return blob;
     }
 
-    // ── TC1: Download OK genera AccessLog ────────────────────────────────────
+    private static IResourcePermissionsQueryService BuildPermissionsServiceMock(
+        bool isBlocked = false)
+    {
+        var permissions = Substitute.For<IResourcePermissionsQueryService>();
+        
+        var blockedActions = isBlocked
+            ? new List<BlockedActionResult>
+            {
+                new("DownloadEvidence", "permission.downloadEvidence",
+                    "SEC-EVDOWN-001", "block.downloadSensitive",
+                    "High", "severity.high", "Evidence", "node.evidence")
+            }
+            : new List<BlockedActionResult>();
+
+        var availableActions = !isBlocked
+            ? new List<AvailableActionResult>
+            {
+                new("DownloadEvidence", "permission.downloadEvidence")
+            }
+            : new List<AvailableActionResult>();
+
+        permissions.GetResourcePermissionsAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid>(), Arg.Any<ResourceContextData>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ResourcePermissionsResult(
+                new List<string> { "Viewer" },
+                availableActions,
+                false,
+                blockedActions));
+
+        return permissions;
+    }
+
+    private static IAuditService BuildAuditServiceMock()
+    {
+        var audit = Substitute.For<IAuditService>();
+        audit.LogAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<AuditEventResult>(),
+                Arg.Any<string>(), Arg.Any<Dictionary<string, object?>>(),
+                Arg.Any<string>(), Arg.Any<AuditSeverity>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        return audit;
+    }
+
+    // ── TC1: Download OK genera AccessLog y AuditEvent.EvidenceDownloaded ──────
     [Fact]
-    public async Task RequestDownload_ValidEvidence_CreatesAccessLog()
+    public async Task RequestDownload_ValidEvidence_CreatesAccessLogAndAudit()
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -68,8 +117,10 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        var auditSvc = BuildAuditServiceMock();
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            auditSvc, NullLogger<EvidenceDownloadService>.Instance);
 
         var result = await svc.RequestDownloadAsync(tenantId, evidence.Id, userId);
 
@@ -81,13 +132,21 @@ public class EvidenceDownloadServiceTests
         Assert.Equal(evidence.Id, log.EvidenceId);
         Assert.Equal(tenantId, log.TenantId);
         Assert.Equal(userId, log.AccessedBy);
+
+        // Verificar que se registró auditoría de éxito
+        await auditSvc.Received(1).LogAsync(
+            tenantId, userId, "EvidenceDownloaded", "Evidence",
+            evidence.Id, AuditEventResult.Success,
+            Arg.Any<string>(), Arg.Any<Dictionary<string, object?>>(),
+            Arg.Any<string>(), AuditSeverity.Info, Arg.Any<CancellationToken>());
     }
 
-    // ── TC2: Sensitive sin reason → excepción ────────────────────────────────
+    // ── TC2: SEC-EVDOWN-001: Viewer + Sensitive → 403 SensitiveEvidenceRestricted ──
     [Fact]
-    public async Task RequestDownload_SensitiveWithoutReason_Throws()
+    public async Task RequestDownload_ViewerDownloadingSensitive_ThrowsAndAudits()
     {
         var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var evidence = BuildActiveEvidence(tenantId);
         Set(evidence, nameof(Modules.Evidence.Domain.Evidence.Sensitivity),
             EvidenceSensitivity.Sensitive);
@@ -96,14 +155,72 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        // Mock: Viewer role con Sensitive evidence → bloqueado
+        var auditSvc = BuildAuditServiceMock();
+        var permSvc = BuildPermissionsServiceMock(isBlocked: true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.RequestDownloadAsync(tenantId, evidence.Id, Guid.NewGuid(), reason: null));
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), permSvc,
+            auditSvc, NullLogger<EvidenceDownloadService>.Instance);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.RequestDownloadAsync(tenantId, evidence.Id, userId));
+
+        Assert.Contains("SensitiveEvidenceRestricted", ex.Message);
+
+        // Verificar que se registró auditoría de denegación
+        await auditSvc.Received(1).LogAsync(
+            tenantId, userId, "EvidenceAccessDenied", "Evidence",
+            evidence.Id, AuditEventResult.Blocked,
+            Arg.Any<string>(), Arg.Any<Dictionary<string, object?>>(),
+            Arg.Any<string>(), AuditSeverity.Critical, Arg.Any<CancellationToken>());
+
+        // Verificar que NO se creó AccessLog (excepción lanzada antes)
+        var logs = db.EvidenceAccessLogs
+            .Where(l => l.EvidenceId == evidence.Id)
+            .ToList();
+        Assert.Empty(logs);
     }
 
-    // ── TC3: Evidence de otro tenant → KeyNotFoundException ──────────────────
+    // ── TC3: Sensitive sin reason → excepción y auditoría denegación ────────
+    [Fact]
+    public async Task RequestDownload_SensitiveWithoutReason_AuditsAndThrows()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var evidence = BuildActiveEvidence(tenantId);
+        Set(evidence, nameof(Modules.Evidence.Domain.Evidence.Sensitivity),
+            EvidenceSensitivity.Sensitive);
+
+        await using var db = BuildContext();
+        db.Evidences.Add(evidence);
+        await db.SaveChangesAsync();
+
+        var auditSvc = BuildAuditServiceMock();
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            auditSvc, NullLogger<EvidenceDownloadService>.Instance);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.RequestDownloadAsync(tenantId, evidence.Id, userId, reason: null));
+
+        Assert.Contains("Missing required reason", ex.Message);
+
+        // Verificar que se registró auditoría de denegación
+        await auditSvc.Received(1).LogAsync(
+            tenantId, userId, "EvidenceAccessDenied", "Evidence",
+            evidence.Id, AuditEventResult.Blocked,
+            Arg.Any<string>(), Arg.Any<Dictionary<string, object?>>(),
+            Arg.Any<string>(), AuditSeverity.Critical, Arg.Any<CancellationToken>());
+
+        // Verificar que NO se creó AccessLog
+        var logs = db.EvidenceAccessLogs
+            .Where(l => l.EvidenceId == evidence.Id)
+            .ToList();
+        Assert.Empty(logs);
+    }
+
+    // ── TC4: Evidence de otro tenant → KeyNotFoundException ──────────────────
     [Fact]
     public async Task RequestDownload_WrongTenant_Throws()
     {
@@ -114,14 +231,15 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            BuildAuditServiceMock(), NullLogger<EvidenceDownloadService>.Instance);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.RequestDownloadAsync(Guid.NewGuid(), evidence.Id, Guid.NewGuid()));
     }
 
-    // ── TC4: Evidence sin BlobPath → excepción ───────────────────────────────
+    // ── TC5: Evidence sin BlobPath → excepción ───────────────────────────────
     [Fact]
     public async Task RequestDownload_NoBlobPath_Throws()
     {
@@ -132,14 +250,15 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            BuildAuditServiceMock(), NullLogger<EvidenceDownloadService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.RequestDownloadAsync(tenantId, evidence.Id, Guid.NewGuid()));
     }
 
-    // ── TC5: Evidence Deleted → excepción ────────────────────────────────────
+    // ── TC6: Evidence Deleted → excepción ────────────────────────────────────
     [Fact]
     public async Task RequestDownload_DeletedEvidence_Throws()
     {
@@ -151,18 +270,20 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            BuildAuditServiceMock(), NullLogger<EvidenceDownloadService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.RequestDownloadAsync(tenantId, evidence.Id, Guid.NewGuid()));
     }
 
-    // ── TC6: Sensitive con reason → OK + log con reason ──────────────────────
+    // ── TC7: Sensitive con reason → OK + log con reason ──────────────────────
     [Fact]
-    public async Task RequestDownload_SensitiveWithReason_LogsReason()
+    public async Task RequestDownload_SensitiveWithReason_LogsReasonAndAudits()
     {
         var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var evidence = BuildActiveEvidence(tenantId);
         Set(evidence, nameof(Modules.Evidence.Domain.Evidence.Sensitivity),
             EvidenceSensitivity.Sensitive);
@@ -171,14 +292,23 @@ public class EvidenceDownloadServiceTests
         db.Evidences.Add(evidence);
         await db.SaveChangesAsync();
 
-        var svc = new EvidenceDownloadService(db, BuildBlobMock(),
-            NullLogger<EvidenceDownloadService>.Instance);
+        var auditSvc = BuildAuditServiceMock();
+        var svc = new EvidenceDownloadService(
+            db, BuildBlobMock(), BuildPermissionsServiceMock(),
+            auditSvc, NullLogger<EvidenceDownloadService>.Instance);
 
         var result = await svc.RequestDownloadAsync(
-            tenantId, evidence.Id, Guid.NewGuid(), reason: "Auditoría interna Q1");
+            tenantId, evidence.Id, userId, reason: "Auditoría interna Q1");
 
         var log = await db.EvidenceAccessLogs.FindAsync(result.AccessLogId);
         Assert.Equal(EvidenceSensitivity.Sensitive, log!.SensitivityAtAccess);
         Assert.Equal("Auditoría interna Q1", log.Reason);
+
+        // Verificar que se registró auditoría de éxito
+        await auditSvc.Received(1).LogAsync(
+            tenantId, userId, "EvidenceDownloaded", "Evidence",
+            evidence.Id, AuditEventResult.Success,
+            Arg.Any<string>(), Arg.Any<Dictionary<string, object?>>(),
+            Arg.Any<string>(), AuditSeverity.Info, Arg.Any<CancellationToken>());
     }
 }

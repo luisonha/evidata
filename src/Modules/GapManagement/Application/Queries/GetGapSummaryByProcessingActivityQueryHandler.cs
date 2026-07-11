@@ -26,31 +26,22 @@ public sealed class GetGapSummaryByProcessingActivityQueryHandler(GapManagementD
             .OrderByDescending(severity => severity)
             .FirstOrDefault();
 
-        // TODO: GapManagement aún no soporta un estado Dismissed explícito; mapear dismissedCount cuando la FSM lo incorpore.
-        const int dismissedCount = 0;
-
         return new ProcessingActivityGapSummaryDto(
             processingActivityId,
             versionId,
             gaps.Count,
-            gaps.Count(g => g.Status is GapStatus.Open or GapStatus.Assigned),
-            gaps.Count(g => g.Status is GapStatus.InProgress or GapStatus.Blocked),
-            gaps.Count(g => g.Status == GapStatus.Resolved || IsClosedFromResolved(g)),
-            gaps.Count(g => g.Status == GapStatus.AcceptedRisk || IsAcceptedWithRiskClosed(g)),
-            dismissedCount,
+            gaps.Count(g => g.Status == GapStatus.Open),
+            gaps.Count(g => g.Status == GapStatus.InCorrection),
+            gaps.Count(g => g.Status == GapStatus.Resolved),
+            gaps.Count(g => g.Status == GapStatus.AcceptedWithRisk),
+            gaps.Count(g => g.Status == GapStatus.Dismissed),
             highestSeverity,
             highestSeverity is null ? null : ToSeverityLabelKey(highestSeverity.Value),
             gaps.Any(g => g.BlocksApproval));
     }
 
     private static bool IsActiveGap(ComplianceGap gap) =>
-        gap.Status is not (GapStatus.Resolved or GapStatus.AcceptedRisk or GapStatus.Closed);
-
-    private static bool IsClosedFromResolved(ComplianceGap gap) =>
-        gap.Status == GapStatus.Closed && gap.RiskAcceptanceJustification is null && gap.ClosedAt.HasValue;
-
-    private static bool IsAcceptedWithRiskClosed(ComplianceGap gap) =>
-        gap.Status == GapStatus.Closed && gap.RiskAcceptanceJustification is not null;
+        gap.Status is not (GapStatus.Resolved or GapStatus.AcceptedWithRisk or GapStatus.Dismissed or GapStatus.Closed);
 
     private static string ToSeverityLabelKey(GapSeverity severity) =>
         $"gap.severity.{char.ToLowerInvariant(severity.ToString()[0])}{severity.ToString()[1..]}";

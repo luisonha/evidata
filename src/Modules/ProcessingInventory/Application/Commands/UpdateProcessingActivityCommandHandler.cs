@@ -1,5 +1,7 @@
 using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
+using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Evidata.Modules.ProcessingInventory.Application.Commands;
@@ -56,7 +58,9 @@ public sealed record UpdateProcessingActivityResult(
             Error: new UpdateProcessingActivityError(code, labelKey, message));
 }
 
-public sealed class UpdateProcessingActivityCommandHandler(ProcessingInventoryDbContext db)
+public sealed class UpdateProcessingActivityCommandHandler(
+    ProcessingInventoryDbContext db,
+    IAuditService auditService)
 {
     public async Task<UpdateProcessingActivityResult> HandleAsync(
         UpdateProcessingActivityCommand cmd,
@@ -114,6 +118,24 @@ public sealed class UpdateProcessingActivityCommandHandler(ProcessingInventoryDb
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Audit: UpdateNode (AUD-NODE-001)
+        await auditService.LogAsync(
+            tenantId: cmd.TenantId,
+            userId: cmd.ModifiedBy,
+            eventType: AuditEventType.UpdateNode.ToString(),
+            resource: "ProcessingActivity",
+            resourceId: activity.Id,
+            result: AuditEventResult.Success,
+            metadata: new Dictionary<string, object?>
+            {
+                { "name", cmd.Name },
+                { "description", cmd.Description },
+                { "controller", cmd.Controller },
+                { "department", cmd.Department }
+            },
+            ct: ct);
+
         return UpdateProcessingActivityResult.Success(ProcessingActivityDto.From(activity));
     }
 }

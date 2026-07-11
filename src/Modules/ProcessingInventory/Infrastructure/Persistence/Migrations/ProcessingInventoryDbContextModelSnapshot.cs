@@ -30,6 +30,9 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Migrati
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("ApprovedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("approved_at");
@@ -81,6 +84,10 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Migrati
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
                         .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -148,6 +155,47 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Migrati
                         .HasDatabaseName("ix_processing_activities_tenant_status");
 
                     b.ToTable("processing_activities", "rat");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.ProcessingInventory.Domain.ProcessingActivitySnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rat_snapshots_activity_version");
+
+                    b.ToTable("processing_activity_snapshots", "rat");
                 });
 
             modelBuilder.Entity("Evidata.Modules.ProcessingInventory.Domain.ProcessingActivity", b =>

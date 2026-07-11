@@ -2,14 +2,17 @@ namespace Evidata.Modules.ProcessingInventory.Domain;
 
 /// <summary>
 /// Estado del ciclo de vida de un tratamiento RAT (doc 15, sec 11).
-/// Draft → UnderReview → Approved → Archived
+/// Draft → UnderReview → Approved → Active → Archived / Deprecated
 /// Draft también puede ir a Archived directamente (descarte).
+/// Active es la versión vigente; Deprecated la reemplaza.
 /// </summary>
 public enum ProcessingActivityStatus
 {
     Draft,
     UnderReview,
     Approved,
+    Active,
+    Deprecated,
     Archived
 }
 
@@ -62,8 +65,14 @@ public class ProcessingActivity
     public Guid? ApprovedBy { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
 
+    /// <summary>Timestamp cuando se completó la revisión requerida más reciente (null si no revisado).</summary>
+    public DateTimeOffset? ReviewedAt { get; private set; }
+
     /// <summary>ID del tratamiento anterior al que esta versión reemplaza (null si es la primera).</summary>
     public Guid? SupersedesId { get; private set; }
+
+    /// <summary>ID de la versión activa (vigente) de este tratamiento. Null si ninguna versión está activa aún.</summary>
+    public Guid? ActiveVersionId { get; set; }
 
     // ── Secciones (owned types / JSONB) ────────────────────────────────────────
 
@@ -249,6 +258,36 @@ public class ProcessingActivity
         LastModifiedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>
+    /// Activates this version as the active version.
+    /// Only valid when status is Approved.
+    /// </summary>
+    public void Activate(Guid activatedBy)
+    {
+        if (Status != ProcessingActivityStatus.Approved)
+            throw new InvalidOperationException(
+                $"Solo se puede activar desde estado Approved. Estado actual: {Status}.");
+
+        Status = ProcessingActivityStatus.Active;
+        LastModifiedBy = activatedBy;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Marks this version as deprecated.
+    /// Called when a new version becomes active.
+    /// </summary>
+    public void SetAsDeprecated(Guid modifiedBy)
+    {
+        if (Status != ProcessingActivityStatus.Active)
+            throw new InvalidOperationException(
+                $"Solo se puede deprecar un tratamiento Active. Estado actual: {Status}.");
+
+        Status = ProcessingActivityStatus.Deprecated;
+        LastModifiedBy = modifiedBy;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
     // ── Sección: Finalidad ─────────────────────────────────────────────────────
 
     public void SetPurpose(PurposeSection purpose, Guid modifiedBy)
@@ -371,7 +410,19 @@ public class ProcessingActivity
             Flags.CriticalGapOpen);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Marks this activity as reviewed (for checking if modified after review).
+    /// Called when a required review is completed.
+    /// 
+    /// Idempotent: if already marked, this method returns without updating the timestamp.
+    /// This ensures that multiple invocations (sync + eventual consistency) don't overwrite ReviewedAt.
+    /// </summary>
+    public void MarkAsReviewed()
+    {
+        if (ReviewedAt.HasValue)
+            return; // Already marked, guard against double invocation
+        ReviewedAt = DateTimeOffset.UtcNow;
+    }
 
     private void Touch(Guid modifiedBy)
     {

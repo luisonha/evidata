@@ -47,6 +47,12 @@ namespace Evidata.Modules.Workflow.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by");
 
+                    b.Property<int>("ReviewDomain")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("review_domain");
+
                     b.Property<Guid?>("ReviewerId")
                         .HasColumnType("uuid")
                         .HasColumnName("reviewer_id");
@@ -90,6 +96,59 @@ namespace Evidata.Modules.Workflow.Migrations
                         .HasDatabaseName("ix_reviews_tenant_entity");
 
                     b.ToTable("reviews", "workflow");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Workflow.Domain.ReviewRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<DateTimeOffset>("ModifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at");
+
+                    b.Property<Guid>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<int>("ReviewType")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_review_requirements_tenant");
+
+                    b.HasIndex("TenantId", "EntityType", "ReviewType")
+                        .IsUnique()
+                        .HasDatabaseName("ix_review_requirements_tenant_entity_type");
+
+                    b.ToTable("review_requirements", "workflow");
                 });
 
             modelBuilder.Entity("Evidata.Modules.Workflow.Domain.WorkflowTask", b =>
