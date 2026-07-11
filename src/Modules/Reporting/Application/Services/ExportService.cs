@@ -1,6 +1,7 @@
 using Evidata.Modules.Audit.Application.Abstractions;
 using Evidata.Modules.Audit.Domain;
 using Evidata.Modules.Identity.Application.Abstractions;
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Domain;
 using Evidata.Modules.Security.Application.Abstractions;
@@ -11,12 +12,14 @@ namespace Evidata.Modules.Reporting.Application.Services;
 /// <summary>
 /// Service for managing Export requests and operations.
 /// Implements SEC-EXP-001 authorization and audit logging.
+/// Implements P1-014-P2: Auto-detection of ExportWarning on export generation.
 /// </summary>
 public sealed class ExportService(
     IExportRepository exportRepository,
     IAuditService auditService,
     IProcessingActivityReadOnlyQueryService processingActivityQueryService,
     IResourcePermissionsQueryService resourcePermissionsService,
+    IProcessingActivityRiskAssessmentService riskAssessmentService,
     ILogger<ExportService> logger) : IExportService
 {
     public async Task<Export> RequestExportAsync(
@@ -104,12 +107,35 @@ public sealed class ExportService(
             requestedByUserId: requestedByUserId,
             correlationId: correlationId.Trim());
 
-        // TODO: P1-014-GAP-2: Auto-detect warnings from gaps and evidence
-        // This requires cross-module coordination with GapManagement and Evidence modules.
-        // Implementation blocked by architecture decision to not introduce direct dependencies.
-        // Recommended for P2: Create an IProcessingActivityRiskAssessmentService in ProcessingInventory
-        // that aggregates risk data from all modules for export warnings.
-        // For now, warnings can be added by external orchestration or left empty.
+        // P1-014-P2: Auto-detect warnings from cross-module risks
+        // Assess risks from GapManagement, Evidence, and Workflow modules
+        // and add warnings if any risks are detected
+        try
+        {
+            var riskAssessment = await riskAssessmentService.AssessRisksAsync(
+                processingActivityId,
+                processingActivityId, // Use processingActivityId as versionId (activity snapshot)
+                ct);
+
+            if (riskAssessment.HasAnyRisk)
+            {
+                var warningMessage = riskAssessment.GenerateWarningMessage();
+                export.AddWarning(warningMessage);
+
+                logger.LogInformation(
+                    "Export {ExportId} generated with auto-detected warning: {WarningMessage}",
+                    export.Id, warningMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Failed to assess export risks for activity {ActivityId}: {ErrorMessage}. " +
+                "Export generated without risk assessment.",
+                processingActivityId, ex.Message);
+            // Do not fail the export if risk assessment fails; warnings are advisory
+        }
 
         // Persist
         await exportRepository.AddAsync(export, ct);

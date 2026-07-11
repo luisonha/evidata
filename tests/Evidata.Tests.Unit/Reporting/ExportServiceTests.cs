@@ -1,5 +1,6 @@
 using Evidata.Modules.Audit.Application.Abstractions;
 using Evidata.Modules.Audit.Domain;
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Abstractions;
 using Evidata.Modules.Reporting.Application.Services;
 using Evidata.Modules.Reporting.Domain;
@@ -21,6 +22,7 @@ public class ExportServiceTests
     private IAuditService _auditMock = null!;
     private IProcessingActivityReadOnlyQueryService _activityQueryMock = null!;
     private IResourcePermissionsQueryService _permissionsMock = null!;
+    private IProcessingActivityRiskAssessmentService _riskAssessmentMock = null!;
     private ILogger<ExportService> _loggerMock = null!;
     private ExportService _service = null!;
 
@@ -30,6 +32,7 @@ public class ExportServiceTests
         _auditMock = Substitute.For<IAuditService>();
         _activityQueryMock = Substitute.For<IProcessingActivityReadOnlyQueryService>();
         _permissionsMock = Substitute.For<IResourcePermissionsQueryService>();
+        _riskAssessmentMock = Substitute.For<IProcessingActivityRiskAssessmentService>();
         _loggerMock = Substitute.For<ILogger<ExportService>>();
         
         // Default setup: Activity is Approved, user has permission
@@ -45,7 +48,16 @@ public class ExportServiceTests
                 false,
                 new BlockedActionResult[] { }));
         
-        _service = new ExportService(_repositoryMock, _auditMock, _activityQueryMock, _permissionsMock, _loggerMock);
+        // Default setup: No risks detected by risk assessment service
+        _riskAssessmentMock.AssessRisksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new ProcessingActivityRiskAssessment
+            {
+                HasCriticalGapsOpen = false,
+                HasPendingEvidence = false,
+                HasPendingReviews = false
+            });
+        
+        _service = new ExportService(_repositoryMock, _auditMock, _activityQueryMock, _permissionsMock, _riskAssessmentMock, _loggerMock);
     }
 
     // ── SEC-EXP-001 Behavioral Tests ──────────────────────────────────────────
@@ -493,5 +505,125 @@ public class ExportServiceTests
             export.Id, Guid.NewGuid(), _user, CancellationToken.None);
 
         Assert.Null(result);
+    }
+
+    // ── P1-014-P2: Auto-detection of ExportWarning ─────────────────────────
+
+    [Fact]
+    public async Task RequestExportAsync_WithRisks_AddsAutoDetectedWarning()
+    {
+        // Arrange: Risk assessment detects pending evidence
+        Setup();
+        const int expectedVersion = 1;
+        _repositoryMock.GetNextVersionAsync(
+            Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(expectedVersion);
+
+        var riskAssessment = new ProcessingActivityRiskAssessment
+        {
+            HasCriticalGapsOpen = false,
+            HasPendingEvidence = true,
+            HasPendingReviews = false,
+            PendingEvidenceDetails = new[] { "Blocking evidence requirements not met: 2" }
+        };
+        _riskAssessmentMock.AssessRisksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(riskAssessment);
+
+        // Act
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Assert: Export has auto-detected warning
+        Assert.NotEmpty(result.Warnings);
+        Assert.Contains("Evidence pending validation", result.Warnings.First());
+    }
+
+    [Fact]
+    public async Task RequestExportAsync_NoRisks_NoAutoDetectedWarning()
+    {
+        // Arrange: Risk assessment detects no risks
+        Setup();
+        const int expectedVersion = 1;
+        _repositoryMock.GetNextVersionAsync(
+            Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(expectedVersion);
+
+        var noRisks = new ProcessingActivityRiskAssessment
+        {
+            HasCriticalGapsOpen = false,
+            HasPendingEvidence = false,
+            HasPendingReviews = false
+        };
+        _riskAssessmentMock.AssessRisksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(noRisks);
+
+        // Act
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Assert: Export has no auto-detected warning
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task RequestExportAsync_MultipleRisksDetected_WarningIncludesAll()
+    {
+        // Arrange: Risk assessment detects multiple risks
+        Setup();
+        const int expectedVersion = 1;
+        _repositoryMock.GetNextVersionAsync(
+            Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(expectedVersion);
+
+        var multipleRisks = new ProcessingActivityRiskAssessment
+        {
+            HasCriticalGapsOpen = true,
+            HasPendingEvidence = true,
+            HasPendingReviews = true,
+            CriticalGapDetails = new[] { "Open gaps detected: 2 open" },
+            PendingEvidenceDetails = new[] { "Evidence pending: 3 pending" },
+            PendingReviewDetails = new[] { "Reviews pending: 1 domain awaiting decision" }
+        };
+        _riskAssessmentMock.AssessRisksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(multipleRisks);
+
+        // Act
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        // Assert: Export warning includes all risk types
+        Assert.NotEmpty(result.Warnings);
+        var warning = result.Warnings.First();
+        Assert.Contains("Critical gaps remain open", warning);
+        Assert.Contains("Evidence pending validation", warning);
+        Assert.Contains("Required reviews not approved", warning);
+    }
+
+    [Fact]
+    public async Task RequestExportAsync_RiskAssessmentFails_ExportStillCreated()
+    {
+        // Arrange: Risk assessment service throws (e.g., module offline)
+        Setup();
+        const int expectedVersion = 1;
+        _repositoryMock.GetNextVersionAsync(
+            Arg.Any<Guid>(), Arg.Any<ExportType>(), Arg.Any<CancellationToken>())
+            .Returns(expectedVersion);
+
+        _riskAssessmentMock.AssessRisksAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProcessingActivityRiskAssessment>(
+                new InvalidOperationException("Risk service offline")));
+
+        // Act & Assert: Export should still be created (warnings are advisory)
+        var result = await _service.RequestExportAsync(
+            _tenant, _activity, ExportType.ProcessingActivityPdfSummary,
+            _contentType, _user, _correlationId, CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal(ExportStatus.Requested, result.Status);
+        // No warning added due to exception
+        Assert.Empty(result.Warnings);
     }
 }

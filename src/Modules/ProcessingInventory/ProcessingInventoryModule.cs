@@ -1,6 +1,7 @@
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
+using Evidata.Modules.ProcessingInventory.Application.Services;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
@@ -14,36 +15,40 @@ namespace Evidata.Modules.ProcessingInventory;
 
 public static class ProcessingInventoryModule
 {
-    public static IServiceCollection AddProcessingInventoryModule(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        var connectionString = configuration.GetConnectionString("evidata-db")
-            ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
+     public static IServiceCollection AddProcessingInventoryModule(
+         this IServiceCollection services,
+         IConfiguration configuration)
+     {
+         var connectionString = configuration.GetConnectionString("evidata-db")
+             ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
 
-        services.AddDbContext<ProcessingInventoryDbContext>(options =>
-            options.UseNpgsql(connectionString,
-                b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
+         services.AddDbContext<ProcessingInventoryDbContext>(options =>
+             options.UseNpgsql(connectionString,
+                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
 
-        // P1-017: Review event handler — called when reviews are approved
-        // P1-019: Register against Contracts interface for clean DI composition
-        services.AddScoped<IReviewEventHandler, ReviewEventHandler>();
+         // P1-017: Review event handler — called when reviews are approved
+         // P1-019: Register against Contracts interface for clean DI composition
+         services.AddScoped<IReviewEventHandler, ReviewEventHandler>();
 
-        services.AddScoped<ListProcessingActivitiesQueryHandler>();
-        services.AddScoped<GetProcessingActivityQueryHandler>();
-        services.AddScoped<GetProcessingActivityControlQueryHandler>();
-        
-        // P1-FULL-COMPOSITION: Register the control query service interface
-        // The API layer will override this with the composition handler implementation
-        services.AddScoped<IProcessingActivityControlQueryService>(sp =>
-            sp.GetRequiredService<GetProcessingActivityControlQueryHandler>());
-        
-        services.AddScoped<CreateProcessingActivityCommandHandler>();
-        services.AddScoped<UpdateProcessingActivityCommandHandler>();
-        
-        // P1-010: Register version service with IAuditService dependency
-        services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
+         services.AddScoped<ListProcessingActivitiesQueryHandler>();
+         services.AddScoped<GetProcessingActivityQueryHandler>();
+         services.AddScoped<GetProcessingActivityControlQueryHandler>();
+         
+         // P1-FULL-COMPOSITION: Register the control query service interface
+         // The API layer will override this with the composition handler implementation
+         services.AddScoped<IProcessingActivityControlQueryService>(sp =>
+             sp.GetRequiredService<GetProcessingActivityControlQueryHandler>());
+         
+         services.AddScoped<CreateProcessingActivityCommandHandler>();
+         services.AddScoped<UpdateProcessingActivityCommandHandler>();
+         
+         // P1-010: Register version service with IAuditService dependency
+         services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
 
-        return services;
-    }
+         // P1-014-P2: Register risk assessment service for export warning auto-detection
+         // This service aggregates cross-module risk data from GapManagement, Evidence, and Workflow
+         services.AddScoped<IProcessingActivityRiskAssessmentService, ProcessingActivityRiskAssessmentService>();
+
+         return services;
+     }
 }
