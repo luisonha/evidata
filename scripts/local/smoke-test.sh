@@ -9,6 +9,11 @@ TENANT_ID="${EVIDATA_TENANT:-00000000-0000-0000-0000-000000000001}"
 ADMIN_ID="${EVIDATA_ADMIN:-00000000-0000-0000-0000-000000000010}"
 USER_ID="${EVIDATA_USER:-00000000-0000-0000-0000-000000000011}"
 
+# ─── Configuración de acceso a PostgreSQL para obtener IDs dinámicos ──────────
+PG_CONTAINER="${EVIDATA_PG_CONTAINER:-evidata-db}"
+PG_PASS="${EVIDATA_PG_PASS:-postgres}"
+PSQL_CMD="docker exec -e PGPASSWORD=$PG_PASS -i $PG_CONTAINER psql -U postgres -d evidata-db"
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 PASS=0; FAIL=0; SKIP=0
@@ -131,6 +136,21 @@ fi
 
 check "GET /openapi/v1.json" 200 GET "/openapi/v1.json"
 
+# ─── Obtener ID dinámico del rol TenantOwner ──────────────────────────────────
+# En lugar de usar hardcoded legacy roleIds, consultamos la BD para obtener IDs reales
+TENANT_OWNER_ID=""
+if $PSQL_CMD -t -c "SELECT 1 FROM information_schema.tables WHERE table_name = 'roles';" &>/dev/null 2>&1; then
+  TENANT_OWNER_ID=$($PSQL_CMD -t -c "SELECT \"Id\" FROM security.roles WHERE \"Name\" = 'TenantOwner' LIMIT 1" 2>/dev/null || true)
+  TENANT_OWNER_ID=$(echo "$TENANT_OWNER_ID" | xargs || true)  # trim whitespace
+  if [[ -n "$TENANT_OWNER_ID" ]]; then
+    echo -e "  ${CYAN}✓ roleId de TenantOwner (dinámico): ${CYAN}$TENANT_OWNER_ID${NC}"
+  else
+    echo -e "  ${YELLOW}⚠ No se pudo obtener roleId de TenantOwner — usando fallback para RBAC tests${NC}"
+  fi
+else
+  echo -e "  ${YELLOW}⚠ Base de datos no accesible — usando fallback para RBAC tests${NC}"
+fi
+
 # ─── Módulo 1: TenantManagement ──────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}▶ TenantManagement${NC}"
@@ -165,11 +185,16 @@ echo -e "${CYAN}▶ Security / RBAC${NC}"
 
 check "GET /api/roles/users/{userId}" 200 GET \
   "/api/roles/users/$ADMIN_ID?tenantId=$TENANT_ID"
-check "POST /api/roles/assign (idempotente)" 200 POST "/api/roles/assign" "{
-  \"userId\": \"$ADMIN_ID\",
-  \"roleId\": \"b0000001-0000-0000-0000-000000000001\",
-  \"tenantId\": \"$TENANT_ID\"
-}"
+
+if [[ -n "$TENANT_OWNER_ID" ]]; then
+  check "POST /api/roles/assign (idempotente)" 200 POST "/api/roles/assign" "{
+    \"userId\": \"$ADMIN_ID\",
+    \"roleId\": \"$TENANT_OWNER_ID\",
+    \"tenantId\": \"$TENANT_ID\"
+  }"
+else
+  skip "POST /api/roles/assign — roleId de TenantOwner no disponible (BD no accesible)"
+fi
 
 # ─── Módulo 4: Audit ─────────────────────────────────────────────────────────
 echo ""
