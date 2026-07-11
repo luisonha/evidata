@@ -1137,3 +1137,86 @@ Code quality clean (build green, 828/828 tests), zero regressions, architecture 
 #### References
 
 Decision document: `.squad/decisions/inbox/gandalf-pr123-review.md`
+
+---
+
+## PR #125 Review: `squad/fix-rbac-seed-determinism` → develop
+**Timestamp:** 2026-07-11T15:33:47Z  
+**Reviewer:** Gandalf  
+**Status:** ✅ APPROVED
+
+### Bug Context
+- **Issue:** `SecurityDbContext.SeedRbacRoles()` and `SeedPermissions()` called `Role.Create()` and `Permission.Create()` internally, which use `Guid.NewGuid()` → non-deterministic model
+- **Symptom:** `PendingModelChangesWarning` on migration runs (HasData values change each build)
+- **Hidden FK Bug:** `SeedRolePermissions()` used hardcoded GUIDs that NEVER matched the random role/permission IDs
+- **Impact:** Model non-determinism + potential FK orphans in dev environments
+
+### Solution Analysis (Aragorn's Fix)
+
+**Domain Layer Changes:**
+- ✅ Added `internal static Role.CreateForSeed(Guid id, ...)` with XML docs explicitly marking "internal use only"
+- ✅ Added `internal static Permission.CreateForSeed(Guid id, ...)` with identical pattern
+- ✅ Preserved public `Role.Create()` and `Permission.Create()` methods (still used extensively in 20+ test files for non-deterministic test data)
+- ✅ Both internal methods documented with clear rationale: "prevent PendingModelChangesWarning from changing HasData values"
+
+**DbContext Seed Methods:**
+- ✅ `SeedRbacRoles()`: Switched to use `Role.CreateForSeed()` with 7 deterministic GUIDs (00000000-...-00000001 through 00000000-...-00000007)
+- ✅ `SeedPermissions()`: Switched to use `Permission.CreateForSeed()` with 6 deterministic GUIDs (00000001-...-00000001 through 00000001-...-00000006)
+- ✅ `SeedRolePermissions()`: Pre-existing hardcoded GUIDs now MATCH the new factory methods (previously were orphaned)
+- ✅ GUID consistency verified: All 13 role/permission identifiers synchronized across all three seed methods
+
+**Migration (20260711192535_SeedRbacData):**
+- ✅ Schema-only changes: InsertData for 6 permissions (deterministic)
+- ✅ InsertData for 7 roles (deterministic)
+- ✅ InsertData for 23 role_permission mappings (now coherent with seeded roles/permissions)
+- ✅ Down() method properly reverses all inserts
+- ✅ No schema changes to existing tables — purely seed data
+- ✅ No side effects on other modules/tables
+
+**Pattern Assessment:**
+- **Pattern Quality:** ✅ Excellent — "CreateForSeed" is explicit, `internal` access prevents misuse, XML docs warn about seeding-only purpose
+- **Separation of Concerns:** ✅ Perfect — public `Create()` remains for runtime (non-deterministic), internal `CreateForSeed()` for seeding (deterministic)
+- **Discoverability:** ✅ Safe — developers cannot accidentally call internal methods from external code; tests using public `Create()` continue to work
+- **Maintainability:** ✅ Clear — the two factory patterns are intentionally different and documented
+
+### Independent Verification
+
+**Build:** ✅ Clean — `dotnet build Evidata.sln` succeeded with 0 errors
+**Unit Tests:** ✅ 828/828 passed in 889ms — all pre-existing tests continue to pass
+**GUID Sync Check:** ✅ Verified all 13 GUID identifiers are consistent across SeedRbacRoles, SeedPermissions, SeedRolePermissions
+**CreateForSeed Usage:** ✅ Only used in SecurityDbContext.cs (never in tests, never exposed externally)
+**Public Create() Integrity:** ✅ Still callable from 20+ test methods — no breaking changes to test infrastructure
+**Migration Integrity:** ✅ Only adds seed data; no schema modifications; Down() reverses cleanly
+
+### Architectural Risk Assessment
+
+| Risk | Status | Notes |
+|------|--------|-------|
+| Production misuse of CreateForSeed | ✅ MITIGATED | `internal` access + XML warnings prevent compile-time misuse |
+| GUID collisions | ✅ ELIMINATED | Deterministic sequential GUIDs, no randomness |
+| FK integrity | ✅ RESTORED | SeedRolePermissions now references actual seeded role/permission IDs |
+| Model determinism | ✅ FIXED | HasData no longer changes between builds |
+| Test compatibility | ✅ MAINTAINED | Public Create() methods unchanged; 828 tests pass |
+| Schema evolution | ✅ SAFE | Migration only seeds data; no structural changes |
+| Idempotency | ✅ CONFIRMED | EF Core HasData(...) is idempotent; migration works on repeated runs |
+
+### Decision
+
+**✅ APROBADO SIN CONDICIONES**
+
+The fix elegantly solves both the non-determinism problem and the hidden FK integrity bug with a clean architectural pattern. The `CreateForSeed()` approach is appropriate for this use case: explicit, isolated from production code, well-documented, and testable. No concerns identified.
+
+**Quality Metrics:**
+- Code clarity: Excellent (explicit intent, clear XML docs)
+- Risk profile: Low (internal access, backward compatible)
+- Test coverage: Maintained (828/828 passing)
+- Migration safety: High (seed-only, reversible)
+
+**Ready for merge:** YES
+
+### References
+- Domain entities: `Permission.cs` lines 25-40, `Role.cs` lines 25-39
+- DbContext seeding: `SecurityDbContext.cs` lines 36-150
+- Migration: `20260711192535_SeedRbacData.cs` (297 lines, verified)
+- Coordinator pre-verification: E2E Docker/Aspire test passed, 14/14 migrations succeeded, 7 roles + 6 permissions + 23 role_permissions verified in Postgres
+
