@@ -1,6 +1,5 @@
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Evidata.Functions.Reporting.Handlers;
-using Evidata.Functions.Reporting.Infrastructure.Adapters;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents.Application.Abstractions;
 using Evidata.Modules.Documents.Infrastructure.Configuration;
@@ -8,7 +7,6 @@ using Evidata.Modules.Documents.Infrastructure.Storage;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
 using Evidata.Modules.ProcessingInventory;
-using Evidata.Modules.ProcessingInventory.Application.Queries;
 using Evidata.Modules.Reporting;
 using Evidata.Modules.Security;
 using Evidata.Worker.Outbox.Persistence;
@@ -34,12 +32,6 @@ builder.Services.AddProcessingInventoryModule(builder.Configuration);
 builder.Services.AddScoped<IOutboxWriter, NullOutboxWriter>();
 builder.Services.AddGapManagementModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
-
-// SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
-// Adapter implemented as host-local (P1-017-ADAPTER pattern) in Evidata.Functions.Reporting.Infrastructure.Adapters
-builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
-builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
-    new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));
 
 // Blob Storage — usa Azurite en local (AzureWebJobsStorage=UseDevelopmentStorage=true)
 builder.Services.Configure<BlobStorageOptions>(
