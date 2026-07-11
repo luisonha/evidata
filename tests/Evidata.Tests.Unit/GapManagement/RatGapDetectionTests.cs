@@ -165,8 +165,7 @@ public class RatGapDetectionTests : IDisposable
         // Crear y cerrar la brecha manualmente
         var existing = ComplianceGap.Create(_tenantId, "ProcessingInventory", _activityId,
             "Faltan medidas de seguridad para datos sensibles", "desc", GapSeverity.Critical, _userId);
-        existing.Assign(Guid.NewGuid(), _userId);
-        existing.StartProgress(_userId);
+        existing.StartCorrection(_userId);
         existing.Resolve(_userId);
         existing.Close(_userId);
         _gapDb.ComplianceGaps.Add(existing);

@@ -18,7 +18,7 @@ public sealed record ComplianceGapDto(
 }
 
 public sealed record GapSummaryDto(
-    int Total, int Open, int InProgress, int Resolved, int Critical, int High, int Medium, int Low);
+    int Total, int Open, int InCorrection, int Resolved, int Critical, int High, int Medium, int Low);
 
 public sealed class ListGapsQueryHandler(GapManagementDbContext db)
 {
@@ -53,7 +53,7 @@ public sealed class GetGapsSummaryQueryHandler(GapManagementDbContext db)
         return new GapSummaryDto(
             gaps.Count,
             gaps.Count(g => g.Status == GapStatus.Open),
-            gaps.Count(g => g.Status == GapStatus.InProgress),
+            gaps.Count(g => g.Status == GapStatus.InCorrection),
             gaps.Count(g => g.Status == GapStatus.Resolved),
             gaps.Count(g => g.Severity == GapSeverity.Critical),
             gaps.Count(g => g.Severity == GapSeverity.High),

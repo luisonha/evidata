@@ -14,6 +14,7 @@ public interface IReviewService
         string targetEntityType,
         Guid targetEntityId,
         Guid requestedBy,
+        int reviewDomain = 0,
         CancellationToken ct = default);
 
     /// <summary>Asigna revisor e inicia la revisión.</summary>

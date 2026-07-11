@@ -9,11 +9,43 @@ public class GapManagementDbContext : DbContext
         : base(options) { }
 
     public DbSet<ComplianceGap> ComplianceGaps => Set<ComplianceGap>();
+    public DbSet<GapRule> GapRules => Set<GapRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("gap");
 
+        // ── GapRule ────────────────────────────────────────────────────────────
+        modelBuilder.Entity<GapRule>(e =>
+        {
+            e.ToTable("gap_rules");
+            e.HasKey(r => r.Id);
+
+            e.Property(r => r.Id).HasColumnName("id");
+            e.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(r => r.RuleCode).HasColumnName("rule_code").HasMaxLength(100).IsRequired();
+            e.Property(r => r.Description).HasColumnName("description").IsRequired();
+            e.Property(r => r.Severity).HasColumnName("severity")
+                .HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(r => r.BlocksApproval).HasColumnName("blocks_approval").IsRequired();
+            e.Property(r => r.TestFixtureName).HasColumnName("test_fixture_name").HasMaxLength(100).IsRequired();
+            e.Property(r => r.IsFullyImplemented).HasColumnName("is_fully_implemented").IsRequired();
+            e.Property(r => r.ImplementationNotes).HasColumnName("implementation_notes");
+            e.Property(r => r.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(r => r.LastModifiedBy).HasColumnName("last_modified_by");
+            e.Property(r => r.LastModifiedAt).HasColumnName("last_modified_at");
+
+            // ── Índices ────────────────────────────────────────────────────────
+            e.HasIndex(r => new { r.TenantId, r.RuleCode })
+                .HasDatabaseName("ix_gap_rules_tenant_code")
+                .IsUnique();
+
+            e.HasIndex(r => r.RuleCode)
+                .HasDatabaseName("ix_gap_rules_code");
+        });
+
+        // ── ComplianceGap ──────────────────────────────────────────────────────
         modelBuilder.Entity<ComplianceGap>(e =>
         {
             e.ToTable("compliance_gaps");
@@ -24,6 +56,7 @@ public class GapManagementDbContext : DbContext
             e.Property(g => g.SourceModule).HasColumnName("source_module").HasMaxLength(100).IsRequired();
             e.Property(g => g.SourceEntityId).HasColumnName("source_entity_id").IsRequired();
             e.Property(g => g.LegalObligationId).HasColumnName("legal_obligation_id");
+            e.Property(g => g.GapRuleId).HasColumnName("gap_rule_id");
             e.Property(g => g.Title).HasColumnName("title").HasMaxLength(300).IsRequired();
             e.Property(g => g.Description).HasColumnName("description").IsRequired();
             e.Property(g => g.Severity).HasColumnName("severity")
@@ -42,7 +75,7 @@ public class GapManagementDbContext : DbContext
 
             e.Ignore(g => g.BlocksApproval);
 
-            // ── Índices ───────────────────────────────────────────────────────
+            // ── Índices ────────────────────────────────────────────────────────
             e.HasIndex(g => new { g.TenantId, g.Status })
                 .HasDatabaseName("ix_compliance_gaps_tenant_status");
 
@@ -54,6 +87,9 @@ public class GapManagementDbContext : DbContext
 
             e.HasIndex(g => g.OwnerId)
                 .HasDatabaseName("ix_compliance_gaps_owner");
+
+            e.HasIndex(g => g.GapRuleId)
+                .HasDatabaseName("ix_compliance_gaps_rule");
         });
     }
 }

@@ -1,5 +1,8 @@
+using Evidata.Api.Infrastructure.Adapters;
 using Evidata.Api.Infrastructure.HealthChecks;
 using Evidata.Api.OpenApi;
+using Evidata.Api.Queries;
+using Evidata.Api.Services;
 using Evidata.Modules.Audit;
 using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
@@ -9,7 +12,10 @@ using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
 using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.ProcessingInventory;
+using Evidata.Modules.ProcessingInventory.Application.Queries;
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Security;
+using Evidata.Modules.Security.Infrastructure.Authorization;
 using Evidata.Modules.TenantManagement;
 using Evidata.Modules.Mcp;
 using Evidata.Modules.Reporting;
@@ -50,6 +56,26 @@ builder.Services.AddWorkflowModule(builder.Configuration);
 builder.Services.AddReportingModule(builder.Configuration);
 builder.Services.AddSearchModule(builder.Configuration);
 builder.Services.AddMcpModule(builder.Configuration);
+
+// SEC-EXP-001: Register adapter for ProcessingActivity status queries (Reporting → ProcessingInventory)
+builder.Services.AddScoped<GetProcessingActivityQueryHandler>();
+builder.Services.AddScoped<Evidata.Modules.Reporting.Application.Abstractions.IProcessingActivityReadOnlyQueryService>(sp =>
+    new ProcessingActivityReadOnlyQueryAdapter(sp.GetRequiredService<GetProcessingActivityQueryHandler>()));
+
+// P1-FULL-COMPOSITION: Register composition query handler for /control endpoint
+// This replaces the stub implementation with full cross-module composition.
+// The composition handler is registered to the IProcessingActivityControlQueryService interface,
+// which is injected into the ProcessingActivitiesController in the module.
+builder.Services.AddScoped<ProcessingActivityControlCompositionQueryHandler>();
+builder.Services.AddScoped<IProcessingActivityControlQueryService>(sp =>
+    sp.GetRequiredService<ProcessingActivityControlCompositionQueryHandler>());
+
+// P1-014-P2: Register risk assessment service for export warning auto-detection
+// This service aggregates cross-module risk data from GapManagement, Evidence, and Workflow.
+// Lives in API layer to avoid circular dependencies (GapManagement → ProcessingInventory already exists).
+builder.Services.AddScoped<ProcessingActivityRiskAssessmentService>();
+builder.Services.AddScoped<IProcessingActivityRiskAssessmentService>(sp =>
+    sp.GetRequiredService<ProcessingActivityRiskAssessmentService>());
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
 {
@@ -101,6 +127,11 @@ builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+
+    // Fine-grained policy for role management operations (assign/remove roles)
+    // Requires user to have TenantOwner or ComplianceAdmin role in the current tenant
+    options.AddPolicy("TenantOwnerOrComplianceAdmin", policy =>
+        policy.AddRequirements(new TenantOwnerOrComplianceAdminRequirement()));
 });
 
 // Add services to the container.
@@ -149,6 +180,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseLocalDevGuard();
+app.UseCorrelationId();
 app.UseAuthentication();
 app.UseAuthorization();
 

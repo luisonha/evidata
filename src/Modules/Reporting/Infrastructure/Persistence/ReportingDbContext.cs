@@ -6,6 +6,7 @@ namespace Evidata.Modules.Reporting.Infrastructure.Persistence;
 public sealed class ReportingDbContext : DbContext
 {
     public DbSet<ReportJob> ReportJobs => Set<ReportJob>();
+    public DbSet<Export> Exports => Set<Export>();
 
     public ReportingDbContext(DbContextOptions<ReportingDbContext> options) : base(options) { }
 
@@ -39,6 +40,44 @@ public sealed class ReportingDbContext : DbContext
                 .HasDatabaseName("ix_report_jobs_tenant_requested_at");
 
             e.Ignore(j => j.IsTerminal);
+        });
+
+        modelBuilder.Entity<Export>(e =>
+        {
+            e.ToTable("exports");
+            e.HasKey(ex => ex.Id);
+
+            e.Property(ex => ex.Id).HasColumnName("id");
+            e.Property(ex => ex.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(ex => ex.ProcessingActivityId).HasColumnName("processing_activity_id").IsRequired();
+            e.Property(ex => ex.ExportType).HasColumnName("export_type")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(ex => ex.Status).HasColumnName("status")
+                .HasConversion<string>().HasMaxLength(30).IsRequired();
+            e.Property(ex => ex.Version).HasColumnName("version").IsRequired();
+            e.Property(ex => ex.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+            e.Property(ex => ex.ArtifactDocumentId).HasColumnName("artifact_document_id");
+            e.Property(ex => ex.RequestedByUserId).HasColumnName("requested_by_user_id").IsRequired();
+            e.Property(ex => ex.RequestedAt).HasColumnName("requested_at").IsRequired();
+            e.Property(ex => ex.GeneratedAt).HasColumnName("generated_at");
+            e.Property(ex => ex.CorrelationId).HasColumnName("correlation_id").HasMaxLength(200).IsRequired();
+            e.Property(ex => ex.ErrorMessage).HasColumnName("error_message").HasMaxLength(2000);
+
+            // Warnings stored as JSONB array
+            e.Property("_warnings")
+                .HasColumnName("warnings")
+                .HasColumnType("jsonb[]");
+
+            e.HasIndex(ex => new { ex.TenantId, ex.ProcessingActivityId })
+                .HasDatabaseName("ix_exports_tenant_activity");
+            e.HasIndex(ex => new { ex.TenantId, ex.Status })
+                .HasDatabaseName("ix_exports_tenant_status");
+            e.HasIndex(ex => new { ex.ProcessingActivityId, ex.ExportType })
+                .HasDatabaseName("ix_exports_activity_type");
+            e.HasIndex(ex => ex.CorrelationId)
+                .HasDatabaseName("ix_exports_correlation_id");
+
+             e.Ignore(ex => ex.IsTerminal);
         });
     }
 }

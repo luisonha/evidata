@@ -58,6 +58,7 @@ public class ProcessingInventoryDbContext : DbContext
             e.Property(a => a.LastModifiedAt).HasColumnName("last_modified_at");
             e.Property(a => a.ApprovedBy).HasColumnName("approved_by");
             e.Property(a => a.ApprovedAt).HasColumnName("approved_at");
+            e.Property(a => a.ReviewedAt).HasColumnName("reviewed_at");
             e.Property(a => a.SupersedesId).HasColumnName("supersedes_id");
 
             e.Ignore(a => a.IsEditable);

@@ -11,6 +11,8 @@ public class EvidenceDbContext : DbContext
     public DbSet<EvidenceAccessLog> EvidenceAccessLogs => Set<EvidenceAccessLog>();
     public DbSet<EvidenceLink> EvidenceLinks => Set<EvidenceLink>();
     public DbSet<EvidencePackJob> EvidencePackJobs => Set<EvidencePackJob>();
+    public DbSet<EvidenceRequirement> EvidenceRequirements => Set<EvidenceRequirement>();
+    public DbSet<EvidenceValidation> EvidenceValidations => Set<EvidenceValidation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -146,6 +148,74 @@ public class EvidenceDbContext : DbContext
             e.HasIndex(j => j.TenantId).HasDatabaseName("ix_evidence_pack_jobs_tenant");
             e.HasIndex(j => new { j.TenantId, j.Status }).HasDatabaseName("ix_evidence_pack_jobs_tenant_status");
             e.HasIndex(j => j.ExpiresAt).HasDatabaseName("ix_evidence_pack_jobs_expires");
+        });
+
+        // ── EvidenceRequirement ────────────────────────────────────────────────
+        modelBuilder.Entity<EvidenceRequirement>(e =>
+        {
+            e.ToTable("evidence_requirements");
+            e.HasKey(er => er.Id);
+
+            e.Property(er => er.Id).HasColumnName("id");
+            e.Property(er => er.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(er => er.ProcessingActivityId).HasColumnName("processing_activity_id").IsRequired();
+            e.Property(er => er.ReviewDomain).HasColumnName("review_domain")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(er => er.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
+            e.Property(er => er.Description).HasColumnName("description").HasMaxLength(2000);
+            e.Property(er => er.IsBlocking).HasColumnName("is_blocking").IsRequired();
+            e.Property(er => er.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(er => er.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(er => er.UpdatedBy).HasColumnName("updated_by");
+            e.Property(er => er.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasMany(er => er.Validations)
+                .WithOne(ev => ev.EvidenceRequirement)
+                .HasForeignKey(ev => ev.EvidenceRequirementId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(er => er.TenantId).HasDatabaseName("ix_evidence_requirements_tenant_id");
+            e.HasIndex(er => new { er.TenantId, er.ProcessingActivityId })
+                .HasDatabaseName("ix_evidence_requirements_tenant_activity");
+            e.HasIndex(er => er.ReviewDomain).HasDatabaseName("ix_evidence_requirements_review_domain");
+        });
+
+        // ── EvidenceValidation ─────────────────────────────────────────────────
+        modelBuilder.Entity<EvidenceValidation>(e =>
+        {
+            e.ToTable("evidence_validations");
+            e.HasKey(ev => ev.Id);
+
+            e.Property(ev => ev.Id).HasColumnName("id");
+            e.Property(ev => ev.TenantId).HasColumnName("tenant_id").IsRequired();
+            e.Property(ev => ev.EvidenceRequirementId).HasColumnName("evidence_requirement_id").IsRequired();
+            e.Property(ev => ev.EvidenceId).HasColumnName("evidence_id");
+            e.Property(ev => ev.Status).HasColumnName("status")
+                .HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(ev => ev.ValidationComment).HasColumnName("validation_comment").HasMaxLength(2000);
+            e.Property(ev => ev.ValidatedBy).HasColumnName("validated_by");
+            e.Property(ev => ev.ValidatedAt).HasColumnName("validated_at");
+            e.Property(ev => ev.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(ev => ev.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(ev => ev.UpdatedBy).HasColumnName("updated_by");
+            e.Property(ev => ev.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasOne(ev => ev.EvidenceRequirement)
+                .WithMany(er => er.Validations)
+                .HasForeignKey(ev => ev.EvidenceRequirementId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(ev => ev.Evidence)
+                .WithMany()
+                .HasForeignKey(ev => ev.EvidenceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(ev => ev.TenantId).HasDatabaseName("ix_evidence_validations_tenant_id");
+            e.HasIndex(ev => new { ev.TenantId, ev.EvidenceRequirementId })
+                .HasDatabaseName("ix_evidence_validations_tenant_requirement");
+            e.HasIndex(ev => ev.Status).HasDatabaseName("ix_evidence_validations_status");
+            e.HasIndex(ev => new { ev.EvidenceRequirementId, ev.Status })
+                .HasDatabaseName("ix_evidence_validations_requirement_status");
         });
     }
 }

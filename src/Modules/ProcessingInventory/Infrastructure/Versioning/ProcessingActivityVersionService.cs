@@ -1,6 +1,8 @@
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Domain;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
+using Evidata.Modules.Audit.Application.Abstractions;
+using Evidata.Modules.Audit.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
@@ -13,10 +15,12 @@ namespace Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
 public sealed class ProcessingActivityVersionService : IProcessingActivityVersionService
 {
     private readonly ProcessingInventoryDbContext _db;
+    private readonly IAuditService _auditService;
 
-    public ProcessingActivityVersionService(ProcessingInventoryDbContext db)
+    public ProcessingActivityVersionService(ProcessingInventoryDbContext db, IAuditService auditService)
     {
         _db = db;
+        _auditService = auditService;
     }
 
     /// <inheritdoc/>
@@ -35,6 +39,21 @@ public sealed class ProcessingActivityVersionService : IProcessingActivityVersio
 
         _db.ProcessingActivitySnapshots.Add(snapshot);
         await _db.SaveChangesAsync(ct);
+
+        // Audit: Approve (AUD-APP-001)
+        await _auditService.LogAsync(
+            tenantId: activity.TenantId,
+            userId: approvedBy,
+            eventType: AuditEventType.Approve.ToString(),
+            resource: "ProcessingActivity",
+            resourceId: activity.Id,
+            result: AuditEventResult.Success,
+            metadata: new Dictionary<string, object?>
+            {
+                { "snapshotVersion", snapshot.Version },
+                { "retentionRequired", retentionRequired }
+            },
+            ct: ct);
 
         return snapshot;
     }

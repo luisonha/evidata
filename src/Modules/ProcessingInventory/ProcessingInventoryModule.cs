@@ -1,7 +1,11 @@
+using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
+using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
+using Evidata.Modules.ProcessingInventory.Infrastructure.Versioning;
+using Evidata.Modules.Contracts.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,22 +14,40 @@ namespace Evidata.Modules.ProcessingInventory;
 
 public static class ProcessingInventoryModule
 {
-    public static IServiceCollection AddProcessingInventoryModule(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        var connectionString = configuration.GetConnectionString("evidata-db")
-            ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
+     public static IServiceCollection AddProcessingInventoryModule(
+         this IServiceCollection services,
+         IConfiguration configuration)
+     {
+         var connectionString = configuration.GetConnectionString("evidata-db")
+             ?? throw new InvalidOperationException("Connection string 'evidata-db' not found.");
 
-        services.AddDbContext<ProcessingInventoryDbContext>(options =>
-            options.UseNpgsql(connectionString,
-                b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
+         services.AddDbContext<ProcessingInventoryDbContext>(options =>
+             options.UseNpgsql(connectionString,
+                 b => b.MigrationsAssembly(typeof(ProcessingInventoryDbContextFactory).Assembly.FullName)));
 
-        services.AddScoped<ListProcessingActivitiesQueryHandler>();
-        services.AddScoped<GetProcessingActivityQueryHandler>();
-        services.AddScoped<CreateProcessingActivityCommandHandler>();
-        services.AddScoped<UpdateProcessingActivityCommandHandler>();
+         // P1-017: Review event handler — called when reviews are approved
+         // P1-019: Register against Contracts interface for clean DI composition
+         services.AddScoped<IReviewEventHandler, ReviewEventHandler>();
 
-        return services;
-    }
+         services.AddScoped<ListProcessingActivitiesQueryHandler>();
+         services.AddScoped<GetProcessingActivityQueryHandler>();
+         services.AddScoped<GetProcessingActivityControlQueryHandler>();
+         
+         // P1-FULL-COMPOSITION: Register the control query service interface
+         // The API layer will override this with the composition handler implementation
+         services.AddScoped<IProcessingActivityControlQueryService>(sp =>
+             sp.GetRequiredService<GetProcessingActivityControlQueryHandler>());
+         
+         services.AddScoped<CreateProcessingActivityCommandHandler>();
+         services.AddScoped<UpdateProcessingActivityCommandHandler>();
+         
+         // P1-010: Register version service with IAuditService dependency
+         services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
+
+         // P1-014-P2: Risk assessment service registration moved to API layer (Program.cs)
+         // This avoids circular dependencies since GapManagement → ProcessingInventory already exists.
+         // ProcessingActivityRiskAssessmentService is implemented in Evidata.Api.Services.
+
+         return services;
+     }
 }

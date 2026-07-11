@@ -314,6 +314,145 @@ namespace Evidata.Modules.Evidence.Infrastructure.Persistence.Migrations
                     b.ToTable("evidence_pack_jobs", "evidence");
                 });
 
+            modelBuilder.Entity("Evidata.Modules.Evidence.Domain.EvidenceRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsBlocking")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_blocking");
+
+                    b.Property<Guid>("ProcessingActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("processing_activity_id");
+
+                    b.Property<string>("ReviewDomain")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("review_domain");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewDomain")
+                        .HasDatabaseName("ix_evidence_requirements_review_domain");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_evidence_requirements_tenant_id");
+
+                    b.HasIndex("TenantId", "ProcessingActivityId")
+                        .HasDatabaseName("ix_evidence_requirements_tenant_activity");
+
+                    b.ToTable("evidence_requirements", "evidence");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Evidence.Domain.EvidenceValidation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("EvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<Guid>("EvidenceRequirementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_requirement_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<DateTimeOffset?>("ValidatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("validated_at");
+
+                    b.Property<Guid?>("ValidatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("validated_by");
+
+                    b.Property<string>("ValidationComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("validation_comment");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EvidenceId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_evidence_validations_status");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_evidence_validations_tenant_id");
+
+                    b.HasIndex("EvidenceRequirementId", "Status")
+                        .HasDatabaseName("ix_evidence_validations_requirement_status");
+
+                    b.HasIndex("TenantId", "EvidenceRequirementId")
+                        .HasDatabaseName("ix_evidence_validations_tenant_requirement");
+
+                    b.ToTable("evidence_validations", "evidence");
+                });
+
             modelBuilder.Entity("Evidata.Modules.Evidence.Domain.EvidenceAccessLog", b =>
                 {
                     b.HasOne("Evidata.Modules.Evidence.Domain.Evidence", "Evidence")
@@ -334,6 +473,29 @@ namespace Evidata.Modules.Evidence.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Evidence");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Evidence.Domain.EvidenceValidation", b =>
+                {
+                    b.HasOne("Evidata.Modules.Evidence.Domain.Evidence", "Evidence")
+                        .WithMany()
+                        .HasForeignKey("EvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Evidata.Modules.Evidence.Domain.EvidenceRequirement", "EvidenceRequirement")
+                        .WithMany("Validations")
+                        .HasForeignKey("EvidenceRequirementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evidence");
+
+                    b.Navigation("EvidenceRequirement");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Evidence.Domain.EvidenceRequirement", b =>
+                {
+                    b.Navigation("Validations");
                 });
 #pragma warning restore 612, 618
         }
