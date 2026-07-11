@@ -886,3 +886,80 @@ This is exactly what Option B should look like. Aragorn executed my recommendati
 **Status**: Ready to merge (condition acknowledged, risk accepted at architecture level)
 
 ---
+
+## 2026-07-11 — PR #120 (P1-014-P2): Auto-Detection of ExportWarning in GenerateOfficialExport
+
+**Author**: Aragorn (implementation), Gandalf (review)
+
+**Decision**: ✅ **APROBADO Y MERGED** sin condiciones.
+
+### Contexto
+
+Último ítem del backlog P2-001a: implementar `IProcessingActivityRiskAssessmentService` que agregue riesgos de GapManagement (brechas críticas abiertas), Evidence (evidencia pendiente), y Workflow (revisiones pendientes) para auto-generar `ExportWarning` en `GenerateOfficialExport`.
+
+### Ciclo de correcciones (3 commits)
+
+**Commit ae1c4cc** (implementación inicial): 
+- ❌ Bug silencioso: Aragorn creó interfaces DUPLICADAS en namespace neutral `Evidata.Modules.Contracts.RiskAssessment` con nombres idénticos a interfaces REALES de módulos
+- ❌ Duplicados con firmas incompatibles (faltaba tenantId, métodos con nombres distintos)
+- ❌ Hubiera causado `InvalidOperationException` en producción al resolver DI
+- ✅ Tests unitarios pasaban porque ExportServiceTests mockeaba todo
+
+**Commit 5e3713b** (bug fix por coordinador):
+- ✅ Movió servicio a `Evidata.Api.Services` (patrón correcto, evita ciclos)
+- ✅ Eliminó todas las interfaces duplicadas
+- ✅ Cambió a usar interfaces REALES: `IGapSummaryQueryService`, `IEvidenceSummaryQueryService`, `IReviewSummaryQueryService`
+- ✅ Agregó resolución de tenantId desde `ICurrentUserContext`
+- ✅ Logging estructurado y error handling
+- ⚠️ Test de DI falló (ICurrentUserContext no registrado)
+
+**Commit 401ed15** (test setup fix por Aragorn):
+- ✅ Registró `ICurrentUserContext` como `NullCurrentUserContext` en test DI
+- ✅ Agregó comentario documentando uso como test-double
+
+**Resultado**: 818 tests pasando, 0 errores, 0 regresiones.
+
+### Verificación independiente
+
+1. **Arquitectura**: ✅ API layer (patrón correcto, sin ciclos)
+2. **Interfaces**: ✅ Todas REALES, no duplicadas, correctamente registradas
+3. **Aislamiento multi-tenant**: ✅ TenantId siempre de ICurrentUserContext (Scoped per-request), controller valida consistency
+4. **Graceful degradation**: ✅ Try-catch en ExportService, export continúa si assessment falla
+5. **Non-blocking**: ✅ Warnings solo, no blockers
+6. **Cobertura de tests**: ✅ 4 tests P1-014-P2 (riesgos detectados, sin riesgos, múltiples, falla graceful) + 2 DI tests
+7. **Build & tests**: ✅ Ejecutado localmente: 0 errores, 818 tests pasando
+8. **DI resolution**: ✅ Todas las dependencias transitivas correctamente registradas
+
+### Gap menor (no bloqueante)
+
+**NullCurrentUserContext en test DI**: Usa Guid.Empty para TenantId.
+- ✓ Patrón establecido en codebase (Identity.Infrastructure)
+- ✓ Test validaza que DI compila, no lógica de negocio
+- ✓ Validación funcional de tenant en ExportServiceTests con valores reales
+- ✓ No requiere test adicional porque mecanismo es idéntico al de ApproveProcessingActivityCommandHandler (P1-016/P1-018, ya verificado)
+
+### Lección de proceso
+
+La corrección en 5e3713b fue posible porque:
+1. Coordinador ejecutó build/test independiente (no confió en auto-reporte de agente)
+2. Identificó DI config bug que tests unitarios ocultaban (por mocking total)
+3. Corrigió raíz del problema (movió a API layer) en vez de parche sintomático
+
+**Regla reforzada**: Composiciones multi-módulo requieren test de DI que resuelva ServiceCollection real, no solo tests unitarios mockeados.
+
+### Estado RBAC (6 permisos críticos del contrato)
+
+Ciclo P1-011→P1-019→P1-014-P2 **COMPLETADO**:
+- ✅ ApproveProcessingActivity (SEC-APP-001): 100% completo, blocker VersionModifiedAfterReview funcional end-to-end (P1-016/P1-017/P1-018)
+- ✅ ActivateProcessingActivity (SEC-ACT-001): 100% completo
+- ✅ ValidateEvidence (SEC-EV-001): 100% completo
+- ✅ AcceptGapWithRisk (SEC-GAP-001): 100% completo
+- ✅ DownloadEvidence (SEC-EVDOWN-001): 100% completo
+- ✅ GenerateOfficialExport (SEC-EXP-001): 4/4 gaps (3 en P1-014, 1 aquí en P1-014-P2)
+
+**Resumen**: 6 de 6 permisos críticos 100% implementados. Auditoría RBAC cerrada. Sin pendientes críticos de seguridad.
+
+**Referencias**: PR #120, decisión en `.squad/decisions/inbox/gandalf-p1-014-p2-review.md`.
+
+---
+
