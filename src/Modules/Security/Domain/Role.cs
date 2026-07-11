@@ -22,6 +22,22 @@ public class Role
         };
     }
 
+    /// <summary>
+    /// Factory method for seeding with deterministic GUIDs (internal use only).
+    /// This is used to ensure that seed data has consistent IDs across all EF Core model builds,
+    /// preventing the "PendingModelChangesWarning" that occurs when HasData values change.
+    /// </summary>
+    internal static Role CreateForSeed(Guid id, string name, string? description = null, bool isSystemRole = false)
+    {
+        return new Role
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            IsSystemRole = isSystemRole
+        };
+    }
+
     public void AddPermission(Permission permission)
     {
         if (_permissions.Any(p => p.PermissionId == permission.Id)) return;

@@ -30,37 +30,54 @@ public class SecurityDbContext : DbContext
     }
 
     /// <summary>
-    /// Seed the 7 standard RBAC roles from the contract.
+    /// Seed the 7 standard RBAC roles from the contract with deterministic GUIDs.
     /// </summary>
     private static void SeedRbacRoles(ModelBuilder modelBuilder)
     {
+        // Fixed GUIDs for deterministic seeding - must match SeedRolePermissions()
+        var tenantOwnerId = new Guid("00000000-0000-0000-0000-000000000001");
+        var complianceAdminId = new Guid("00000000-0000-0000-0000-000000000002");
+        var processOwnerId = new Guid("00000000-0000-0000-0000-000000000003");
+        var legalReviewerId = new Guid("00000000-0000-0000-0000-000000000004");
+        var securityReviewerId = new Guid("00000000-0000-0000-0000-000000000005");
+        var auditorId = new Guid("00000000-0000-0000-0000-000000000006");
+        var viewerId = new Guid("00000000-0000-0000-0000-000000000007");
+
         var roles = new[]
         {
-            Role.Create("TenantOwner", "Tenant owner - highest privilege", isSystemRole: true),
-            Role.Create("ComplianceAdmin", "Compliance administrator", isSystemRole: true),
-            Role.Create("ProcessOwner", "Process owner - manages individual processing activities", isSystemRole: true),
-            Role.Create("LegalReviewer", "Legal domain reviewer for evidence validation", isSystemRole: true),
-            Role.Create("SecurityReviewer", "Security domain reviewer for evidence validation", isSystemRole: true),
-            Role.Create("Auditor", "Auditor - read-only access with audit rights", isSystemRole: true),
-            Role.Create("Viewer", "Viewer - read-only access to published information", isSystemRole: true)
+            Role.CreateForSeed(tenantOwnerId, "TenantOwner", "Tenant owner - highest privilege", isSystemRole: true),
+            Role.CreateForSeed(complianceAdminId, "ComplianceAdmin", "Compliance administrator", isSystemRole: true),
+            Role.CreateForSeed(processOwnerId, "ProcessOwner", "Process owner - manages individual processing activities", isSystemRole: true),
+            Role.CreateForSeed(legalReviewerId, "LegalReviewer", "Legal domain reviewer for evidence validation", isSystemRole: true),
+            Role.CreateForSeed(securityReviewerId, "SecurityReviewer", "Security domain reviewer for evidence validation", isSystemRole: true),
+            Role.CreateForSeed(auditorId, "Auditor", "Auditor - read-only access with audit rights", isSystemRole: true),
+            Role.CreateForSeed(viewerId, "Viewer", "Viewer - read-only access to published information", isSystemRole: true)
         };
 
         modelBuilder.Entity<Role>().HasData(roles);
     }
 
     /// <summary>
-    /// Seed the 6 critical permissions from the contract.
+    /// Seed the 6 critical permissions from the contract with deterministic GUIDs.
     /// </summary>
     private static void SeedPermissions(ModelBuilder modelBuilder)
     {
+        // Fixed GUIDs for deterministic seeding - must match SeedRolePermissions()
+        var approvePermId = new Guid("00000001-0000-0000-0000-000000000001");
+        var activatePermId = new Guid("00000001-0000-0000-0000-000000000002");
+        var validateEvidencePermId = new Guid("00000001-0000-0000-0000-000000000003");
+        var acceptGapPermId = new Guid("00000001-0000-0000-0000-000000000004");
+        var generateExportPermId = new Guid("00000001-0000-0000-0000-000000000005");
+        var downloadEvidencePermId = new Guid("00000001-0000-0000-0000-000000000006");
+
         var permissions = new[]
         {
-            Permission.Create("processingActivity", "approve", "Approve a processing activity for review"),
-            Permission.Create("processingActivity", "activate", "Activate an approved processing activity"),
-            Permission.Create("evidence", "validate", "Validate evidence requirements"),
-            Permission.Create("gap", "acceptWithRisk", "Accept gaps with risk justification"),
-            Permission.Create("export", "generate", "Generate official exports"),
-            Permission.Create("evidence", "download", "Download evidence files")
+            Permission.CreateForSeed(approvePermId, "processingActivity", "approve", "Approve a processing activity for review"),
+            Permission.CreateForSeed(activatePermId, "processingActivity", "activate", "Activate an approved processing activity"),
+            Permission.CreateForSeed(validateEvidencePermId, "evidence", "validate", "Validate evidence requirements"),
+            Permission.CreateForSeed(acceptGapPermId, "gap", "acceptWithRisk", "Accept gaps with risk justification"),
+            Permission.CreateForSeed(generateExportPermId, "export", "generate", "Generate official exports"),
+            Permission.CreateForSeed(downloadEvidencePermId, "evidence", "download", "Download evidence files")
         };
 
         modelBuilder.Entity<Permission>().HasData(permissions);
