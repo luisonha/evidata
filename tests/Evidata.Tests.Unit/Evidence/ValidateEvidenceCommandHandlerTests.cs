@@ -67,11 +67,8 @@ public class ValidateEvidenceCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "LegalReviewer");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new ValidateEvidenceCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new ValidateEvidenceCommandHandler(db, auditService, httpAccessor);
         var cmd = new ValidateEvidenceCommand(tenantId, validation.Id, "Validate", "Policy document is compliant", userId);
 
         // Act
@@ -118,11 +115,8 @@ public class ValidateEvidenceCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "SecurityReviewer"); // Wrong role
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new ValidateEvidenceCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new ValidateEvidenceCommandHandler(db, auditService, httpAccessor);
         var cmd = new ValidateEvidenceCommand(tenantId, validation.Id, "Validate", "Policy document is compliant", userId);
 
         // Act & Assert
@@ -164,11 +158,8 @@ public class ValidateEvidenceCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "SecurityReviewer");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new ValidateEvidenceCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new ValidateEvidenceCommandHandler(db, auditService, httpAccessor);
         var cmd = new ValidateEvidenceCommand(tenantId, validation.Id, "Reject", "Missing required encryption details", userId);
 
         // Act
@@ -214,11 +205,8 @@ public class ValidateEvidenceCommandHandlerTests
 
         var auditService = Substitute.For<IAuditService>();
         var httpAccessor = BuildHttpContextAccessor(correlationId, "LegalReviewer");
-        var currentUser = Substitute.For<ICurrentUserContext>();
-        currentUser.TenantId.Returns(tenantId);
-        currentUser.UserId.Returns(userId);
 
-        var handler = new ValidateEvidenceCommandHandler(db, auditService, currentUser, httpAccessor);
+        var handler = new ValidateEvidenceCommandHandler(db, auditService, httpAccessor);
         var cmd = new ValidateEvidenceCommand(tenantId, validation.Id, "MarkInsufficient", "Incomplete policy details", userId);
 
         // Act
