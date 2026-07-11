@@ -746,3 +746,30 @@ Este ciclo demuestra el valor de que el coordinador nunca confíe ciegamente en 
 | GenerateOfficialExport | ✅ Completo (P1-014 + P1-014-P2) |
 
 **Referencias**: PR #120, `.squad/decisions/inbox/{aragorn-p1-014-p2-*,gandalf-p1-014-p2-review}.md` (consolidadas y eliminadas del inbox tras este merge).
+
+## 2026-07-11 — PR #121 (P1-DEGRADATION): Degradación parcial en composición de /control
+
+**Autores**: Aragorn (implementación), Gandalf (diseño original de la nota TODO en PR #104 + revisión final).
+
+**Decisión**: ✅ **APROBADO SIN CONDICIONES Y MERGED.**
+
+### Contexto
+PR #104 (`/control` endpoint) usaba `Task.WhenAll` sobre 6 servicios de módulos distintos (Evidence, GapManagement, Workflow/Review, Audit/Timeline, Reporting/Exports, Security/Permissions). Si CUALQUIERA fallaba, el endpoint completo devolvía 500 — incluso si servicios de puro enriquecimiento (Timeline, Exports) eran los únicos afectados. Gandalf dejó esto documentado como TODO no bloqueante al aprobar PR #104.
+
+### Diseño e implementación
+**Clasificación crítico/opcional**:
+- **CRÍTICO (fail-closed)**: `_permissionsService` (Security/RBAC) — sin datos reales de permisos, la UI podría asumir acciones disponibles que en realidad están bloqueadas. Si falla, el endpoint sigue fallando.
+- **OPCIONAL (fail-open con degradación)**: `_evidenceService`, `_gapService`, `_reviewService`, `_timelineService`, `_exportService` — si fallan individualmente, se loggea un warning estructurado (tenantId, processingActivityId, servicio, excepción) y se usa un valor por defecto seguro (0 requisitos/gaps, listas vacías, estado Draft) para permitir que el resto de la vista se componga correctamente.
+
+**Paralelismo preservado**: las 6 tareas se lanzan simultáneamente antes de cualquier `await`; el manejo individual con try/catch por tarea no serializa la ejecución.
+
+### Análisis de seguridad (punto crítico de la revisión)
+Se evaluó explícitamente si degradar `GapSummary.ApprovalBlocked` a `false` (valor por defecto) podría inducir a un usuario a creer que no hay riesgos cuando en realidad el servicio simplemente falló al consultar el estado real. **Conclusión: seguro**, por defense-in-depth — el endpoint `/control` es de solo lectura/informativo; el bloqueo REAL de aprobación ocurre en `ApproveProcessingActivityCommandHandler` (P1-013/016), que revalida `activity.Flags.CriticalGapOpen` y demás blockers directamente desde el estado de dominio real, sin depender en absoluto de los datos compuestos por este endpoint. La degradación es honesta (retorna "sin datos", no "autorizado").
+
+### Resultado
+818 → **823 tests** (+5), 0 regresiones. PR #121 merged a develop.
+
+### Estado — Ciclo RBAC + calidad arquitectónica cerrado
+Con este merge se cierran todos los pendientes técnicos identificados durante el ciclo P1-011→P1-014-P2, incluyendo la nota de degradación parcial dejada abierta desde PR #104.
+
+**Referencias**: PR #121, `.squad/decisions/inbox/{aragorn-p1-degradation,gandalf-p1-degradation-review}.md` (consolidadas y eliminadas del inbox tras este merge).
