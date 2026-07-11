@@ -750,3 +750,68 @@ Result: Correctas! - Con error: 0, Superado: 2, Omitido: 0, Total: 2
 All 818 tests in Evidata.Tests.Unit pass with 0 failures.
 
 **Commit**: `dc23851` - "Fix: Register ICurrentUserContext in ProcessingActivityRiskAssessmentService DI tests"
+
+## 2026-07-11: P1-DEGRADATION — Graceful Degradation en Composición de /control Endpoint
+
+**Ticket**: P1-DEGRADATION  
+**PR**: #121  
+**Objetivo**: Implementar estrategia de degradación parcial (graceful degradation) para el endpoint `/control` que compone datos de 6 servicios en paralelo.
+
+**Problema Original (PR #104)**:
+- Si CUALQUIERA de los 6 servicios falla (timeout, error transitorio BD, etc.), el endpoint completo falla con 500
+- Especialmente grave para servicios opcionales (Timeline/Exports): no debería tumbar vista completa del centro de control
+
+**Decisión de Diseño: Clasificación Crítico vs Opcional**
+
+| Servicio | Clasificación | Rationale |
+|----------|---|---|
+| `_permissionsService` (Security/RBAC) | **CRÍTICO** | Sin datos de permisos reales, UI podría asumir "todo permitido" (RIESGO CRÍTICO DE SEGURIDAD). Fail-closed. |
+| `_evidenceService` (Evidence Summary) | **OPCIONAL** | Resumen de estado (requisitos, porcentajes). Degradar a vacío → 0 requisitos, 0% completitud. `CalculateCompletionPercentage` sigue siendo seguro. |
+| `_gapService` (Gap Management Summary) | **OPCIONAL** | Resumen de estado (aberturas, severidad). Degradar a vacío → 0 gaps. `CalculateRiskLevel` sigue siendo seguro (devuelve null). |
+| `_reviewService` (Workflow/Review Summary) | **OPCIONAL** | Resumen de decisiones. Degradar a Draft por defecto. Ya existe mapeo seguro (MapReviewSummary con null handling). |
+| `_timelineService` (Audit Timeline) | **OPCIONAL** | Enriquecimiento puro (bitácora historial). Degradar a lista vacía. Sin timeline, vista sigue funcional. |
+| `_exportService` (Reporting Exports) | **OPCIONAL** | Enriquecimiento puro (opciones descarga). Degradar a lista vacía. Sin exports, usuario puede seguir viendo/editando. |
+
+**Rationale de Seguridad**: Solo Permissions puede romper la seguridad de la vista. Si falla, es mejor fallar (fail-closed) que arriesgar que UI renderice acciones bloqueadas como disponibles.
+
+**Implementación**:
+1. Reemplazar `Task.WhenAll` monolítico por manejo individual por tarea con try/catch
+2. Servicios opcionales: catch excepción → loguea warning + usa valor por defecto seguro
+3. Servicios críticos (Permissions): sin try/catch → exception propaga (fail-closed)
+4. Agregar `ILogger<ProcessingActivityControlCompositionQueryHandler>` para warnings
+5. Actualizar `MapEvidenceSummary(null)` y `MapGapSummary(null)` para degradar gracefully
+
+**Logging Pattern** (ejemplo Evidence):
+```csharp
+_logger.LogWarning(
+    "Evidence service failed for processingActivityId={processingActivityId}, tenantId={tenantId}. " +
+    "Degrading to empty evidence summary. Exception: {exceptionMessage}",
+    processingActivityId, tenantId, ex.Message);
+```
+
+**Tests** (6 nuevos, 0 regressions):
+- ✅ Optional Evidence fails → degrada, loguea warning
+- ✅ Optional Gap fails → degrada, loguea warning
+- ✅ Optional Timeline fails → degrada, loguea warning
+- ✅ Optional Export fails → degrada, loguea warning
+- ✅ Multiple optional services fail simultáneamente → todas degradan correctamente
+- ✅ Critical Permissions fails → exception propagates (fail-closed regression test)
+
+**Métricas**:
+- Antes: 818 tests pasando
+- Después: 823 tests pasando (+5 nuevos)
+- Regressions: 0
+- Build: 0 errores
+
+**Commit**: `b0252e5` - "P1-DEGRADATION: Implementar graceful degradation en composición de /control endpoint"
+
+**Learning & Future Considerations**:
+- Patrón replicable para futuras composiciones paralelas (múltiples servicios, algunos opcionales)
+- Signal de degradación: Hoy, warnings se loguean pero no se exponen en API response (para no romper contrato). Posible mejora futura: campo degradationFlags en ViewModel.
+- Alternativa no implementada: usar `Task.WhenAll` + inspeccionar `.Status`/`.Exception` post-await. Opción actual (try/catch individual) es más legible.
+
+**Referencias**:
+- P1-FULL-COMPOSITION: PR #104 (composición inicial)
+- Patrón fail-closed: SEC-EV-001 (PR #105), SEC-GAP-001 (PR #107), SEC-EXP-001 (PR #109)
+- Similar graceful degradation pattern used in P1-014-P2 (ExportWarning auto-detection)
+
