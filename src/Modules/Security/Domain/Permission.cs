@@ -21,4 +21,21 @@ public class Permission
             Description = description
         };
     }
+
+    /// <summary>
+    /// Factory method for seeding with deterministic GUIDs (internal use only).
+    /// This is used to ensure that seed data has consistent IDs across all EF Core model builds,
+    /// preventing the "PendingModelChangesWarning" that occurs when HasData values change.
+    /// </summary>
+    internal static Permission CreateForSeed(Guid id, string resource, string action, string? description = null)
+    {
+        return new Permission
+        {
+            Id = id,
+            Resource = resource,
+            Action = action,
+            Name = $"{resource}:{action}",
+            Description = description
+        };
+    }
 }
