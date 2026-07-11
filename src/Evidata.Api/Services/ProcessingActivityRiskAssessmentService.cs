@@ -1,9 +1,11 @@
-using Evidata.Modules.Contracts.RiskAssessment;
+using Evidata.Modules.Evidence.Application.Abstractions;
+using Evidata.Modules.GapManagement.Application.Abstractions;
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
+using Evidata.Modules.Workflow.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Evidata.Modules.ProcessingInventory.Application.Services;
+namespace Evidata.Api.Services;
 
 /// <summary>
 /// Implementation of ProcessingActivityRiskAssessmentService.
@@ -14,18 +16,16 @@ namespace Evidata.Modules.ProcessingInventory.Application.Services;
 /// to identify risks that should trigger export warnings.
 /// 
 /// Key Design Decisions:
-/// 1. Tenant isolation: Always resolved from ICurrentUserContext, never from client.
-/// 2. No reflection: Uses standard DI (ctor injection) for cross-module services.
-/// 3. No circular references: ProcessingInventory depends on Contracts (neutral), 
-///    which re-exports the query interfaces from other modules.
-/// 4. Query-only: All injected services are query/read-only interfaces (no state modification).
+/// 1. Lives in API layer to avoid circular module dependencies (GapManagement → ProcessingInventory already exists)
+/// 2. Tenant isolation: Always resolved from ICurrentUserContext, never from client.
+/// 3. Uses REAL interfaces from each module (Abstractions), not duplicates
+/// 4. Query-only: All injected services are read-only interfaces (no state modification).
 /// 5. Graceful degradation: If one module's risk assessment fails, others continue.
 /// </summary>
 public sealed class ProcessingActivityRiskAssessmentService(
     IGapSummaryQueryService gapSummaryQueryService,
     IEvidenceSummaryQueryService evidenceSummaryQueryService,
     IReviewSummaryQueryService reviewSummaryQueryService,
-    IReviewRequirementPolicyService reviewRequirementPolicyService,
     ICurrentUserContext currentUserContext,
     ILogger<ProcessingActivityRiskAssessmentService> logger) 
     : IProcessingActivityRiskAssessmentService
@@ -59,20 +59,17 @@ public sealed class ProcessingActivityRiskAssessmentService(
         // ─── Risk Check #1: Critical Gaps Open ───────────────────────────────
         try
         {
-            var gapSummary = await gapSummaryQueryService.GetGapSummaryAsync(
-                processingActivityId, versionId);
+            var gapSummary = await gapSummaryQueryService.GetByProcessingActivityAsync(
+                tenantId, processingActivityId, versionId, ct);
 
             if (gapSummary != null && gapSummary.OpenCount > 0 && gapSummary.HighestSeverity.HasValue)
             {
                 // A gap is "critical" if it is open AND has severity assigned
                 hasCriticalGapsOpen = true;
-                var severityLabel = gapSummary.HighestSeverity.ToString();
+                var severityLabel = gapSummary.HighestSeverityLabelKey ?? gapSummary.HighestSeverity.ToString();
                 criticalGapDetails.Add(
                     $"Open gaps detected: {gapSummary.OpenCount} open (highest severity: {severityLabel})");
-                if (gapSummary.OpenGapReasons.Count > 0)
-                {
-                    criticalGapDetails.AddRange(gapSummary.OpenGapReasons);
-                }
+                
                 logger.LogDebug(
                     "Risk detected: Critical gaps open for activity {ActivityId}: {OpenCount} open gaps",
                     processingActivityId, gapSummary.OpenCount);
@@ -90,8 +87,8 @@ public sealed class ProcessingActivityRiskAssessmentService(
         // ─── Risk Check #2: Pending Evidence ────────────────────────────────
         try
         {
-            var evidenceSummary = await evidenceSummaryQueryService.GetEvidenceSummaryAsync(
-                processingActivityId, versionId);
+            var evidenceSummary = await evidenceSummaryQueryService.GetSummaryAsync(
+                tenantId, processingActivityId, versionId, ct);
 
             if (evidenceSummary != null && 
                 (evidenceSummary.BlockingRequirementsCount > 0 || evidenceSummary.PendingCount > 0))
@@ -111,11 +108,6 @@ public sealed class ProcessingActivityRiskAssessmentService(
                 {
                     pendingEvidenceDetails.Add(
                         $"Evidence pending attachment/validation: {evidenceSummary.PendingCount}");
-                }
-
-                if (evidenceSummary.PendingReasons.Count > 0)
-                {
-                    pendingEvidenceDetails.AddRange(evidenceSummary.PendingReasons);
                 }
 
                 logger.LogDebug(
@@ -138,7 +130,7 @@ public sealed class ProcessingActivityRiskAssessmentService(
         try
         {
             var reviewSummary = await reviewSummaryQueryService.GetReviewSummaryAsync(
-                processingActivityId, versionId);
+                tenantId, processingActivityId, versionId, ct);
 
             if (reviewSummary != null && reviewSummary.PendingDomains.Count > 0)
             {
@@ -147,11 +139,6 @@ public sealed class ProcessingActivityRiskAssessmentService(
                 hasPendingReviews = true;
                 pendingReviewDetails.Add(
                     $"Reviews pending approval: {reviewSummary.PendingDomains.Count} domain(s) awaiting decision");
-
-                if (reviewSummary.PendingReasons.Count > 0)
-                {
-                    pendingReviewDetails.AddRange(reviewSummary.PendingReasons);
-                }
 
                 logger.LogDebug(
                     "Risk detected: Pending reviews for activity {ActivityId}: {PendingCount} pending domain(s)",

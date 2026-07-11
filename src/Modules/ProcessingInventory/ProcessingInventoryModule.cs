@@ -1,7 +1,6 @@
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.ProcessingInventory.Application.Commands;
 using Evidata.Modules.ProcessingInventory.Application.Queries;
-using Evidata.Modules.ProcessingInventory.Application.Services;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Notifications;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence;
 using Evidata.Modules.ProcessingInventory.Infrastructure.Persistence.Factories;
@@ -45,9 +44,9 @@ public static class ProcessingInventoryModule
          // P1-010: Register version service with IAuditService dependency
          services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
 
-         // P1-014-P2: Register risk assessment service for export warning auto-detection
-         // This service aggregates cross-module risk data from GapManagement, Evidence, and Workflow
-         services.AddScoped<IProcessingActivityRiskAssessmentService, ProcessingActivityRiskAssessmentService>();
+         // P1-014-P2: Risk assessment service registration moved to API layer (Program.cs)
+         // This avoids circular dependencies since GapManagement → ProcessingInventory already exists.
+         // ProcessingActivityRiskAssessmentService is implemented in Evidata.Api.Services.
 
          return services;
      }
