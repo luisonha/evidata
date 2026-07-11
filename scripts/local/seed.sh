@@ -154,19 +154,12 @@ if [[ -n "$PSQL_CMD" ]]; then
   info "Insertando roles del sistema via SQL..."
   $PSQL_CMD <<'EOSQL' 2>&1 | grep -v "^$" || warn "Algunos roles pueden ya existir"
 -- Permisos Ley 21.719 (schema: security, columnas PascalCase con EF Core)
-INSERT INTO security.permissions ("Id", "Name", "Resource", "Action", "Description")
-VALUES
-  ('a0000001-0000-0000-0000-000000000001', 'documents:read',   'documents', 'read',     'Leer documentos del tenant'),
-  ('a0000001-0000-0000-0000-000000000002', 'documents:write',  'documents', 'write',    'Crear y editar documentos'),
-  ('a0000001-0000-0000-0000-000000000003', 'documents:delete', 'documents', 'delete',   'Eliminar documentos'),
-  ('a0000001-0000-0000-0000-000000000004', 'rat:read',         'rat',       'read',     'Leer Registros de Actividad de Tratamiento'),
-  ('a0000001-0000-0000-0000-000000000005', 'rat:write',        'rat',       'write',    'Crear y editar RATs'),
-  ('a0000001-0000-0000-0000-000000000006', 'rat:approve',      'rat',       'approve',  'Aprobar RATs (rol DPO)'),
-  ('a0000001-0000-0000-0000-000000000007', 'evidence:read',    'evidence',  'read',     'Ver evidencias de cumplimiento'),
-  ('a0000001-0000-0000-0000-000000000008', 'evidence:write',   'evidence',  'write',    'Registrar evidencias'),
-  ('a0000001-0000-0000-0000-000000000009', 'reports:generate', 'reports',   'generate', 'Generar reportes'),
-  ('a0000001-0000-0000-0000-000000000010', 'admin:tenant',     'admin',     'tenant',   'Administrar configuración del tenant')
-ON CONFLICT ("Id") DO NOTHING;
+-- Nota: Permisos legacy 'a0000001-*' fueron removidos — no hay roles legacy (DPO, PrivacyAnalyst)
+-- que los referencien tras el fix RBAC. Los 7 roles oficiales se siembran en SecurityDbContext.
+-- Esta tabla está vacía por ahora (los permisos reales se definirán con el nuevo modelo de autorización).
+--
+-- INSERT INTO security.permissions ("Id", "Name", "Resource", "Action", "Description")
+-- VALUES (...) — Pendiente futura definición de permisos
 
 -- NOTE: Legacy roles (DPO, PrivacyAnalyst) removed. 
 -- The 7 official RBAC roles (TenantOwner, ComplianceAdmin, ProcessOwner, LegalReviewer, SecurityReviewer, Auditor, Viewer)
@@ -226,6 +219,92 @@ EOSQL
   fi
 else
   warn "PostgreSQL no disponible. Asignación de rol omitida."
+fi
+
+# ═══════════════════════════════════════════════════════
+# BLOQUE 2b: Reglas de Detección de Brechas (GapRules)
+# ═══════════════════════════════════════════════════════
+section "Bloque 2b: Reglas de detección de brechas (11 reglas)"
+
+if [[ -n "$PSQL_CMD" ]]; then
+  info "Insertando 11 reglas de detección de brechas..."
+  $PSQL_CMD <<'EOSQL' 2>&1 | grep -v "^$" || warn "Algunas reglas pueden ya existir"
+-- 11 Reglas de detección de brechas de cumplimiento (contract 04, lines 162-174)
+-- Severity values: Low=0, Medium=1, High=2, Critical=3
+INSERT INTO gap.gap_rules 
+  (id, tenant_id, rule_code, description, severity, blocks_approval, test_fixture_name, is_fully_implemented, implementation_notes, created_by, created_at)
+VALUES
+  ('10000000-0000-0000-0000-000000000000', '$TENANT_ID',
+   'TRANSFER_WITHOUT_DESTINATION_COUNTRY',
+   'Transferencia de datos sin país destino especificado',
+   'Critical', true, 'pa-transfer-no-country', true,
+   'Evalúa si un nodo de transferencia internacional tiene especificado el país destino.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000001', '$TENANT_ID',
+   'TRANSFER_WITHOUT_RECEIVER',
+   'Transferencia sin receptor identificado',
+   'High', true, 'pa-transfer-no-receiver', true,
+   'Verifica que todo nodo de transferencia identifique un receptor o destinatario.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000002', '$TENANT_ID',
+   'TRANSFER_WITHOUT_SAFEGUARD',
+   'Transferencia internacional sin salvaguarda especificada',
+   'Critical', true, 'pa-transfer-no-safeguard', true,
+   'Controla que transferencias internacionales de terceros países cuenten con salvaguarda (Capítulo V RGPD).',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000003', '$TENANT_ID',
+   'TRANSFER_WITHOUT_BLOCKING_EVIDENCE',
+   'Transferencia sin evidencia de aprobación o base legal',
+   'Critical', true, 'pa-transfer-no-evidence', true,
+   'Valida que exista evidencia adjunta que apruebe o justifique la transferencia internacional.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000004', '$TENANT_ID',
+   'SENSITIVE_DATA_WITHOUT_SECURITY_REVIEW',
+   'Dato sensible sin revisión de seguridad',
+   'Critical', true, 'pa-sensitive-no-security-review', true,
+   'Verifica que categorías de datos sensibles tengan validación de evidencia de tipo Security.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000005', '$TENANT_ID',
+   'LEGAL_BASIS_MISSING',
+   'Base legal no especificada',
+   'Critical', true, 'pa-no-legal-basis', true,
+   'Comprueba que todo tratamiento de datos cuente con base legal explícita (consentimiento, contrato, obligación legal, etc.).',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000006', '$TENANT_ID',
+   'RETENTION_UNDEFINED',
+   'Período de retención no definido',
+   'High', true, 'pa-retention-undefined', false,
+   'Requiere especificación de período de retención. Nota: El dominio aún no modela explícitamente ''retention_period_days'' en ProcessingActivity.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000007', '$TENANT_ID',
+   'DATA_CATEGORIES_EMPTY',
+   'Sin categorías de datos especificadas',
+   'High', true, 'pa-no-data-categories', true,
+   'Verifica que al menos una categoría de dato esté vinculada al tratamiento.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000008', '$TENANT_ID',
+   'PURPOSE_UNDEFINED',
+   'Propósito del tratamiento no definido',
+   'Critical', true, 'pa-purpose-undefined', true,
+   'Asegura que se especifique claramente el propósito o finalidad del tratamiento de datos.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000009', '$TENANT_ID',
+   'DATA_SUBJECTS_EMPTY',
+   'Sin categorías de interesados especificadas',
+   'High', true, 'pa-no-data-subjects', true,
+   'Comprueba que al menos una categoría de interesado esté identificada en el tratamiento.',
+   '$ADMIN_ID', NOW()),
+  ('10000000-0000-0000-0000-000000000010', '$TENANT_ID',
+   'SYSTEMS_WITHOUT_OWNER',
+   'Sistemas sin propietario identificado',
+   'High', true, 'pa-systems-without-owner', false,
+   'Verifica que todo sistema participante en el tratamiento tenga propietario asignado. Nota: Requiere introspección de nodos que el dominio aún no modeliza completamente.',
+   '$ADMIN_ID', NOW())
+ON CONFLICT (id) DO NOTHING;
+EOSQL
+  info "11 Reglas de detección de brechas insertadas ✅"
+else
+  warn "PostgreSQL no disponible. Reglas de brechas omitidas."
 fi
 
 # ═══════════════════════════════════════════════════════
@@ -306,6 +385,7 @@ echo "║  Datos creados:                                          ║"
 echo "║    • 1 Tenant                                            ║"
 echo "║    • 7 Roles RBAC (TenantOwner, ComplianceAdmin, etc.)    ║"
 echo "║    • 2 Usuarios de prueba con roles asignados            ║"
+echo "║    • 11 Reglas de detección de brechas                   ║"
 echo "║    • 5 RATs (1 Approved, 1 UnderReview, 3 Draft)         ║"
 echo "║    • 1 Consulta MCP de prueba                            ║"
 echo "╠══════════════════════════════════════════════════════════╣"

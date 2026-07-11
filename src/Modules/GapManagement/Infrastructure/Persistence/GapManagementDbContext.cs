@@ -44,9 +44,6 @@ public class GapManagementDbContext : DbContext
 
             e.HasIndex(r => r.RuleCode)
                 .HasDatabaseName("ix_gap_rules_code");
-            
-            // Seed default gap rules
-            e.HasData(SeedGapRules());
         });
 
         // ── ComplianceGap ──────────────────────────────────────────────────────
@@ -95,49 +92,5 @@ public class GapManagementDbContext : DbContext
             e.HasIndex(g => g.GapRuleId)
                 .HasDatabaseName("ix_compliance_gaps_rule");
         });
-    }
-
-    /// <summary>
-    /// Seed the 11 default gap detection rules from the contract.
-    /// Uses deterministic GUIDs for the development tenant.
-    /// EF Core will map these anonymous objects to GapRule entities.
-    /// </summary>
-    private static object[] SeedGapRules()
-    {
-        // Fixed IDs for seed data
-        var tenantId = new Guid("00000000-0000-0000-0000-000000000001"); // Development tenant
-        var systemUserId = new Guid("00000000-0000-0000-0000-000000000010"); // Admin user for seeding
-        var now = new DateTimeOffset(2026, 7, 11, 0, 0, 0, TimeSpan.Zero);
-
-        var rules = GapRuleInitializer.GetDefaultRules();
-        var gapRules = new List<object>();
-        int index = 0;
-
-        foreach (var seed in rules)
-        {
-            // Create deterministic GUID for each rule based on index
-            var ruleId = new Guid($"10000000-0000-0000-0000-{index:D12}");
-
-            gapRules.Add(new
-            {
-                Id = ruleId,
-                TenantId = tenantId,
-                RuleCode = seed.RuleCode,
-                Description = seed.Description,
-                Severity = seed.Severity, // Pass GapSeverity enum directly
-                BlocksApproval = seed.BlocksApproval,
-                TestFixtureName = seed.TestFixtureName,
-                IsFullyImplemented = seed.IsFullyImplemented,
-                ImplementationNotes = seed.ImplementationNotes,
-                CreatedBy = systemUserId,
-                CreatedAt = now,
-                LastModifiedBy = (Guid?)null,
-                LastModifiedAt = (DateTimeOffset?)null
-            });
-
-            index++;
-        }
-
-        return gapRules.ToArray();
     }
 }
