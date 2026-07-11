@@ -963,3 +963,93 @@ Ciclo P1-011→P1-019→P1-014-P2 **COMPLETADO**:
 
 ---
 
+
+---
+
+## 2026-07-11T11:49:35Z — PR #121 (P1-DEGRADATION): Graceful Degradation in /control Endpoint
+
+**Author**: Aragorn (implementation), Gandalf (review)
+
+**Decision**: ✅ **APROBADO SIN CONDICIONES** (Unconditional Approval)
+
+### Contexto
+
+Resolución del TODO de PR #104: el endpoint `/control` fallaba completamente (500) si cualquiera de sus 6 servicios de composición fallaba, incluso los que son puro enriquecimiento de UI (Evidence, Gap, Review, Timeline, Exports). PR #121 implementa degradación parcial: servicios opcionales degradan a valores por defecto seguros + warning logueado; el servicio de permisos (Security/RBAC) permanece fail-closed (si falla, el endpoint falla).
+
+### Verificación independiente (5 puntos críticos)
+
+#### 1. Clasificación Crítico/Opcional ✅
+
+**CRÍTICO (fail-closed)**: `_permissionsService` (Security/RBAC)
+- Correcto: si fallan permisos, el endpoint debe fallar (500). No hay escenario donde retornar permisos incompletos sea seguro.
+
+**OPCIONAL (fail-open)**: Evidence, Gap, Review, Timeline, Exports
+- Riesgo aparente: ¿podría `GapSummary.ApprovalBlocked: false` degradado engañar a un usuario haciéndole creer que puede aprobar cuando no debería?
+- **Análisis**: El bloqueo REAL de aprobación ocurre en `ApproveProcessingActivityCommandHandler` (P1-016), que **re-valida todo independientemente**:
+  - Re-consulta permisos via `permissionsService` (no confía en endpoint)
+  - Re-valida blockers via `activity.Flags.BlocksApproval` (re-computa desde gaps reales)
+  - Si hay gaps críticos, bloquea (422) aunque endpoint retornó "sin gaps"
+- **Conclusión**: Degradación es segura. El endpoint es **informativo, no autoritativo**. La autoridad real está en el command handler.
+
+#### 2. Paralelismo de tareas ✅
+
+- Todas las 6 tareas se lanzan **simultáneamente** (sin `await` hasta después del lanzamiento)
+- Cada `try/catch` es **independiente** (no cancela otras tareas)
+- Ejecución **verdaderamente paralela** (no hay `Task.WhenAll()` que las secuencialice)
+
+#### 3. Logging ✅
+
+Mensajes de warning:
+```
+Evidence service failed for processingActivityId={id}, tenantId={id}. Degrading to empty. Exception: {msg}
+```
+- ✅ Incluye: processingActivityId, tenantId, nombre servicio, mensaje excepción
+- ✅ No filtra datos sensibles
+- ✅ Suficiente para operación en producción
+
+Nota menor: Export service no incluye tenantId (porque su interfaz no lo recibe). Gap de consistencia menor, no bloqueante.
+
+#### 4. Cobertura de tests ✅
+
+9 escenarios, 623 líneas de test, usando NSubstitute (sin reflection):
+1. Happy path: todos los servicios retornan datos
+2. Tenant isolation: tenantId se propaga correctamente
+3. P1-004 security: blocked actions vs available actions separados
+4. Graceful degradation x5: Evidence, Gap, Review, Timeline, Exports individualmente
+5. Multiple failures simultáneos: Gap + Timeline fallan juntos
+6. Fail-closed: Permissions service falla, excepción se propaga
+
+✅ No tautologías (cada test verifica comportamiento distinto)
+✅ Cobertura completa (happy path, individual failures, simultaneous failures, critical fail-closed)
+
+#### 5. Build & Tests ✅
+
+```
+dotnet build Evidata.sln
+→ 0 Errors, 0 Warnings, Build succeeded
+
+dotnet test tests/Evidata.Tests.Unit/
+→ 823/823 PASS, 0 failures
+```
+
+### Decisión
+
+**✅ APROBADO SIN CONDICIONES**
+
+Todas las 5 verificaciones críticas pasaron. Arquitectura es sólida:
+- Degradación de servicios opcionales es **segura** (bloqueo real en command handler)
+- Paralelismo **preservado** (no hay secuencialización oculta)
+- Logging **operacionalizable** (IDs + nombre servicio + excepción)
+- Tests **completos y no-tautológicos** (9 escenarios distintos)
+- Code quality **limpio** (build clean, 823/823 tests)
+
+La estrategia P1-DEGRADATION (fail-closed en Security, fail-open en todo lo demás) es defense-in-depth correcta.
+
+### Mejora futura (no bloqueante)
+
+UI podría mostrar indicador visual "⚠️ Estado desconocido" cuando `GapSummary` está completamente degradado (TotalCount=0, HighestSeverity=null), para hacer explícito que la información es incompleta. Esto es mejora de UX/transparencia, no bloqueante.
+
+### Referencias
+
+Decisión completa: `.squad/decisions/inbox/gandalf-p1-degradation-review.md`
+
