@@ -863,3 +863,139 @@ Al intentar el merge estándar vía `gh pr merge #124`, GitHub mostró `reviewDe
 **Nota de proceso**: PR #123 → P1-SCRIPTS-ALIGNMENT es técnicamente cerrado con este merge. Scripts/RBAC alignment está 100% implementado: migraciones fijas (#123), seed corregido (#123), GapRuleInitializer agregado (#123), smoke-test desalineado corregido (#124).
 
 **Referencias**: PR #124 (merge commit 23e21a5), sin decisiones formales necesarias en inbox.
+
+---
+
+## 2026-07-11 — PR #125: Corrección de Non-Determinismo en RBAC Seed + Bug Oculto de Integridad FK
+
+**Autor**: Coordinador (fix de seguridad/integridad de datos en `SecurityDbContext` seeding).
+
+**Decisión**: ✅ **APROBADO SIN CONDICIONES Y MERGED.**
+
+### Contexto Crítico
+
+`SecurityDbContext.SeedRbacRoles()` y `SeedPermissions()` invocaban `Role.Create()` y `Permission.Create()` que internamente llamaban `Guid.NewGuid()`, generando GUIDs no-deterministas en cada build. EF Core detectaba esta variabilidad y emitía `PendingModelChangesWarning`, bloqueando `scripts/local/migrate.sh` con error "cambios pendientes en el modelo detectados".
+
+Adicionalmente, se descubrió un **bug oculto de integridad de datos**: `SeedRolePermissions()` usaba hardcoded GUIDs fijos que nunca coincidían con los roles/permisos generados aleatoriamente, dejando la tabla `role_permissions` con referencias de FK huérfanas (GUIDs que no existían en `roles`/`permissions`).
+
+### Raíz del Problema
+
+1. **Non-Determinismo**: `Role.Create()` / `Permission.Create()` = `new Guid.NewGuid()` interno
+2. **FK Integrity Bug**: `SeedRolePermissions()` usaba `id: Guid.Parse("00000000-...-00000001")` hardcodeado, pero `SeedRbacRoles()` generaba `00000000-...-aaaabbbb` aleatorio en cada build
+
+### Solución: Patrón CreateForSeed
+
+**Métodos factory internos agregados:**
+```csharp
+// Role.cs
+internal static Role CreateForSeed(Guid id, string name, string? description = null, bool isSystemRole = false)
+  → Previene Guid.NewGuid(), usa GUID explícito
+
+// Permission.cs
+internal static Permission CreateForSeed(Guid id, string resource, string action, string? description = null)
+  → Previene Guid.NewGuid(), usa GUID explícito
+```
+
+**Sincronización GUID:**
+- `SeedRbacRoles()`: 7 roles con GUIDs fijos `00000000-...-{0001..0007}`
+- `SeedPermissions()`: 6 permisos con GUIDs fijos `00000001-...-{0001..0006}`
+- `SeedRolePermissions()`: 23 mappings usando exactamente los GUIDs anteriores
+- Resultado: **FK references siempre válidas, modelo determinista**
+
+**Beneficios del patrón:**
+- ✅ Explicit intent (nombre `CreateForSeed` señaliza uso exclusivo de seeding)
+- ✅ Access control (keyword `internal` previene llamadas desde código externo, compilación segura)
+- ✅ Backward compatible (public `Create()` intacto, 828 tests siguen funcionando)
+- ✅ Separation of concerns (runtime no-determinístico vs seeding determinístico)
+
+### Migración: 20260711192535_SeedRbacData
+
+**Contenido verificado:**
+- InsertData para 6 permisos (deterministic GUIDs)
+- InsertData para 7 roles (deterministic GUIDs)
+- InsertData para 23 role_permission mappings
+- Down() fully reversible (elimina todos 23 + 7 + 6 = 36 inserts)
+- ✅ Idempotent (EF Core HasData() = idempotent, puede correr N veces)
+
+**Cambios:**
+- `src/Modules/Security/Domain/Role.cs`: +35 líneas (CreateForSeed internal method + XML docs)
+- `src/Modules/Security/Domain/Permission.cs`: +30 líneas (CreateForSeed internal method + XML docs)
+- `src/Modules/Security/Infrastructure/Persistence/SecurityDbContext.cs`: +10 líneas (SeedRbacRoles/SeedPermissions/SeedRolePermissions ahora usan CreateForSeed, GUID refs sincronizadas)
+- `src/Modules/Security/Infrastructure/Persistence/Migrations/20260711192535_SeedRbacData.cs`: ~150 líneas (migration schema + seed data)
+
+### Verificación Independiente (Coordinador + Gandalf)
+
+**Build & Tests:**
+- `dotnet build Evidata.sln`: ✅ Clean (0 errors, pre-existing 30 warnings unrelated)
+- `dotnet test`: ✅ **828/828 tests passed** (0 regressions)
+- `dotnet ef database update`: ✅ 14/14 migration modules executed sin `PendingModelChangesWarning`
+
+**Verificación E2E Docker/Aspire (Coordinador):**
+- Reseteo BD local completamente
+- Corrió `scripts/local/migrate.sh`: ✅ Success (sin el bloqueo original)
+- Conexión directa a Postgres:
+  - ✅ `SELECT * FROM roles WHERE tenant_id IS NULL`: 7 filas exactas con GUIDs fijos correctos
+  - ✅ `SELECT * FROM permissions WHERE tenant_id IS NULL`: 6 filas exactas
+  - ✅ `SELECT COUNT(*) FROM role_permissions`: 23 rows exactas
+  - ✅ FK integrity check (LEFT JOIN para huérfanas): **0 filas huérfanas**, todas las references válidas
+
+**Code Review (Gandalf):**
+- ✅ GUID consistency verified across all 3 seed methods (13 identifiers synchronized)
+- ✅ `CreateForSeed()` only used in SecurityDbContext.cs (no external calls)
+- ✅ Public `Create()` methods preserved (test compatibility maintained)
+- ✅ Migration only seeds data (no schema changes)
+- ✅ No breaking changes to public APIs
+- ✅ XML documentation complete and accurate
+- ✅ Risk profile LOW (internal methods, backward compatible)
+- ✅ Pattern quality A+ (clear intent, compile-time safety, separation of concerns)
+
+### Análisis de Riesgo
+
+| Categoría | Riesgo | Status | Mitigación |
+|---|---|---|---|
+| **Code Correctness** | Logic error en CreateForSeed | ✅ BAJO | Tests pass; GUID sync verified; migration reverses cleanly |
+| **API Safety** | External code invoca CreateForSeed | ✅ ELIMINADO | `internal` keyword; compile-time enforcement |
+| **Data Integrity** | FK violations persisten | ✅ FIJO | GUIDs synchronized across all seed methods; 0 orphans verified |
+| **Model Determinism** | PendingModelChangesWarning persiste | ✅ FIJO | HasData() values ahora deterministic |
+| **Test Compatibility** | Tests break por cambios Create() | ✅ MANTENIDO | Public Create() unchanged; all 828 tests pass |
+| **Migration Reversibility** | Down() broken | ✅ VERIFICADO | All inserts properly deleted; idempotent |
+
+### Checklist de Aprobación
+
+- ✅ Build limpio (0 errors)
+- ✅ 828/828 tests pass (0 regressions)
+- ✅ No breaking changes
+- ✅ Code quality high (clear intent, well-documented)
+- ✅ Risk profile low
+- ✅ Architecture sound (separation of concerns)
+- ✅ Migration safe and reversible
+- ✅ GUID consistency verified
+- ✅ FK integrity restored
+- ✅ Model determinism fixed
+- ✅ No side effects on other modules
+- ✅ E2E verification passed (real Docker/Aspire test)
+
+### Veredicto: ✅ APROBADO SIN CONDICIONES
+
+**Quality Score (Gandalf):**
+- Correctness: 10/10
+- Safety: 10/10
+- Maintainability: 9/10 (clear pattern for future seed methods)
+- Test Coverage: 10/10
+- Documentation: 9/10
+
+**Overall: 9.6/10 — Excellent quality, production-ready**
+
+**Recomendación**: Merge to develop immediately
+
+### Resultado
+
+✅ PR #125 merged a develop (merge commit `cfde0f6`).
+✅ **828/828 tests**, **0 regressions**.
+✅ `scripts/local/migrate.sh` ahora ejecuta sin error.
+✅ RBAC seed determinista, FK integrity garantizada.
+✅ Security/integridad de datos corregida post-hoc (bug oculto que quedó en prod risk).
+
+**Impact**: Cierra un bug crítico pero sutil en el seeding del modelo RBAC. Garantiza determinismo del modelo EF Core (blocker para CI/CD en muchos entornos). Restaura integridad referencial en tablas de RBAC.
+
+**Referencias**: PR #125 (merge commit cfde0f6), `.squad/agents/gandalf/history.md` (decisión de aprobación registrada commit c2bcec4), `gandalf-pr125-review.md` consolidada acá.
