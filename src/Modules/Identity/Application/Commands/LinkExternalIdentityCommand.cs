@@ -37,5 +37,5 @@ public class LinkExternalIdentityCommandHandler
     }
 
     private static UserProfileDto MapToDto(UserProfile p) =>
-        new(p.Id, p.TenantId, p.Email, p.DisplayName, p.Provider, p.IsActive);
+        new(p.Id, p.TenantId, p.Email, p.DisplayName, p.Provider, p.Status);
 }

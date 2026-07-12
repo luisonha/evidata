@@ -18,7 +18,13 @@ public class DeactivateUserCommandHandler
         var profile = await _repository.GetByIdAsync(command.UserId, ct)
             ?? throw new InvalidOperationException($"UserProfile {command.UserId} not found.");
 
-        profile.Deactivate();
+        // For now, map deactivation to Disable (permanent during Sprint 3)
+        // This may evolve to Suspend (temporary) based on admin action intent
+        if (profile.Status == UserStatus.Active || profile.Status == UserStatus.Suspended)
+        {
+            profile.Disable();
+        }
+
         await _repository.UpsertAsync(profile, ct);
     }
 }

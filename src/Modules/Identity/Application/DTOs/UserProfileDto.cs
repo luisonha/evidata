@@ -1,3 +1,5 @@
+using Evidata.Modules.Identity.Domain;
+
 namespace Evidata.Modules.Identity.Application.DTOs;
 
 public record UserProfileDto(
@@ -6,5 +8,11 @@ public record UserProfileDto(
     string Email,
     string DisplayName,
     string Provider,
-    bool IsActive
-);
+    UserStatus Status
+)
+{
+    /// <summary>
+    /// Backward compatibility property for existing code that checks if user is active.
+    /// </summary>
+    public bool IsActive => Status == UserStatus.Active;
+}

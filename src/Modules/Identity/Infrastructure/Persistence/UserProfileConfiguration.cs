@@ -34,8 +34,9 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
         builder.Property(x => x.TenantId)
             .IsRequired();
 
-        builder.Property(x => x.IsActive)
-            .IsRequired();
+        builder.Property(x => x.Status)
+            .IsRequired()
+            .HasConversion<int>();
 
         builder.Property(x => x.CreatedAt)
             .IsRequired();
@@ -43,7 +44,14 @@ public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
         builder.Property(x => x.UpdatedAt)
             .IsRequired();
 
+        // Ignore the UserProfileRoles collection property - it's only for domain logic
+        // The actual many-to-many relationship is managed by the join table UserProfileRole
+        builder.Ignore(x => x.UserProfileRoles);
+
         builder.HasIndex(x => new { x.ExternalId, x.Provider, x.TenantId })
             .IsUnique();
+
+        builder.HasIndex(x => x.TenantId);
+        builder.HasIndex(x => x.Status);
     }
 }
