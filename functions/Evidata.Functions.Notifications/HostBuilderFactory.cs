@@ -20,7 +20,14 @@ public static class HostBuilderFactory
     /// Builds and returns an IHost with full DI configuration.
     /// Does NOT call host.Run() — that remains in Program.cs entrypoint.
     /// </summary>
-    public static IHost Build(string[] args)
+    public static IHost Build(string[] args) => BuildForValidation(args).Host;
+
+    /// <summary>
+    /// Builds the host AND exposes the raw IServiceCollection used to build it,
+    /// so tests can resolve every registered service descriptor and force full
+    /// DI graph validation.
+    /// </summary>
+    public static (IHost Host, IServiceCollection Services) BuildForValidation(string[] args)
     {
         var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -38,6 +45,8 @@ public static class HostBuilderFactory
         builder.Services.AddScoped<GapNotificationHandler>();
         builder.Services.AddScoped<RatNotificationHandler>();
 
-        return builder.Build();
+        var services = builder.Services;
+        var host = builder.Build();
+        return (host, services);
     }
 }

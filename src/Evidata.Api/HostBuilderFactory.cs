@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using System.Text;
@@ -40,7 +41,14 @@ public static class HostBuilderFactory
     /// Builds and returns a WebApplication with full DI configuration.
     /// Does NOT call app.Run() — that remains in Program.cs entrypoint.
     /// </summary>
-    public static WebApplication Build(string[] args)
+    public static WebApplication Build(string[] args) => BuildForValidation(args).App;
+
+    /// <summary>
+    /// Builds the app AND exposes the raw IServiceCollection used to build it,
+    /// so tests can resolve every registered service descriptor and force full
+    /// DI graph validation.
+    /// </summary>
+    public static (WebApplication App, IServiceCollection Services) BuildForValidation(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -148,6 +156,7 @@ public static class HostBuilderFactory
         });
         builder.Services.AddControllers();
 
+        var services = builder.Services;
         var app = builder.Build();
 
         app.MapDefaultEndpoints();
@@ -188,7 +197,7 @@ public static class HostBuilderFactory
         app.UseTenantIsolation();
         app.MapControllers();
 
-        return app;
+        return (app, services);
     }
 }
 

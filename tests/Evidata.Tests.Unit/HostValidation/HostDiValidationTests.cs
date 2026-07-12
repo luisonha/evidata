@@ -71,10 +71,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var app = Evidata.Api.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = app.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
+            var (app, services) = Evidata.Api.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (app)
+            {
+                app.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -89,11 +90,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.Notifications.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.Notifications.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -108,11 +109,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.DocumentProcessing.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.DocumentProcessing.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -127,11 +128,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.Maintenance.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.Maintenance.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -146,11 +147,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.McpBatch.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.McpBatch.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -165,11 +166,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.Reporting.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.Reporting.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
@@ -184,11 +185,11 @@ public class HostDiValidationTests
         // Act & Assert: No exception should be thrown
         var exception = Record.Exception(() =>
         {
-            var host = Evidata.Functions.SearchIndexing.HostBuilderFactory.Build(EmptyArgs);
-            // Attempt to resolve a core service to force DI validation
-            var logger = host.Services.GetRequiredService<ILoggerFactory>();
-            Assert.NotNull(logger);
-            host?.Dispose();
+            var (host, services) = Evidata.Functions.SearchIndexing.HostBuilderFactory.BuildForValidation(EmptyArgs);
+            using (host)
+            {
+                host.Services.ResolveAllRegisteredServices(services);
+            }
         });
 
         Assert.Null(exception);
