@@ -8,20 +8,38 @@ namespace Evidata.Modules.Security.Api;
 [ApiController]
 [Authorize]
 [Route("api/roles")]
+[Route("api/v1/admin/roles")]
 public class RolesController : ControllerBase
 {
     private readonly AssignRoleToUserCommandHandler _assign;
     private readonly RemoveRoleFromUserCommandHandler _remove;
     private readonly GetUserRolesQueryHandler _getRoles;
+    private readonly GetAllRolesQueryHandler _getAllRoles;
 
     public RolesController(
         AssignRoleToUserCommandHandler assign,
         RemoveRoleFromUserCommandHandler remove,
-        GetUserRolesQueryHandler getRoles)
+        GetUserRolesQueryHandler getRoles,
+        GetAllRolesQueryHandler getAllRoles)
     {
         _assign = assign;
         _remove = remove;
         _getRoles = getRoles;
+        _getAllRoles = getAllRoles;
+    }
+
+    /// <summary>
+    /// List all available roles from the RBAC catalog.
+    /// Only TenantOwner or ComplianceAdmin can access this endpoint.
+    /// Returns roles with id, name, and description.
+    /// Route: GET /api/v1/admin/roles or GET /api/roles
+    /// </summary>
+    [HttpGet]
+    [Authorize(Policy = "TenantOwnerOrComplianceAdmin")]
+    public async Task<IActionResult> ListAllRoles(CancellationToken ct)
+    {
+        var result = await _getAllRoles.HandleAsync(ct);
+        return Ok(result);
     }
 
     [HttpGet("users/{userId:guid}")]
