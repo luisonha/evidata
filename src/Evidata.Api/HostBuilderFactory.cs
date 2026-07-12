@@ -175,7 +175,9 @@ public static class HostBuilderFactory
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
+            // AllowAnonymous es necesario: el FallbackPolicy global exige
+            // autenticación para todo endpoint que no la excluya explícitamente.
+            app.MapOpenApi().AllowAnonymous();
         }
 
         app.UseHttpsRedirection();
