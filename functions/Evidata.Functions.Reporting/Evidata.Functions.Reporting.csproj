@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\src\Modules\Reporting\Evidata.Modules.Reporting.csproj" />
     <ProjectReference Include="..\..\src\Modules\Security\Evidata.Modules.Security.csproj" />
     <ProjectReference Include="..\..\src\Modules\TenantManagement\Evidata.Modules.TenantManagement.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Workflow\Evidata.Modules.Workflow.csproj" />
   </ItemGroup>
 
 </Project>
