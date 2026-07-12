@@ -19,6 +19,6 @@ public class GetUserProfileQueryHandler
         var profile = await _repository.GetByIdAsync(query.UserId, ct);
         if (profile is null) return null;
 
-        return new UserProfileDto(profile.Id, profile.TenantId, profile.Email, profile.DisplayName, profile.Provider, profile.IsActive);
+        return new UserProfileDto(profile.Id, profile.TenantId, profile.Email, profile.DisplayName, profile.Provider, profile.Status);
     }
 }
