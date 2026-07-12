@@ -19,6 +19,7 @@ using Evidata.Modules.Reporting;
 using Evidata.Modules.Search;
 using Evidata.Modules.Workflow;
 using Evidata.Worker.Outbox.Persistence;
+using Evidata.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -141,18 +142,8 @@ app.MapEvidataHealthEndpoints();
 // ── /api/version — versión del binario en ejecución ──────────────────────────
 app.MapGet("/api/version", () =>
 {
-    var asm = Assembly.GetEntryAssembly()!;
-    var infoVersion = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                      ?? asm.GetName().Version?.ToString() ?? "unknown";
-    var fileVersion = asm.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "unknown";
-    return Results.Ok(new
-    {
-        version       = infoVersion,
-        fileVersion   = fileVersion,
-        assemblyName  = asm.GetName().Name,
-        buildTime     = new FileInfo(asm.Location).LastWriteTimeUtc.ToString("o"),
-        environment   = app.Environment.EnvironmentName
-    });
+    var versionInfo = VersionHelper.GetVersionInfo();
+    return Results.Ok(versionInfo.ToResponse(app.Environment.EnvironmentName));
 })
 .WithName("GetVersion")
 .AllowAnonymous()
