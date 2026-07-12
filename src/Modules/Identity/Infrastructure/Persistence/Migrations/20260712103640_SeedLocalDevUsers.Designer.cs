@@ -3,6 +3,7 @@ using System;
 using Evidata.Modules.Identity.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Evidata.Modules.Identity.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    partial class IdentityDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260712103640_SeedLocalDevUsers")]
+    partial class SeedLocalDevUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -84,58 +87,6 @@ namespace Evidata.Modules.Identity.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Status");
 
                     b.ToTable("invitations", "identity");
-                });
-
-            modelBuilder.Entity("Evidata.Modules.Identity.Domain.Session", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("LastAccessedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("PermissionsVersion")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RolesSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("idx_sessions_expires_at");
-
-                    b.HasIndex("Id")
-                        .IsUnique()
-                        .HasDatabaseName("idx_sessions_id_unique");
-
-                    b.HasIndex("RevokedAt")
-                        .HasDatabaseName("idx_sessions_revoked_at");
-
-                    b.HasIndex("TenantId", "UserId")
-                        .HasDatabaseName("idx_sessions_tenant_user");
-
-                    b.ToTable("sessions", "identity");
                 });
 
             modelBuilder.Entity("Evidata.Modules.Identity.Domain.UserProfile", b =>

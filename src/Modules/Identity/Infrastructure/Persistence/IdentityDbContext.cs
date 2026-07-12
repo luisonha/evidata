@@ -10,6 +10,7 @@ public class IdentityDbContext : DbContext
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<UserProfileRole> UserProfileRoles => Set<UserProfileRole>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
+    public DbSet<Session> Sessions => Set<Session>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
