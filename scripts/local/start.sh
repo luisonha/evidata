@@ -35,15 +35,33 @@ if [[ -n "$EXISTING_PID" ]]; then
   info "Instancia anterior detenida."
 fi
 
+# ─── Limpiar procesos MSBuild colgados ───────────────────────────────────────
+info "Limpiando servidores de compilación (MSBuild/VBCSCompiler)..."
+dotnet build-server shutdown 2>/dev/null || true
+sleep 1
+
 # ─── Build con git hash para versionamiento ──────────────────────────────────
 GIT_HASH=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_NUMBER=$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || echo "0")
-info "Compilando (versión 1.0.0.${BUILD_NUMBER}+${GIT_HASH})..."
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo -e "║ ${CYAN}Compilando versión 1.0.0.${BUILD_NUMBER}+${GIT_HASH}${NC}"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
+
 dotnet build "$REPO_ROOT/Evidata.sln" \
   -p:SourceRevisionId="$GIT_HASH" \
   -p:BuildNumber="$BUILD_NUMBER" \
   --nologo -v:q 2>&1 | grep -E "error|warning|Error|Warning" || true
-info "Compilación completada."
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo -e "║ ${GREEN}✅ Compilación completada${NC}"
+echo -e "║    Hash: ${CYAN}${GIT_HASH}${NC}"
+echo -e "║    Build: ${CYAN}${BUILD_NUMBER}${NC}"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
 
 info "Iniciando stack via .NET Aspire..."
 echo ""
@@ -53,6 +71,10 @@ echo "  • API REST         : puerto dinámico (ver dashboard)"
 echo "  • Mailpit (emails) : http://localhost:8025"
 echo ""
 echo -e "${YELLOW}  Presiona Ctrl+C para detener el stack${NC}"
+echo ""
+echo -e "${CYAN}  📋 Para verificar que todos los servicios corren el commit ${GIT_HASH}:${NC}"
+echo "     $ scripts/local/verify-version.sh"
+echo "     (Una vez que Aspire esté completamente iniciado en otra terminal)"
 echo ""
 
 cd "$REPO_ROOT/src/Evidata.AppHost"
