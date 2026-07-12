@@ -10,14 +10,11 @@ public class VersionFunction
 {
     [Function("GetVersion")]
     public async Task<HttpResponseData> GetVersion(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "version")] HttpRequestData req,
-        FunctionContext executionContext)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "version")] HttpRequestData req)
     {
         var versionInfo = VersionHelper.GetVersionInfo();
 
-        var httpResponse = executionContext.GetHttpResponseData()!;
-        httpResponse.StatusCode = HttpStatusCode.OK;
-        httpResponse.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        var httpResponse = req.CreateResponse(HttpStatusCode.OK);
 
         var responseBody = versionInfo.ToResponse();
         await httpResponse.WriteAsJsonAsync(responseBody);
