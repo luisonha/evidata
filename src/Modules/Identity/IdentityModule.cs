@@ -32,6 +32,18 @@ public static class IdentityModule
         services.AddScoped<DeactivateUserCommandHandler>();
         services.AddScoped<GetUserProfileQueryHandler>();
 
+        // OIDC and authentication services
+        services.AddScoped<IOidcService, OidcService>();
+        services.AddSingleton<IEntraIdTokenService, EntraIdTokenService>();
+        services.AddScoped<IUserResolutionService, UserResolutionService>();
+        
+        // Auth command/query handlers
+        services.AddScoped<CompleteLoginCommandHandler>();
+        services.AddScoped<LogoutCommandHandler>();
+        services.AddScoped<GetSessionStatusQueryHandler>();
+        services.AddScoped<GetCurrentUserProfileQueryHandler>();
+        services.AddScoped<GetCurrentUserPermissionsQueryHandler>();
+
         // Session service
         services.AddScoped<ISessionService, SessionService>();
 

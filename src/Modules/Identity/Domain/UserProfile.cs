@@ -16,6 +16,12 @@ public class UserProfile : ITenantScoped
     /// </summary>
     public UserStatus Status { get; private set; }
     
+    /// <summary>
+    /// The last time this user successfully logged in (UTC).
+    /// Updated on each successful Entra ID callback/session creation.
+    /// </summary>
+    public DateTime? LastLoginAt { get; private set; }
+    
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -61,6 +67,34 @@ public class UserProfile : ITenantScoped
         }
         Status = UserStatus.Active;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Records the user's login timestamp.
+    /// Called after successful authentication via Entra ID or other providers.
+    /// </summary>
+    public void RecordLogin()
+    {
+        LastLoginAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Links the user to an Entra AD external identity (if not already linked).
+    /// Called during first successful Entra ID login.
+    /// </summary>
+    public void LinkEntraId(string entraOid)
+    {
+        if (string.IsNullOrWhiteSpace(entraOid))
+            throw new ArgumentNullException(nameof(entraOid));
+
+        // Only link if not already linked
+        if (Provider != "EntraId" || ExternalId != entraOid)
+        {
+            Provider = "EntraId";
+            ExternalId = entraOid;
+            UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     /// <summary>

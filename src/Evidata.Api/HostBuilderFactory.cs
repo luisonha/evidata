@@ -155,6 +155,14 @@ public static class HostBuilderFactory
             options.AddOperationTransformer<ApiErrorResponsesOperationTransformer>();
         });
         builder.Services.AddControllers();
+        
+        // Configure Antiforgery (used for CSRF protection on form submissions)
+        builder.Services.AddAntiforgery(options =>
+        {
+            options.Cookie.Name = "__Host-evidata.csrf";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+        });
 
         var services = builder.Services;
         var app = builder.Build();
@@ -183,6 +191,10 @@ public static class HostBuilderFactory
         app.UseHttpsRedirection();
         app.UseLocalDevGuard();
         app.UseCorrelationId();
+        
+        // Session resolution middleware must come before authentication/authorization
+        app.UseMiddleware<SessionResolutionMiddleware>();
+        
         app.UseAuthentication();
         app.UseAuthorization();
 
