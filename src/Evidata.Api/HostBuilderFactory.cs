@@ -6,13 +6,16 @@ using Evidata.Modules.Documents;
 using Evidata.Modules.Evidence;
 using Evidata.Modules.GapManagement;
 using Evidata.Modules.Identity;
+using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Middleware;
+using Evidata.Modules.Identity.Infrastructure.Services;
 using Evidata.Modules.LegalKnowledge;
 using Evidata.Modules.ProcessingInventory;
 using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Security;
 using Evidata.Modules.Security.Infrastructure.Authorization;
+using Evidata.Modules.Security.Infrastructure.Persistence;
 using Evidata.Modules.TenantManagement;
 using Evidata.Modules.Mcp;
 using Evidata.Modules.Reporting;
@@ -24,6 +27,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
@@ -54,10 +58,20 @@ public static class HostBuilderFactory
 
         builder.AddServiceDefaults();
         builder.Services.AddDistributedMemoryCache();
+        builder.Services.AddMemoryCache();  // Add IMemoryCache for RoleNameResolver
         builder.Services.AddEvidataHealthChecks(builder.Configuration);
         builder.Services.AddTenantManagement(builder.Configuration);
         builder.Services.AddIdentityBridge(builder.Configuration, builder.Environment);
         builder.Services.AddRbac(builder.Configuration);
+        
+        // Register RoleNameResolver for admin user management (after both Identity and Security modules are configured)
+        builder.Services.AddScoped<IRoleNameResolver>(sp =>
+        {
+            var securityDbContext = sp.GetRequiredService<SecurityDbContext>();
+            var cache = sp.GetRequiredService<IMemoryCache>();
+            return new RoleNameResolver(securityDbContext, cache);
+        });
+        
         builder.Services.AddAudit(builder.Configuration);
         builder.Services.AddDocumentsModule(builder.Configuration);
         builder.Services.AddLegalKnowledge(builder.Configuration);
