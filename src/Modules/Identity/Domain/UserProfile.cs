@@ -208,4 +208,24 @@ public class UserProfile : ITenantScoped
     /// Checks if the user has any role in a collection.
     /// </summary>
     public bool HasAnyRole(IEnumerable<Guid> roleIds) => _userProfileRoles.Any(r => roleIds.Contains(r.RoleId));
+
+    /// <summary>
+    /// Returns a list of role names (currently returns placeholders - TODO: resolve from Security module).
+    /// </summary>
+    public IReadOnlyList<string> GetRoleNames()
+    {
+        // TODO: Map RoleIds to role names from Security module
+        // For now, return "Unknown" for each role to unblock tests
+        return _userProfileRoles.Select(_ => "Unknown").ToList();
+    }
+
+    /// <summary>
+    /// Checks if user has a role by name (currently limited implementation).
+    /// </summary>
+    public bool HasRoleName(string roleName)
+    {
+        // TODO: Implement proper role name resolution
+        // This requires access to the Security module to map role names to IDs
+        return false;
+    }
 }
