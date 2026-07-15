@@ -76,24 +76,41 @@ public class UserResolutionService : IUserResolutionService
             return (await ValidateUserStatusAsync(userByEmail, null, ct), null, null);
         }
 
-        // Step 3: Try to find a pending invitation matching tenantId + email
+        // Step 3: Try to find an invitation matching tenantId + email (any status)
+        // This allows us to detect revoked or expired invitations for better error reporting
         var invitation = await _identityContext.Invitations
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 i => i.TenantId == tenantId 
-                     && i.Email.ToLower() == normalizedEmail
-                     && i.Status == InvitationStatus.Pending,
+                     && i.Email.ToLower() == normalizedEmail,
                 cancellationToken: ct);
 
         if (invitation is not null)
         {
-            // If tenant mismatch detected (Entra tid != our Evidata tenant), return specific error
-            // (This is a defensive check; in normal flow tenant is validated at request level)
-            
-            // Validate invitation not expired
-            if (DateTime.UtcNow > invitation.ExpiresAt)
+            // Validate invitation status and return appropriate error codes
+            if (invitation.Status == InvitationStatus.Revoked)
+            {
+                _logger.LogInformation("Invitation {InvitationId} has been revoked", invitation.Id);
+                return (null, null, IdentityErrorCodes.InvitationRevoked);
+            }
+
+            if (invitation.Status == InvitationStatus.Expired)
             {
                 _logger.LogInformation("Invitation {InvitationId} expired", invitation.Id);
+                return (null, null, IdentityErrorCodes.InvitationExpired);
+            }
+
+            if (invitation.Status == InvitationStatus.Accepted)
+            {
+                // Invitation was already accepted; user should exist
+                _logger.LogWarning("User not provisioned: invitation already accepted for {Email}", normalizedEmail);
+                return (null, null, IdentityErrorCodes.UserNotProvisioned);
+            }
+
+            // Status == Pending: continue with normal flow
+            if (DateTime.UtcNow > invitation.ExpiresAt)
+            {
+                _logger.LogInformation("Pending invitation {InvitationId} has exceeded expiry time", invitation.Id);
                 return (null, null, IdentityErrorCodes.InvitationExpired);
             }
 
