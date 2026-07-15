@@ -340,15 +340,22 @@ public class AdminUsersServiceTests
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
         var user = UserProfile.Create(Guid.NewGuid().ToString(), "EntraId", "user@test.com", "User", tenantB);
-        // Set status to Invited (as required by RevokeInvitation)
-        user.SetRoles(new[] { OtherRoleId });
-        // Manually set to Invited since there's no public method for it
-        // We'll use reflection or accept that this particular test may need adjustment
+        // UserProfile.Create defaults Status to Invited, which is what RevokeInvitation requires.
 
         var userRepo = Substitute.For<IUserProfileRepository>();
         userRepo.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<UserProfile?>(user));
 
-        var service = CreateService(userRepo, Substitute.For<IInvitationRepository>());
+        // A genuinely pending invitation exists for TenantB — if the tenant check in
+        // RevokeInvitationAsync were ever removed, the call from TenantA would find and
+        // revoke this invitation instead of failing. Without this, the invitation repo
+        // substitute would return null regardless, masking the missing check behind an
+        // unrelated "invitation not found" error — a vacuous test.
+        var invitation = Invitation.Create(tenantB, user.Email, "OtherRole", Guid.NewGuid(), DateTime.UtcNow.AddDays(7));
+        var invitationRepo = Substitute.For<IInvitationRepository>();
+        invitationRepo.GetByEmailAndTenantAsync(user.Email, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Invitation?>(invitation));
+
+        var service = CreateService(userRepo, invitationRepo);
         var cmd = new RevokeInvitationCommand(tenantA, user.Id, Guid.NewGuid(), "test");
 
         var ex = await Assert.ThrowsAsync<IdentityDomainException>(
