@@ -19,10 +19,26 @@ public class UserProfileRepository : IUserProfileRepository
         => await _context.UserProfiles
             .FirstOrDefaultAsync(x => x.ExternalId == externalId && x.Provider == provider && x.TenantId == tenantId, ct);
 
+    public async Task<UserProfile?> GetByEmailAsync(string email, Guid tenantId, CancellationToken ct = default)
+        => await _context.UserProfiles
+            .FirstOrDefaultAsync(x => x.Email == email && x.TenantId == tenantId, ct);
+
     public async Task<IReadOnlyList<UserProfile>> GetByTenantIdAsync(Guid tenantId, CancellationToken ct = default)
         => await _context.UserProfiles
             .Where(x => x.TenantId == tenantId)
             .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<UserProfile>> GetByRoleAndTenantAsync(Guid roleId, Guid tenantId, CancellationToken ct = default)
+        => await _context.UserProfiles
+            .Where(x => x.TenantId == tenantId && x.UserProfileRoles.Any(r => r.RoleId == roleId))
+            .ToListAsync(ct);
+
+    public async Task<int> CountActiveTenantOwnersAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        // TODO: Replace with actual TenantOwner role ID resolution from Security module
+        // For now, return a stub count
+        return await Task.FromResult(1);
+    }
 
     public async Task UpsertAsync(UserProfile profile, CancellationToken ct = default)
     {

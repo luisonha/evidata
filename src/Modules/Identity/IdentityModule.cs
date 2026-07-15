@@ -1,6 +1,7 @@
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Identity.Application.Commands;
 using Evidata.Modules.Identity.Application.Queries;
+using Evidata.Modules.Identity.Application.Services;
 using Evidata.Modules.Identity.Domain;
 using Evidata.Modules.Identity.Infrastructure;
 using Evidata.Modules.Identity.Infrastructure.Auth;
@@ -28,6 +29,7 @@ public static class IdentityModule
                 b => b.MigrationsAssembly(typeof(IdentityModule).Assembly.FullName)));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<LinkExternalIdentityCommandHandler>();
         services.AddScoped<DeactivateUserCommandHandler>();
         services.AddScoped<GetUserProfileQueryHandler>();
@@ -43,6 +45,9 @@ public static class IdentityModule
         services.AddScoped<GetSessionStatusQueryHandler>();
         services.AddScoped<GetCurrentUserProfileQueryHandler>();
         services.AddScoped<GetCurrentUserPermissionsQueryHandler>();
+
+        // Admin user management service (handles all admin endpoints)
+        services.AddScoped<AdminUsersService>();
 
         // Session service
         services.AddScoped<ISessionService, SessionService>();
