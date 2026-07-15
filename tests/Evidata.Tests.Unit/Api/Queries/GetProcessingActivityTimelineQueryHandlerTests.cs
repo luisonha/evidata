@@ -62,6 +62,45 @@ public class GetProcessingActivityTimelineQueryHandlerTests
 
             return Task.FromResult<IReadOnlyList<AuditLog>>(result);
         }
+
+        public Task<(IReadOnlyList<AuditLog> Events, int TotalCount)> GetByTenantWithFiltersAsync(
+            Guid tenantId,
+            string? eventType = null,
+            Guid? actorUserId = null,
+            Guid? targetUserId = null,
+            DateTime? fromDate = null,
+            DateTime? toDate = null,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default)
+        {
+            var query = _logs
+                .Where(x => x.TenantId == tenantId);
+
+            if (!string.IsNullOrWhiteSpace(eventType))
+                query = query.Where(x => x.EventType == eventType);
+
+            if (actorUserId.HasValue)
+                query = query.Where(x => x.UserId == actorUserId.Value);
+
+            if (targetUserId.HasValue)
+                query = query.Where(x => x.ResourceId == targetUserId.Value);
+
+            if (fromDate.HasValue)
+                query = query.Where(x => x.OccurredAt >= fromDate.Value);
+
+            if (toDate.HasValue)
+                query = query.Where(x => x.OccurredAt <= toDate.Value);
+
+            var totalCount = query.Count();
+            var events = query
+                .OrderByDescending(x => x.OccurredAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Task.FromResult<(IReadOnlyList<AuditLog>, int)>((events, totalCount));
+        }
     }
 
     private GetProcessingActivityTimelineQueryHandler CreateHandler(IReadOnlyList<AuditLog> logs)

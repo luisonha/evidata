@@ -46,6 +46,56 @@ public class AuditController : ControllerBase
         return Ok(logs.Select(MapToDto));
     }
 
+    /// <summary>
+    /// Get audit events for the current tenant with optional filtering.
+    /// Endpoint: GET /api/v1/admin/audit
+    /// Permission: Admin.ReadAudit
+    /// Supports filtering by: eventType, actorUserId, targetUserId, date range, and pagination
+    /// Tenant isolation is enforced - tenant ID is resolved from the authenticated session.
+    /// </summary>
+    [HttpGet]
+    [Route("api/v1/admin/audit")]
+    [Authorize]
+    public async Task<IActionResult> GetAdminAudit(
+        [FromQuery] string? eventType = null,
+        [FromQuery] Guid? actorUserId = null,
+        [FromQuery] Guid? targetUserId = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        // Validate pagination parameters
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 1;
+        if (pageSize > 100) pageSize = 100;
+
+        // Resolve tenant from current user session (never from client parameter)
+        var tenantId = _currentUser.TenantId;
+
+        // Get filtered audit logs
+        var (auditLogs, totalCount) = await _repository.GetByTenantWithFiltersAsync(
+            tenantId, eventType, actorUserId, targetUserId, from, to, page, pageSize, ct);
+
+        var dtos = auditLogs.Select(MapToDto).ToList();
+
+        // Return with pagination metadata
+        var response = new
+        {
+            data = dtos,
+            pagination = new
+            {
+                page,
+                pageSize,
+                totalCount,
+                totalPages = (totalCount + pageSize - 1) / pageSize
+            }
+        };
+
+        return Ok(response);
+    }
+
     private static AuditLogDto MapToDto(AuditLog x) =>
         new(x.Id, x.TenantId, x.UserId, x.EventType, x.Resource, x.ResourceId, x.Result, x.CorrelationId, x.Metadata, x.IpAddress, x.OccurredAt, x.Severity);
 }
