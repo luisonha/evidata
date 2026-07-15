@@ -24,11 +24,7 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                     { new Guid("00000001-0000-0000-0000-000000000003"), "validate", "Validate evidence requirements", "evidence:validate", "evidence" },
                     { new Guid("00000001-0000-0000-0000-000000000004"), "acceptWithRisk", "Accept gaps with risk justification", "gap:acceptWithRisk", "gap" },
                     { new Guid("00000001-0000-0000-0000-000000000005"), "generate", "Generate official exports", "export:generate", "export" },
-                    { new Guid("00000001-0000-0000-0000-000000000006"), "download", "Download evidence files", "evidence:download", "evidence" },
-                    { new Guid("00000001-0000-0000-0000-000000000007"), "read", "Read users in tenant", "Admin.ReadUsers", "admin" },
-                    { new Guid("00000001-0000-0000-0000-000000000008"), "manage", "Invite, edit, suspend, reactivate, revoke users in tenant", "Admin.ManageUsers", "admin" },
-                    { new Guid("00000001-0000-0000-0000-000000000009"), "readAudit", "Read audit logs in tenant", "Admin.ReadAudit", "admin" },
-                    { new Guid("00000001-0000-0000-0000-000000000010"), "changeRole", "Change user role in tenant", "Admin.ChangeUserRole", "admin" }
+                    { new Guid("00000001-0000-0000-0000-000000000006"), "download", "Download evidence files", "evidence:download", "evidence" }
                 });
 
             migrationBuilder.InsertData(
@@ -58,20 +54,12 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                     { new Guid("00000001-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0000-000000000001") },
                     { new Guid("00000001-0000-0000-0000-000000000005"), new Guid("00000000-0000-0000-0000-000000000001") },
                     { new Guid("00000001-0000-0000-0000-000000000006"), new Guid("00000000-0000-0000-0000-000000000001") },
-                    { new Guid("00000001-0000-0000-0000-000000000007"), new Guid("00000000-0000-0000-0000-000000000001") },
-                    { new Guid("00000001-0000-0000-0000-000000000008"), new Guid("00000000-0000-0000-0000-000000000001") },
-                    { new Guid("00000001-0000-0000-0000-000000000009"), new Guid("00000000-0000-0000-0000-000000000001") },
-                    { new Guid("00000001-0000-0000-0000-000000000010"), new Guid("00000000-0000-0000-0000-000000000001") },
                     { new Guid("00000001-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000002"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000005"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000006"), new Guid("00000000-0000-0000-0000-000000000002") },
-                    { new Guid("00000001-0000-0000-0000-000000000007"), new Guid("00000000-0000-0000-0000-000000000002") },
-                    { new Guid("00000001-0000-0000-0000-000000000008"), new Guid("00000000-0000-0000-0000-000000000002") },
-                    { new Guid("00000001-0000-0000-0000-000000000009"), new Guid("00000000-0000-0000-0000-000000000002") },
-                    { new Guid("00000001-0000-0000-0000-000000000010"), new Guid("00000000-0000-0000-0000-000000000002") },
                     { new Guid("00000001-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0000-000000000003") },
                     { new Guid("00000001-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0000-000000000003") },
                     { new Guid("00000001-0000-0000-0000-000000000005"), new Guid("00000000-0000-0000-0000-000000000003") },
@@ -82,7 +70,6 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                     { new Guid("00000001-0000-0000-0000-000000000006"), new Guid("00000000-0000-0000-0000-000000000005") },
                     { new Guid("00000001-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0000-000000000006") },
                     { new Guid("00000001-0000-0000-0000-000000000006"), new Guid("00000000-0000-0000-0000-000000000006") },
-                    { new Guid("00000001-0000-0000-0000-000000000009"), new Guid("00000000-0000-0000-0000-000000000006") },
                     { new Guid("00000001-0000-0000-0000-000000000006"), new Guid("00000000-0000-0000-0000-000000000007") }
                 });
         }
@@ -125,30 +112,6 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                 table: "permissions",
                 keyColumn: "Id",
                 keyValue: new Guid("00000001-0000-0000-0000-000000000006"));
-
-            migrationBuilder.DeleteData(
-                schema: "security",
-                table: "permissions",
-                keyColumn: "Id",
-                keyValue: new Guid("00000001-0000-0000-0000-000000000007"));
-
-            migrationBuilder.DeleteData(
-                schema: "security",
-                table: "permissions",
-                keyColumn: "Id",
-                keyValue: new Guid("00000001-0000-0000-0000-000000000008"));
-
-            migrationBuilder.DeleteData(
-                schema: "security",
-                table: "permissions",
-                keyColumn: "Id",
-                keyValue: new Guid("00000001-0000-0000-0000-000000000009"));
-
-            migrationBuilder.DeleteData(
-                schema: "security",
-                table: "permissions",
-                keyColumn: "Id",
-                keyValue: new Guid("00000001-0000-0000-0000-000000000010"));
 
             migrationBuilder.DeleteData(
                 schema: "security",

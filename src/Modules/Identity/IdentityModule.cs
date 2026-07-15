@@ -28,7 +28,6 @@ public static class IdentityModule
                 b => b.MigrationsAssembly(typeof(IdentityModule).Assembly.FullName)));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
-        services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<LinkExternalIdentityCommandHandler>();
         services.AddScoped<DeactivateUserCommandHandler>();
         services.AddScoped<GetUserProfileQueryHandler>();
@@ -44,20 +43,6 @@ public static class IdentityModule
         services.AddScoped<GetSessionStatusQueryHandler>();
         services.AddScoped<GetCurrentUserProfileQueryHandler>();
         services.AddScoped<GetCurrentUserPermissionsQueryHandler>();
-
-        // Admin user management command handlers
-        services.AddScoped<InviteUserCommandHandler>();
-        services.AddScoped<ResendInvitationCommandHandler>();
-        services.AddScoped<RevokeInvitationCommandHandler>();
-        services.AddScoped<UpdateUserCommandHandler>();
-        services.AddScoped<SuspendUserCommandHandler>();
-        services.AddScoped<ReactivateUserCommandHandler>();
-        services.AddScoped<DisableUserCommandHandler>();
-        services.AddScoped<ChangeUserRolesCommandHandler>();
-
-        // Admin user management query handlers
-        services.AddScoped<ListUsersQueryHandler>();
-        services.AddScoped<GetUserDetailQueryHandler>();
 
         // Session service
         services.AddScoped<ISessionService, SessionService>();
