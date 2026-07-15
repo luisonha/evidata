@@ -1,5 +1,6 @@
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Identity.Application.DTOs;
+using Evidata.Modules.Identity.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,11 +11,12 @@ namespace Evidata.Modules.Identity.Api;
 /// <summary>
 /// Development-only authentication endpoints for local/test environments.
 /// These endpoints are ONLY available when IHostEnvironment.IsDevelopment() is true.
-/// Guarded by LocalDevEnvironmentGuard middleware.
+/// Protected by [DevelopmentOnly] filter that returns 404 in non-dev environments.
 /// </summary>
 [ApiController]
 [Route("dev/auth")]
-[AllowAnonymous]  // Dev endpoints don't require auth, but LocalDevGuard ensures dev environment
+[AllowAnonymous]  // Dev endpoints don't require auth, but DevelopmentOnly filter ensures dev environment
+[DevelopmentOnly] // SECURITY: Blocks all endpoints if not in Development environment (returns 404)
 public class DevAuthController : ControllerBase
 {
     private readonly IDevAuthService _devAuthService;
@@ -258,6 +260,53 @@ public class DevAuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting scenario");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Logs out the current session (alias for expire-session with cleaner semantics).
+    /// Invalidates the session and clears the cookie.
+    /// </summary>
+    /// <remarks>
+    /// DEVELOPMENT ONLY.
+    /// Similar to production POST /auth/logout but without CSRF validation (dev-only).
+    /// </remarks>
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        try
+        {
+            if (!HttpContext.Request.Cookies.TryGetValue("__Host-evidata.sid", out var sessionId) ||
+                string.IsNullOrWhiteSpace(sessionId))
+            {
+                return Unauthorized(new { message = "No active session" });
+            }
+
+            var success = await _devAuthService.ExpireCurrentSessionAsync(sessionId, ct);
+
+            if (!success)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to logout" });
+            }
+
+            // Clear cookie
+            Response.Cookies.Delete(
+                "__Host-evidata.sid",
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Path = "/"
+                });
+
+            _logger.LogInformation("Dev logout successful");
+            return Ok(new { message = "Logout successful" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during dev logout");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Internal server error" });
         }
     }

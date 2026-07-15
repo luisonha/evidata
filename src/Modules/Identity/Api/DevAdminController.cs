@@ -1,5 +1,6 @@
 using Evidata.Modules.Identity.Application.Abstractions;
 using Evidata.Modules.Identity.Application.DTOs;
+using Evidata.Modules.Identity.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +12,12 @@ namespace Evidata.Modules.Identity.Api;
 /// Development-only administrative endpoints for local/test environments.
 /// These endpoints manage test data and scenarios for Phase 3+ testing.
 /// ONLY available when IHostEnvironment.IsDevelopment() is true.
-/// Guarded by LocalDevEnvironmentGuard middleware.
+/// Protected by [DevelopmentOnly] filter that returns 404 in non-dev environments.
 /// </summary>
 [ApiController]
 [Route("dev/admin")]
-[AllowAnonymous]  // Dev endpoints don't require auth, but LocalDevGuard ensures dev environment
+[AllowAnonymous]  // Dev endpoints don't require auth, but DevelopmentOnly filter ensures dev environment
+[DevelopmentOnly] // SECURITY: Blocks all endpoints if not in Development environment (returns 404)
 public class DevAdminController : ControllerBase
 {
     private readonly IDevAuthService _devAuthService;
