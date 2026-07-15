@@ -129,28 +129,28 @@ public sealed class AdminUsersCsrfTests : IAsyncLifetime
         {
             try
             {
-                // Check if database exists first
-                var databaseExists = await ctx.Database.CanConnectAsync();
-                if (!databaseExists)
+                // Use EnsureCreated + MigrateAsync for maximum compatibility
+                if (!await ctx.Database.CanConnectAsync())
                 {
                     await ctx.Database.EnsureCreatedAsync();
-                    _output.WriteLine($"✓ Created database for {name}");
+                    _output.WriteLine($"✓ Ensured database exists for {name}");
                 }
-                else
+                
+                // Apply migrations
+                try
                 {
                     await ctx.Database.MigrateAsync();
                     _output.WriteLine($"✓ Migrated {name}");
                 }
-            }
-            catch (Exception ex) when (ex.InnerException?.Message?.Contains("already exists") == true 
-                || ex.Message.Contains("already exists"))
-            {
-                _output.WriteLine($"✓ {name} already migrated");
+                catch (Exception mex) when (mex.Message.Contains("already exists"))
+                {
+                    _output.WriteLine($"✓ {name} already migrated");
+                }
             }
             catch (Exception ex)
             {
-                _output.WriteLine($"✗ Error migrating {name}: {ex.Message}");
-                // Don't throw - continue to try other migrations
+                _output.WriteLine($"⚠ Error with {name}: {ex.Message} - continuing with next context");
+                // Don't throw - continue to try other contexts
             }
         }
 
