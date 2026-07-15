@@ -47,6 +47,9 @@ public static class IdentityModule
         // Session service
         services.AddScoped<ISessionService, SessionService>();
 
+        // Dev auth service (for local/test environments)
+        services.AddScoped<IDevAuthService, DevAuthService>();
+
         services.AddHttpContextAccessor();
 
         // LocalDev en Development, JWT en otros ambientes
