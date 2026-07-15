@@ -198,7 +198,7 @@ public class ProcessingActivitiesController(
         {
             return NotFound(CreateApiError("NOT_FOUND", "error.processingActivity.notFound", ex.Message));
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             return Forbid();
         }

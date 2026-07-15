@@ -123,7 +123,9 @@ X-Evidata-Dev-User: {{adminId}}
 X-Evidata-Dev-Tenant: {{tenantId}}
 X-Evidata-Dev-Email: admin@localdev.evidata
 
-### Asignar rol DPO al admin (idempotente)
+### Asignar rol TenantOwner al admin (idempotente)
+### Nota: Este es un ejemplo de asignación de rol. El roleId debe ser obtenido dinámicamente
+### desde SELECT "Id" FROM security.roles WHERE "Name" = 'TenantOwner' LIMIT 1
 # @name assignRole
 POST {{baseUrl}}/api/roles/assign
 Content-Type: application/json
@@ -133,11 +135,13 @@ X-Evidata-Dev-Email: admin@localdev.evidata
 
 {
   "userId": "{{adminId}}",
-  "roleId": "b0000001-0000-0000-0000-000000000001",
+  "roleId": "00000000-0000-0000-0000-000000000100",
   "tenantId": "{{tenantId}}"
 }
 
-### Asignar rol PrivacyAnalyst al usuario regular
+### Asignar rol ComplianceAdmin al usuario regular
+### Nota: El roleId debe ser obtenido dinámicamente
+### desde SELECT "Id" FROM security.roles WHERE "Name" = 'ComplianceAdmin' LIMIT 1
 POST {{baseUrl}}/api/roles/assign
 Content-Type: application/json
 X-Evidata-Dev-User: {{adminId}}
@@ -146,7 +150,7 @@ X-Evidata-Dev-Email: admin@localdev.evidata
 
 {
   "userId": "{{userId}}",
-  "roleId": "b0000001-0000-0000-0000-000000000002",
+  "roleId": "00000000-0000-0000-0000-000000000101",
   "tenantId": "{{tenantId}}"
 }
 

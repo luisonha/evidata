@@ -36,6 +36,8 @@ public static class SecurityModule
         services.AddScoped<AssignRoleToUserCommandHandler>();
         services.AddScoped<RemoveRoleFromUserCommandHandler>();
         services.AddScoped<GetUserRolesQueryHandler>();
+        services.AddScoped<GetAllRolesQueryHandler>();
+        services.AddScoped<GetAllPermissionsQueryHandler>();
 
         return services;
     }

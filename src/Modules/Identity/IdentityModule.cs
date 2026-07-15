@@ -5,6 +5,7 @@ using Evidata.Modules.Identity.Domain;
 using Evidata.Modules.Identity.Infrastructure;
 using Evidata.Modules.Identity.Infrastructure.Auth;
 using Evidata.Modules.Identity.Infrastructure.Persistence;
+using Evidata.Modules.Identity.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,24 @@ public static class IdentityModule
         services.AddScoped<DeactivateUserCommandHandler>();
         services.AddScoped<GetUserProfileQueryHandler>();
 
+        // OIDC and authentication services
+        services.AddScoped<IOidcService, OidcService>();
+        services.AddSingleton<IEntraIdTokenService, EntraIdTokenService>();
+        services.AddScoped<IUserResolutionService, UserResolutionService>();
+        
+        // Auth command/query handlers
+        services.AddScoped<CompleteLoginCommandHandler>();
+        services.AddScoped<LogoutCommandHandler>();
+        services.AddScoped<GetSessionStatusQueryHandler>();
+        services.AddScoped<GetCurrentUserProfileQueryHandler>();
+        services.AddScoped<GetCurrentUserPermissionsQueryHandler>();
+
+        // Session service
+        services.AddScoped<ISessionService, SessionService>();
+
+        // Dev auth service (for local/test environments)
+        services.AddScoped<IDevAuthService, DevAuthService>();
+
         services.AddHttpContextAccessor();
 
         // LocalDev en Development, JWT en otros ambientes
@@ -40,7 +59,7 @@ public static class IdentityModule
         }
         else
         {
-            services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
+            services.AddScoped<ICurrentUserContext, SessionResolverFactory>();
         }
 
         return services;

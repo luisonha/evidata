@@ -23,6 +23,121 @@ namespace Evidata.Modules.Identity.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Evidata.Modules.Identity.Domain.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("ResponsibleAreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Roles")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasComment("Comma-separated list of role names");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "Email");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("invitations", "identity");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Identity.Domain.Session", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastAccessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PermissionsVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RolesSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_sessions_expires_at");
+
+                    b.HasIndex("Id")
+                        .IsUnique()
+                        .HasDatabaseName("idx_sessions_id_unique");
+
+                    b.HasIndex("RevokedAt")
+                        .HasDatabaseName("idx_sessions_revoked_at");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("idx_sessions_tenant_user");
+
+                    b.ToTable("sessions", "identity");
+                });
+
             modelBuilder.Entity("Evidata.Modules.Identity.Domain.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -46,13 +161,16 @@ namespace Evidata.Modules.Identity.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -62,10 +180,50 @@ namespace Evidata.Modules.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
+
                     b.HasIndex("ExternalId", "Provider", "TenantId")
                         .IsUnique();
 
                     b.ToTable("user_profiles", "identity");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Identity.Domain.UserProfileRole", b =>
+                {
+                    b.Property<Guid>("UserProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserProfileId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "RoleId");
+
+                    b.HasIndex("TenantId", "UserProfileId");
+
+                    b.ToTable("user_profile_roles", "identity");
+                });
+
+            modelBuilder.Entity("Evidata.Modules.Identity.Domain.UserProfileRole", b =>
+                {
+                    b.HasOne("Evidata.Modules.Identity.Domain.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("UserProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -44,9 +44,11 @@ public static class ProcessingInventoryModule
          // P1-010: Register version service with IAuditService dependency
          services.AddScoped<IProcessingActivityVersionService, ProcessingActivityVersionService>();
 
-         // P1-014-P2: Risk assessment service registration moved to API layer (Program.cs)
-         // This avoids circular dependencies since GapManagement → ProcessingInventory already exists.
-         // ProcessingActivityRiskAssessmentService is implemented in Evidata.Api.Services.
+         // P1-014-P2: Risk assessment service registration moved to Reporting module (ReportingModule.cs)
+         // This consolidates cross-module service availability across all hosts (Api, fn-reporting, etc.)
+         // No circular dependencies since GapManagement → ProcessingInventory already exists,
+         // and Reporting (which now contains this service) doesn't exist when those older dependencies were created.
+         // ProcessingActivityRiskAssessmentService is implemented in Evidata.Modules.Reporting.Infrastructure.Services.
 
          return services;
      }

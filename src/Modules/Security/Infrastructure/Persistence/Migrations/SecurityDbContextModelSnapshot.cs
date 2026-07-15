@@ -53,6 +53,56 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("permissions", "security");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000001"),
+                            Action = "approve",
+                            Description = "Approve a processing activity for review",
+                            Name = "processingActivity:approve",
+                            Resource = "processingActivity"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000002"),
+                            Action = "activate",
+                            Description = "Activate an approved processing activity",
+                            Name = "processingActivity:activate",
+                            Resource = "processingActivity"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000003"),
+                            Action = "validate",
+                            Description = "Validate evidence requirements",
+                            Name = "evidence:validate",
+                            Resource = "evidence"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000004"),
+                            Action = "acceptWithRisk",
+                            Description = "Accept gaps with risk justification",
+                            Name = "gap:acceptWithRisk",
+                            Resource = "gap"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000005"),
+                            Action = "generate",
+                            Description = "Generate official exports",
+                            Name = "export:generate",
+                            Resource = "export"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000001-0000-0000-0000-000000000006"),
+                            Action = "download",
+                            Description = "Download evidence files",
+                            Name = "evidence:download",
+                            Resource = "evidence"
+                        });
                 });
 
             modelBuilder.Entity("Evidata.Modules.Security.Domain.Role", b =>
@@ -78,6 +128,57 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("roles", "security");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+                            Description = "Tenant owner - highest privilege",
+                            IsSystemRole = true,
+                            Name = "TenantOwner"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
+                            Description = "Compliance administrator",
+                            IsSystemRole = true,
+                            Name = "ComplianceAdmin"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000003"),
+                            Description = "Process owner - manages individual processing activities",
+                            IsSystemRole = true,
+                            Name = "ProcessOwner"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000004"),
+                            Description = "Legal domain reviewer for evidence validation",
+                            IsSystemRole = true,
+                            Name = "LegalReviewer"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000005"),
+                            Description = "Security domain reviewer for evidence validation",
+                            IsSystemRole = true,
+                            Name = "SecurityReviewer"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000006"),
+                            Description = "Auditor - read-only access with audit rights",
+                            IsSystemRole = true,
+                            Name = "Auditor"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000007"),
+                            Description = "Viewer - read-only access to published information",
+                            IsSystemRole = true,
+                            Name = "Viewer"
+                        });
                 });
 
             modelBuilder.Entity("Evidata.Modules.Security.Domain.RolePermission", b =>
@@ -91,6 +192,123 @@ namespace Evidata.Modules.Security.Infrastructure.Persistence.Migrations
                     b.HasKey("RoleId", "PermissionId");
 
                     b.ToTable("role_permissions", "security");
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000001")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000004")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000001")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000004")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000001")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000007"),
+                            PermissionId = new Guid("00000001-0000-0000-0000-000000000006")
+                        });
                 });
 
             modelBuilder.Entity("Evidata.Modules.Security.Domain.UserRoleAssignment", b =>

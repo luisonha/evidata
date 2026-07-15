@@ -24,6 +24,9 @@
     <ProjectReference Include="..\Audit\Evidata.Modules.Audit.csproj" />
     <ProjectReference Include="..\Security\Evidata.Modules.Security.csproj" />
     <ProjectReference Include="..\ProcessingInventory\Evidata.Modules.ProcessingInventory.csproj" />
+    <ProjectReference Include="..\GapManagement\Evidata.Modules.GapManagement.csproj" />
+    <ProjectReference Include="..\Evidence\Evidata.Modules.Evidence.csproj" />
+    <ProjectReference Include="..\Workflow\Evidata.Modules.Workflow.csproj" />
   </ItemGroup>
 
 </Project>

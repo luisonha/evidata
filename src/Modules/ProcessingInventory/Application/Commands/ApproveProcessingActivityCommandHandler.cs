@@ -41,7 +41,6 @@ namespace Evidata.Modules.ProcessingInventory.Application.Commands;
 /// </summary>
 public sealed class ApproveProcessingActivityCommandHandler(
     ProcessingInventoryDbContext db,
-    SecurityDbContext securityDb,
     IResourcePermissionsQueryService permissionsService,
     IAuditService auditService,
     IReviewService reviewService,
@@ -284,7 +283,7 @@ public sealed class ApproveProcessingActivityCommandHandler(
 
             return ProcessingActivityDto.From(activity);
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             // Authorization already logged above
             throw;

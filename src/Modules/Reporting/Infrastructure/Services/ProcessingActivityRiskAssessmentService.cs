@@ -5,7 +5,7 @@ using Evidata.Modules.ProcessingInventory.Application.Abstractions;
 using Evidata.Modules.Workflow.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace Evidata.Api.Services;
+namespace Evidata.Modules.Reporting.Infrastructure.Services;
 
 /// <summary>
 /// Implementation of ProcessingActivityRiskAssessmentService.
@@ -16,7 +16,7 @@ namespace Evidata.Api.Services;
 /// to identify risks that should trigger export warnings.
 /// 
 /// Key Design Decisions:
-/// 1. Lives in API layer to avoid circular module dependencies (GapManagement → ProcessingInventory already exists)
+/// 1. Lives in Reporting module to consolidate cross-module service availability (same pattern as PR #130)
 /// 2. Tenant isolation: Always resolved from ICurrentUserContext, never from client.
 /// 3. Uses REAL interfaces from each module (Abstractions), not duplicates
 /// 4. Query-only: All injected services are read-only interfaces (no state modification).
