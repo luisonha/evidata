@@ -229,6 +229,35 @@ public class UserResolutionServiceTests : IDisposable
         Assert.Equal(IdentityErrorCodes.InvitationExpired, errorCode);
     }
 
+    [Fact]
+    public async Task ResolveUserAsync_InvitationRevoked_ReturnsInvitationRevoked()
+    {
+        // Arrange
+        var invitation = Invitation.Create(
+            _tenantId,
+            "inviteduser@example.com",
+            "ProcessOwner",
+            Guid.NewGuid(),
+            DateTime.UtcNow.AddDays(7)); // Not expired
+        invitation.Revoke(); // Revoke the invitation
+        _context.Invitations.Add(invitation);
+        await _context.SaveChangesAsync();
+
+        var claims = new EntraIdTokenClaimsDto(
+            Oid: "entra-oid-new",
+            Email: "inviteduser@example.com",
+            DisplayName: "New User",
+            EntaTenantId: "entra-tenant");
+
+        // Act
+        var (resolvedUser, resolvedInvitation, errorCode) = await _service.ResolveUserAsync(claims, _tenantId);
+
+        // Assert
+        Assert.Null(resolvedUser);
+        Assert.Null(resolvedInvitation);
+        Assert.Equal(IdentityErrorCodes.InvitationRevoked, errorCode);
+    }
+
     #endregion
 
     public void Dispose()
