@@ -16,15 +16,18 @@ public class AdminUsersService
     private readonly IUserProfileRepository _userRepository;
     private readonly IInvitationRepository _invitationRepository;
     private readonly ISessionService _sessionService;
+    private readonly IRoleNameResolver _roleNameResolver;
 
     public AdminUsersService(
         IUserProfileRepository userRepository,
         IInvitationRepository invitationRepository,
-        ISessionService sessionService)
+        ISessionService sessionService,
+        IRoleNameResolver roleNameResolver)
     {
         _userRepository = userRepository;
         _invitationRepository = invitationRepository;
         _sessionService = sessionService;
+        _roleNameResolver = roleNameResolver;
     }
 
     public async Task<ListUsersResponseDto> ListUsersAsync(ListUsersQuery query, CancellationToken ct)
@@ -42,11 +45,21 @@ public class AdminUsersService
             items = items.Where(u => u.Status == query.StatusFilter.Value);
 
         if (!string.IsNullOrWhiteSpace(query.RoleFilter))
-            items = items.Where(u => u.HasRoleName(query.RoleFilter));
+        {
+            var roleId = await _roleNameResolver.GetRoleIdByNameAsync(query.RoleFilter, ct);
+            if (roleId.HasValue)
+                items = items.Where(u => u.HasRole(roleId.Value));
+            else
+                items = items.Where(u => false); // Filter doesn't match any role
+        }
 
         var total = items.Count();
-        var pageItems = items.OrderByDescending(u => u.UpdatedAt).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
-            .Select(u => new AdminUserListItemDto(u.Id, u.Email, u.DisplayName, u.Status, u.GetRoleNames(), null, u.LastLoginAt)).ToList();
+        var pageItems = new List<AdminUserListItemDto>();
+        foreach (var user in items.OrderByDescending(u => u.UpdatedAt).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize))
+        {
+            var roleNames = await _roleNameResolver.GetRoleNamesAsync(user.GetRoleIds(), ct);
+            pageItems.Add(new AdminUserListItemDto(user.Id, user.Email, user.DisplayName, user.Status, roleNames, null, user.LastLoginAt));
+        }
 
         return new(pageItems, query.Page, query.PageSize, total);
     }
@@ -56,7 +69,9 @@ public class AdminUsersService
         var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user is null || user.TenantId != tenantId)
             throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
-        return new(user.Id, user.Email, user.DisplayName, user.Status, user.GetRoleNames(), null, user.LastLoginAt, user.CreatedAt, user.UpdatedAt);
+        
+        var roleNames = await _roleNameResolver.GetRoleNamesAsync(user.GetRoleIds(), ct);
+        return new(user.Id, user.Email, user.DisplayName, user.Status, roleNames, null, user.LastLoginAt, user.CreatedAt, user.UpdatedAt);
     }
 
     public async Task<InviteUserResponseDto> InviteUserAsync(InviteUserCommand cmd, CancellationToken ct)
@@ -88,8 +103,8 @@ public class AdminUsersService
             throw new IdentityDomainException(IdentityErrorCodes.InvitationRevoked, "No pending invitation");
 
         var newExpiresAt = DateTime.UtcNow.AddDays(7);
-        // For now, just update the expiry time conceptually
-        // Note: Invitation is immutable, so a full update would require deleting and recreating
+        inv.ExtendExpiry(newExpiresAt);
+        await _invitationRepository.UpsertAsync(inv, ct);
         return new(cmd.UserId, inv.Id, newExpiresAt, DateTime.UtcNow);
     }
 
@@ -120,7 +135,8 @@ public class AdminUsersService
 
         await _userRepository.UpsertAsync(user, ct);
 
-        var userDto = new AdminUserDetailDto(user.Id, user.Email, user.DisplayName, user.Status, user.GetRoleNames(), cmd.ResponsibleAreaId, user.LastLoginAt, user.CreatedAt, user.UpdatedAt);
+        var roleNames = await _roleNameResolver.GetRoleNamesAsync(user.GetRoleIds(), ct);
+        var userDto = new AdminUserDetailDto(user.Id, user.Email, user.DisplayName, user.Status, roleNames, cmd.ResponsibleAreaId, user.LastLoginAt, user.CreatedAt, user.UpdatedAt);
         return new(userDto, user.UpdatedAt);
     }
 
@@ -130,7 +146,9 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId || user.Status != UserStatus.Active)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot suspend this user");
 
-        if (user.HasRoleName("TenantOwner"))
+        // Check if user has TenantOwner role
+        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct);
+        if (tenantOwnerRoleId.HasValue && user.HasRole(tenantOwnerRoleId.Value))
         {
             var count = await _userRepository.CountActiveTenantOwnersAsync(cmd.TenantId, ct);
             if (count <= 1) throw new IdentityDomainException(IdentityErrorCodes.LastTenantOwnerBlocked, "Cannot suspend last TenantOwner");
@@ -159,7 +177,9 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId || (user.Status != UserStatus.Active && user.Status != UserStatus.Suspended))
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot disable this user");
 
-        if (user.HasRoleName("TenantOwner"))
+        // Check if user has TenantOwner role
+        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct);
+        if (tenantOwnerRoleId.HasValue && user.HasRole(tenantOwnerRoleId.Value))
         {
             var count = await _userRepository.CountActiveTenantOwnersAsync(cmd.TenantId, ct);
             if (count <= 1) throw new IdentityDomainException(IdentityErrorCodes.LastTenantOwnerBlocked, "Cannot disable last TenantOwner");
@@ -179,13 +199,20 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId)
             throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
 
-        var currentRoles = user.GetRoleNames();
-        if (currentRoles.Contains("TenantOwner") && !cmd.Roles.Contains("TenantOwner") && user.Status == UserStatus.Active)
+        // Get current role names for validation
+        var currentRoleNames = await _roleNameResolver.GetRoleNamesAsync(user.GetRoleIds(), ct);
+        
+        // Check if trying to remove TenantOwner role while it's the last one
+        if (currentRoleNames.Contains("TenantOwner") && !cmd.Roles.Contains("TenantOwner") && user.Status == UserStatus.Active)
         {
             var count = await _userRepository.CountActiveTenantOwnersAsync(cmd.TenantId, ct);
             if (count <= 1) throw new IdentityDomainException(IdentityErrorCodes.LastTenantOwnerBlocked, "Cannot remove last TenantOwner");
         }
 
+        // Resolve role names to IDs and update user's roles
+        var newRoleIds = await _roleNameResolver.GetRoleIdsByNamesAsync(cmd.Roles, ct);
+        user.SetRoles(newRoleIds);
+        
         await _userRepository.UpsertAsync(user, ct);
         return new(user.Id, cmd.Roles, user.UpdatedAt);
     }

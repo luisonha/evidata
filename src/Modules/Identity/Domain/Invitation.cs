@@ -137,4 +137,24 @@ public class Invitation : ITenantScoped
     /// Checks if the invitation is still valid (pending and not expired).
     /// </summary>
     public bool IsValid => Status == InvitationStatus.Pending && DateTime.UtcNow <= ExpiresAt;
+
+    /// <summary>
+    /// Extends the invitation expiry by updating ExpiresAt to a new date.
+    /// Can only be called on pending invitations.
+    /// </summary>
+    public void ExtendExpiry(DateTime newExpiresAt)
+    {
+        if (Status != InvitationStatus.Pending)
+        {
+            throw new InvalidOperationException($"Cannot extend expiry of an invitation with status {Status}");
+        }
+
+        if (newExpiresAt <= DateTime.UtcNow)
+        {
+            throw new ArgumentException("New expiry date must be in the future", nameof(newExpiresAt));
+        }
+
+        ExpiresAt = newExpiresAt;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

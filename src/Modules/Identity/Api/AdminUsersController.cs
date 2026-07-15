@@ -5,6 +5,7 @@ using Evidata.Modules.Identity.Application.Queries;
 using Evidata.Modules.Identity.Application.Services;
 using Evidata.Modules.Identity.Contracts;
 using Evidata.Modules.Identity.Domain;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,10 +17,12 @@ namespace Evidata.Modules.Identity.Api;
 public class AdminUsersController : ControllerBase
 {
     private readonly AdminUsersService _service;
+    private readonly IAntiforgery _antiforgery;
 
-    public AdminUsersController(AdminUsersService service)
+    public AdminUsersController(AdminUsersService service, IAntiforgery antiforgery)
     {
         _service = service;
+        _antiforgery = antiforgery;
     }
 
     private IActionResult MapError(IdentityDomainException ex)
@@ -39,6 +42,18 @@ public class AdminUsersController : ControllerBase
 
     private Guid GetTenantId() => Guid.Parse(User.FindFirst("tenant_id")?.Value ?? throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "Tenant not found"));
     private Guid GetActorId() => Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "Actor not found"));
+
+    private async Task ValidateCsrfAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _antiforgery.ValidateRequestAsync(HttpContext);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            throw new IdentityDomainException(IdentityErrorCodes.CsrfValidationFailed, "CSRF validation failed");
+        }
+    }
 
     [HttpPost("users")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
@@ -95,12 +110,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPatch("users/{userId:guid}")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new UpdateUserCommand(tenantId, userId, actorId, request.DisplayName, request.ResponsibleAreaId);
@@ -114,12 +128,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPost("users/{userId:guid}/resend-invitation")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> ResendInvitation(Guid userId, [FromBody] ResendInvitationRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> ResendInvitation(Guid userId, [FromBody] ResendInvitationRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new ResendInvitationCommand(tenantId, userId, actorId);
@@ -133,12 +146,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPost("users/{userId:guid}/revoke-invitation")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> RevokeInvitation(Guid userId, [FromBody] RevokeInvitationRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> RevokeInvitation(Guid userId, [FromBody] RevokeInvitationRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new RevokeInvitationCommand(tenantId, userId, actorId, request.Reason);
@@ -152,12 +164,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPost("users/{userId:guid}/suspend")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> SuspendUser(Guid userId, [FromBody] SuspendUserRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> SuspendUser(Guid userId, [FromBody] SuspendUserRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new SuspendUserCommand(tenantId, userId, actorId, request.Reason);
@@ -171,12 +182,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPost("users/{userId:guid}/reactivate")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> ReactivateUser(Guid userId, [FromBody] ReactivateUserRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> ReactivateUser(Guid userId, [FromBody] ReactivateUserRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new ReactivateUserCommand(tenantId, userId, actorId, request.Reason);
@@ -190,12 +200,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPost("users/{userId:guid}/disable")]
     [Authorize(Policy = "HasPermission:Admin.ManageUsers")]
-    public async Task<IActionResult> DisableUser(Guid userId, [FromBody] DisableUserRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> DisableUser(Guid userId, [FromBody] DisableUserRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new DisableUserCommand(tenantId, userId, actorId, request.Reason);
@@ -209,12 +218,11 @@ public class AdminUsersController : ControllerBase
 
     [HttpPatch("users/{userId:guid}/role")]
     [Authorize(Policy = "HasPermission:Admin.ChangeUserRole")]
-    public async Task<IActionResult> ChangeUserRoles(Guid userId, [FromBody] ChangeUserRolesRequestDto request, [FromHeader(Name = "X-CSRF-Token")] string? csrfToken, CancellationToken ct)
+    public async Task<IActionResult> ChangeUserRoles(Guid userId, [FromBody] ChangeUserRolesRequestDto request, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(csrfToken)) return StatusCode(403, new { errorCode = "CsrfTokenMissing", message = "CSRF token missing" });
-
         try
         {
+            await ValidateCsrfAsync(ct);
             var tenantId = GetTenantId();
             var actorId = GetActorId();
             var cmd = new ChangeUserRolesCommand(tenantId, userId, actorId, request.Roles, request.Reason);

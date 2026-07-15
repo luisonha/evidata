@@ -48,6 +48,9 @@ public static class IdentityModule
 
         // Admin user management service (handles all admin endpoints)
         services.AddScoped<AdminUsersService>();
+        
+        // Role name resolver - default null implementation (will be overridden in API)
+        services.AddScoped<IRoleNameResolver, NullRoleNameResolver>();
 
         // Session service
         services.AddScoped<ISessionService, SessionService>();
