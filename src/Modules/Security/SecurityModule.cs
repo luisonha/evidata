@@ -32,6 +32,7 @@ public static class SecurityModule
         
         // Authorization handlers for fine-grained RBAC policies
         services.AddScoped<IAuthorizationHandler, TenantOwnerOrComplianceAdminHandler>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         services.AddScoped<AssignRoleToUserCommandHandler>();
         services.AddScoped<RemoveRoleFromUserCommandHandler>();
