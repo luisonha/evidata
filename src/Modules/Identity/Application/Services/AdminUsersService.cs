@@ -117,7 +117,10 @@ public class AdminUsersService
     public async Task<RevokeInvitationResponseDto> RevokeInvitationAsync(RevokeInvitationCommand cmd, CancellationToken ct)
     {
         var user = await _userRepository.GetByIdAsync(cmd.UserId, ct);
-        if (user is null || user.TenantId != cmd.TenantId || user.Status != UserStatus.Invited)
+        if (user is null || user.TenantId != cmd.TenantId)
+            throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
+
+        if (user.Status != UserStatus.Invited)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Invalid user state");
 
         // Same rationale as ResendInvitationAsync: look up by email/tenant, not by UserId.
@@ -150,7 +153,10 @@ public class AdminUsersService
     public async Task<SuspendUserResponseDto> SuspendUserAsync(SuspendUserCommand cmd, CancellationToken ct)
     {
         var user = await _userRepository.GetByIdAsync(cmd.UserId, ct);
-        if (user is null || user.TenantId != cmd.TenantId || user.Status != UserStatus.Active)
+        if (user is null || user.TenantId != cmd.TenantId)
+            throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
+        
+        if (user.Status != UserStatus.Active)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot suspend this user");
 
         // Check if user has TenantOwner role. Fail closed (block the mutation) if the role
@@ -174,7 +180,10 @@ public class AdminUsersService
     public async Task<ReactivateUserResponseDto> ReactivateUserAsync(ReactivateUserCommand cmd, CancellationToken ct)
     {
         var user = await _userRepository.GetByIdAsync(cmd.UserId, ct);
-        if (user is null || user.TenantId != cmd.TenantId || (user.Status != UserStatus.Suspended && user.Status != UserStatus.Disabled))
+        if (user is null || user.TenantId != cmd.TenantId)
+            throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
+
+        if (user.Status != UserStatus.Suspended && user.Status != UserStatus.Disabled)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot reactivate this user");
 
         user.Reactivate();
@@ -185,7 +194,10 @@ public class AdminUsersService
     public async Task<DisableUserResponseDto> DisableUserAsync(DisableUserCommand cmd, CancellationToken ct)
     {
         var user = await _userRepository.GetByIdAsync(cmd.UserId, ct);
-        if (user is null || user.TenantId != cmd.TenantId || (user.Status != UserStatus.Active && user.Status != UserStatus.Suspended))
+        if (user is null || user.TenantId != cmd.TenantId)
+            throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
+
+        if (user.Status != UserStatus.Active && user.Status != UserStatus.Suspended)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot disable this user");
 
         // Check if user has TenantOwner role. Fail closed if the role catalog cannot resolve
