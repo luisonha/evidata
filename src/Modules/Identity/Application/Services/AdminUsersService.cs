@@ -98,8 +98,14 @@ public class AdminUsersService
 
     public async Task<ResendInvitationResponseDto> ResendInvitationAsync(ResendInvitationCommand cmd, CancellationToken ct)
     {
-        var inv = await _invitationRepository.GetByUserIdAsync(cmd.UserId, ct);
-        if (inv is null || inv.TenantId != cmd.TenantId || inv.Status != InvitationStatus.Pending)
+        var user = await _userRepository.GetByIdAsync(cmd.UserId, ct);
+        if (user is null || user.TenantId != cmd.TenantId)
+            throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "User not found");
+
+        // Invitation.UserId stays null until the invitee logs in and calls Accept() — so a still-pending
+        // invitation can only be looked up by email/tenant, not by the admin-created UserProfile.Id.
+        var inv = await _invitationRepository.GetByEmailAndTenantAsync(user.Email, cmd.TenantId, ct);
+        if (inv is null || inv.Status != InvitationStatus.Pending)
             throw new IdentityDomainException(IdentityErrorCodes.InvitationRevoked, "No pending invitation");
 
         var newExpiresAt = DateTime.UtcNow.AddDays(7);
@@ -114,7 +120,8 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId || user.Status != UserStatus.Invited)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Invalid user state");
 
-        var inv = await _invitationRepository.GetByUserIdAsync(cmd.UserId, ct);
+        // Same rationale as ResendInvitationAsync: look up by email/tenant, not by UserId.
+        var inv = await _invitationRepository.GetByEmailAndTenantAsync(user.Email, cmd.TenantId, ct);
         if (inv is null) throw new IdentityDomainException(IdentityErrorCodes.UserNotFound, "Invitation not found");
 
         inv.Revoke();
@@ -146,9 +153,13 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId || user.Status != UserStatus.Active)
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot suspend this user");
 
-        // Check if user has TenantOwner role
-        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct);
-        if (tenantOwnerRoleId.HasValue && user.HasRole(tenantOwnerRoleId.Value))
+        // Check if user has TenantOwner role. Fail closed (block the mutation) if the role
+        // catalog cannot resolve "TenantOwner" at all — this indicates a data-integrity problem
+        // and must never be treated as "user is not a TenantOwner" (that would silently disable
+        // the guard).
+        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct)
+            ?? throw new InvalidOperationException("TenantOwner role could not be resolved from the role catalog");
+        if (user.HasRole(tenantOwnerRoleId))
         {
             var count = await _userRepository.CountActiveTenantOwnersAsync(cmd.TenantId, ct);
             if (count <= 1) throw new IdentityDomainException(IdentityErrorCodes.LastTenantOwnerBlocked, "Cannot suspend last TenantOwner");
@@ -177,9 +188,11 @@ public class AdminUsersService
         if (user is null || user.TenantId != cmd.TenantId || (user.Status != UserStatus.Active && user.Status != UserStatus.Suspended))
             throw new IdentityDomainException(IdentityErrorCodes.InvalidStateTransition, "Cannot disable this user");
 
-        // Check if user has TenantOwner role
-        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct);
-        if (tenantOwnerRoleId.HasValue && user.HasRole(tenantOwnerRoleId.Value))
+        // Check if user has TenantOwner role. Fail closed if the role catalog cannot resolve
+        // "TenantOwner" — never silently disable the guard.
+        var tenantOwnerRoleId = await _roleNameResolver.GetRoleIdByNameAsync("TenantOwner", ct)
+            ?? throw new InvalidOperationException("TenantOwner role could not be resolved from the role catalog");
+        if (user.HasRole(tenantOwnerRoleId))
         {
             var count = await _userRepository.CountActiveTenantOwnersAsync(cmd.TenantId, ct);
             if (count <= 1) throw new IdentityDomainException(IdentityErrorCodes.LastTenantOwnerBlocked, "Cannot disable last TenantOwner");

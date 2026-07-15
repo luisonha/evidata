@@ -58,31 +58,24 @@ public class RoleNameResolver : IRoleNameResolver
             return cachedName;
         }
 
-        try
-        {
-            var roleType = GetRoleType();
-            var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
-            var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
+        var roleType = GetRoleType();
+        var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
+        var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
 
-            var dbSet = GetDbSet(roleType);
-            var roles = await dbSet.Cast<object>().ToListAsync(ct);
+        var dbSet = GetDbSet(roleType);
+        var roles = await dbSet.Cast<object>().ToListAsync(ct);
 
-            var role = roles.FirstOrDefault(r => (Guid)idProperty.GetValue(r)! == roleId);
-            if (role is null)
-                return null;
-
-            var name = (string?)nameProperty.GetValue(role);
-            if (name is not null)
-            {
-                _cache.Set(cacheKey, name, TimeSpan.FromHours(1));
-            }
-
-            return name;
-        }
-        catch
-        {
+        var role = roles.FirstOrDefault(r => (Guid)idProperty.GetValue(r)! == roleId);
+        if (role is null)
             return null;
+
+        var name = (string?)nameProperty.GetValue(role);
+        if (name is not null)
+        {
+            _cache.Set(cacheKey, name, TimeSpan.FromHours(1));
         }
+
+        return name;
     }
 
     public async Task<Guid?> GetRoleIdByNameAsync(string roleName, CancellationToken ct = default)
@@ -93,31 +86,24 @@ public class RoleNameResolver : IRoleNameResolver
             return cachedId;
         }
 
-        try
-        {
-            var roleType = GetRoleType();
-            var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
-            var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
+        var roleType = GetRoleType();
+        var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
+        var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
 
-            var dbSet = GetDbSet(roleType);
-            var roles = await dbSet.Cast<object>().ToListAsync(ct);
+        var dbSet = GetDbSet(roleType);
+        var roles = await dbSet.Cast<object>().ToListAsync(ct);
 
-            var role = roles.FirstOrDefault(r => (string?)nameProperty.GetValue(r) == roleName);
-            if (role is null)
-                return null;
-
-            var id = (Guid?)idProperty.GetValue(role);
-            if (id.HasValue)
-            {
-                _cache.Set(cacheKey, id, TimeSpan.FromHours(1));
-            }
-
-            return id;
-        }
-        catch
-        {
+        var role = roles.FirstOrDefault(r => (string?)nameProperty.GetValue(r) == roleName);
+        if (role is null)
             return null;
+
+        var id = (Guid?)idProperty.GetValue(role);
+        if (id.HasValue)
+        {
+            _cache.Set(cacheKey, id, TimeSpan.FromHours(1));
         }
+
+        return id;
     }
 
     public async Task<IReadOnlyList<string>> GetRoleNamesAsync(IEnumerable<Guid> roleIds, CancellationToken ct = default)
@@ -126,34 +112,27 @@ public class RoleNameResolver : IRoleNameResolver
         if (!ids.Any())
             return [];
 
-        try
+        var roleType = GetRoleType();
+        var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
+        var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
+
+        var dbSet = GetDbSet(roleType);
+        var roles = await dbSet.Cast<object>().ToListAsync(ct);
+
+        var nameMap = new Dictionary<Guid, string>();
+        foreach (var role in roles)
         {
-            var roleType = GetRoleType();
-            var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
-            var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
-
-            var dbSet = GetDbSet(roleType);
-            var roles = await dbSet.Cast<object>().ToListAsync(ct);
-
-            var nameMap = new Dictionary<Guid, string>();
-            foreach (var role in roles)
+            var id = (Guid)idProperty.GetValue(role)!;
+            if (ids.Contains(id))
             {
-                var id = (Guid)idProperty.GetValue(role)!;
-                if (ids.Contains(id))
-                {
-                    var name = (string)nameProperty.GetValue(role)!;
-                    nameMap[id] = name;
-                }
+                var name = (string)nameProperty.GetValue(role)!;
+                nameMap[id] = name;
             }
+        }
 
-            return ids.Select(id => nameMap.TryGetValue(id, out var name) ? name : "Unknown")
-                .ToList()
-                .AsReadOnly();
-        }
-        catch
-        {
-            return ids.Select(_ => "Unknown").ToList().AsReadOnly();
-        }
+        return ids.Select(id => nameMap.TryGetValue(id, out var name) ? name : "Unknown")
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<IReadOnlyList<Guid>> GetRoleIdsByNamesAsync(IEnumerable<string> roleNames, CancellationToken ct = default)
@@ -162,36 +141,29 @@ public class RoleNameResolver : IRoleNameResolver
         if (!names.Any())
             return [];
 
-        try
+        var roleType = GetRoleType();
+        var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
+        var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
+
+        var dbSet = GetDbSet(roleType);
+        var roles = await dbSet.Cast<object>().ToListAsync(ct);
+
+        var idMap = new Dictionary<string, Guid>();
+        foreach (var role in roles)
         {
-            var roleType = GetRoleType();
-            var idProperty = roleType.GetProperty("Id") ?? throw new InvalidOperationException("Role entity has no Id property");
-            var nameProperty = roleType.GetProperty("Name") ?? throw new InvalidOperationException("Role entity has no Name property");
-
-            var dbSet = GetDbSet(roleType);
-            var roles = await dbSet.Cast<object>().ToListAsync(ct);
-
-            var idMap = new Dictionary<string, Guid>();
-            foreach (var role in roles)
+            var name = (string)nameProperty.GetValue(role)!;
+            if (names.Contains(name))
             {
-                var name = (string)nameProperty.GetValue(role)!;
-                if (names.Contains(name))
-                {
-                    var id = (Guid)idProperty.GetValue(role)!;
-                    idMap[name] = id;
-                }
+                var id = (Guid)idProperty.GetValue(role)!;
+                idMap[name] = id;
             }
+        }
 
-            return names
-                .Where(name => idMap.ContainsKey(name))
-                .Select(name => idMap[name])
-                .ToList()
-                .AsReadOnly();
-        }
-        catch
-        {
-            return [];
-        }
+        return names
+            .Where(name => idMap.ContainsKey(name))
+            .Select(name => idMap[name])
+            .ToList()
+            .AsReadOnly();
     }
 }
 
