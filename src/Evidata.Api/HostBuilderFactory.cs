@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using System.Text;
@@ -156,6 +157,11 @@ public static class HostBuilderFactory
             options.AddPolicy("TenantOwnerOrComplianceAdmin", policy =>
                 policy.AddRequirements(new TenantOwnerOrComplianceAdminRequirement()));
         });
+
+        // Register the custom IAuthorizationPolicyProvider for dynamic permission-based policies
+        // This enables policies like [Authorize(Policy = "HasPermission:Admin.ReadUsers")]
+        // to be dynamically constructed from permission codes stored in the database
+        builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 
         // Add services to the container.
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

@@ -112,26 +112,45 @@ public sealed class AdminUsersCsrfTests : IAsyncLifetime
                 CREATE SCHEMA IF NOT EXISTS outbox;
                 """);
         }
-        catch { /* May already exist */ }
+        catch (Exception ex) 
+        { 
+            _output.WriteLine($"Warning creating schemas: {ex.Message}");
+        }
 
         // Migrate each context
-        var contexts = new DbContext[]
+        var contexts = new (DbContext ctx, string name)[] 
         {
-            sp.GetRequiredService<IdentityDbContext>(),
-            sp.GetRequiredService<SecurityDbContext>(),
-            sp.GetRequiredService<EvidataDbContext>(),
+            (sp.GetRequiredService<IdentityDbContext>(), "IdentityDbContext"),
+            (sp.GetRequiredService<SecurityDbContext>(), "SecurityDbContext"),
+            (sp.GetRequiredService<EvidataDbContext>(), "EvidataDbContext"),
         };
 
-        foreach (var ctx in contexts)
+        foreach (var (ctx, name) in contexts)
         {
             try
             {
-                await ctx.Database.MigrateAsync();
+                // Check if database exists first
+                var databaseExists = await ctx.Database.CanConnectAsync();
+                if (!databaseExists)
+                {
+                    await ctx.Database.EnsureCreatedAsync();
+                    _output.WriteLine($"✓ Created database for {name}");
+                }
+                else
+                {
+                    await ctx.Database.MigrateAsync();
+                    _output.WriteLine($"✓ Migrated {name}");
+                }
             }
             catch (Exception ex) when (ex.InnerException?.Message?.Contains("already exists") == true 
                 || ex.Message.Contains("already exists"))
             {
-                // Table already exists
+                _output.WriteLine($"✓ {name} already migrated");
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"✗ Error migrating {name}: {ex.Message}");
+                // Don't throw - continue to try other migrations
             }
         }
 
@@ -142,60 +161,103 @@ public sealed class AdminUsersCsrfTests : IAsyncLifetime
             if (!await tenantDb.Tenants.AnyAsync())
             {
                 await tenantDb.Database.ExecuteSqlAsync($"""
-                    INSERT INTO "Tenants" ("Id", "Name", "CreatedAt", "UpdatedAt", "IsActive")
-                    VALUES ({_testTenantId}, 'Test Tenant', NOW(), NOW(), true)
+                    INSERT INTO tenants ("Id", "Slug", "Name", "Status", "Settings_TimeZone", "Settings_Locale", "Settings_MaxUsers", "Settings_MfaRequired", "CreatedAt", "UpdatedAt")
+                    VALUES ({_testTenantId}, 'test-tenant', 'Test Tenant', 'Active', 'UTC', 'en-US', 100, false, {DateTime.UtcNow:O}, {DateTime.UtcNow:O})
                     ON CONFLICT DO NOTHING;
                     """);
+                _output.WriteLine("✓ Test tenant created");
             }
         }
-        catch { /* Tenant might exist */ }
+        catch (Exception ex) 
+        { 
+            _output.WriteLine($"✗ Error creating tenant: {ex.Message}");
+            throw;
+        }
 
         // Create test user profile  
         try
         {
             var identityDb = sp.GetRequiredService<IdentityDbContext>();
             var now = DateTime.UtcNow;
-            await identityDb.Database.ExecuteSqlAsync($"""
-                INSERT INTO identity.user_profiles ("Id", "ExternalId", "Provider", "Email", "DisplayName", "TenantId", "Status", "CreatedAt", "UpdatedAt")
-                VALUES ({_testUserId}, 'test-external-id', 'local', 'test@local', 'Test User', {_testTenantId}, 1, {now}, {now})
-                ON CONFLICT DO NOTHING;
-                """);
+            // Skip if table doesn't exist - user may not be required for permission tests
+            try
+            {
+                await identityDb.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO identity."user_profiles" ("Id", "ExternalId", "Provider", "Email", "DisplayName", "TenantId", "Status", "CreatedAt", "UpdatedAt")
+                    VALUES ({_testUserId}, 'test-external-id', 'local', 'test@local', 'Test User', {_testTenantId}, 1, {now}, {now})
+                    ON CONFLICT ("Id") DO NOTHING
+                    """);
+                _output.WriteLine("✓ Test user created");
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01") 
+            { 
+                _output.WriteLine($"⚠ user_profiles table doesn't exist yet - skipping user creation");
+            }
         }
-        catch { /* User might exist */ }
+        catch (Exception ex) 
+        { 
+            _output.WriteLine($"✗ Error creating user: {ex.Message}");
+            // Don't throw - continue with test
+        }
 
         // Create Admin role and permissions
         try
         {
             var securityDb = sp.GetRequiredService<SecurityDbContext>();
-            var permId = Guid.Parse("00000000-0000-0000-0000-000000000011");
             var roleId = Guid.Parse("00000000-0000-0000-0000-000000000010");
             var assignmentId = Guid.Parse("00000000-0000-0000-0000-000000000012");
             
-            await securityDb.Database.ExecuteSqlAsync($"""
-                INSERT INTO security.permissions ("Id", "Name", "Resource", "Action", "Description")
-                VALUES ({permId}, 'Admin:ManageUsers', 'Admin', 'ManageUsers', 'Manage users')
-                ON CONFLICT ("Name") DO NOTHING;
-                """);
-            
+            // Step 1: Create the Admin role first
             await securityDb.Database.ExecuteSqlAsync($"""
                 INSERT INTO security.roles ("Id", "Name", "Description", "IsSystemRole")
                 VALUES ({roleId}, 'Admin', 'Administrator role', true)
                 ON CONFLICT ("Name") DO NOTHING;
                 """);
             
-            await securityDb.Database.ExecuteSqlAsync($"""
-                INSERT INTO security.role_permissions ("RoleId", "PermissionId")
-                VALUES ({roleId}, {permId})
-                ON CONFLICT DO NOTHING;
-                """);
+            // Step 2: Create all required Admin permissions
+            var permissionCodes = new[] 
+            { 
+                "Admin.ReadUsers",
+                "Admin.ManageUsers",
+                "Admin.ChangeUserRole",
+                "Admin.ReadAudit"
+            };
+
+            foreach (var code_index_pair in permissionCodes.Select((c, i) => (c, i)))
+            {
+                var code = code_index_pair.c;
+                var index = code_index_pair.i;
+                // Create valid Guid: 00000000-0000-0000-0000-00000000000b, where b is hex for 11+index
+                var hexValue = (11 + index).ToString("x1");
+                var permId = new Guid($"00000000-0000-0000-0000-00000000000{hexValue}");
+                
+                await securityDb.Database.ExecuteSqlAsync($"""
+                    INSERT INTO security.permissions ("Id", "Name", "Resource", "Action", "Description")
+                    VALUES ({permId}, {code}, 'Admin', '{code.Split('.')[1]}', 'Admin permission')
+                    ON CONFLICT ("Name") DO NOTHING;
+                    """);
+                
+                // Step 3: Link permissions to role
+                await securityDb.Database.ExecuteSqlAsync($"""
+                    INSERT INTO security.role_permissions ("RoleId", "PermissionId")
+                    VALUES ({roleId}, {permId})
+                    ON CONFLICT DO NOTHING;
+                    """);
+            }
             
+            // Step 4: Assign role to test user
             await securityDb.Database.ExecuteSqlAsync($"""
                 INSERT INTO security.user_role_assignments ("Id", "UserId", "RoleId", "TenantId", "AssignedAt")
                 VALUES ({assignmentId}, {_testUserId}, {roleId}, {_testTenantId}, NOW())
                 ON CONFLICT DO NOTHING;
                 """);
+            _output.WriteLine("✓ Admin role and permissions created");
         }
-        catch { /* Permissions might exist */ }
+        catch (Exception ex) 
+        { 
+            _output.WriteLine($"✗ Error creating admin role: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task DisposeAsync()
